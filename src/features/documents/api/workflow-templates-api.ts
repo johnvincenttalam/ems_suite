@@ -1,16 +1,81 @@
-import type { WorkflowTemplate } from '../types'
+import type { DocumentCategory, WorkflowTemplate } from '../types'
 import { mockWorkflowTemplates } from '../data/mock-workflow-templates'
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 200 + 100))
 
+interface CreateTemplateInput {
+  name: string
+  description?: string
+  category?: DocumentCategory
+  approverIds: string[]
+}
+
+type UpdateTemplateInput = Partial<CreateTemplateInput>
+
+function nextTemplateId(): string {
+  const max = mockWorkflowTemplates.reduce((m, t) => {
+    const n = Number(t.id.replace(/^WFT-/, ''))
+    return Number.isFinite(n) && n > m ? n : m
+  }, 0)
+  return `WFT-${String(max + 1).padStart(3, '0')}`
+}
+
+function findOrThrow(id: string): WorkflowTemplate {
+  const t = mockWorkflowTemplates.find((x) => x.id === id)
+  if (!t) throw new Error(`Workflow template ${id} not found`)
+  return t
+}
+
 /**
  * Workflow templates API. Swap with real HTTP when backend is ready:
- *   list: () => http.get<WorkflowTemplate[]>('/workflow-templates')
+ *   list:   () => http.get<WorkflowTemplate[]>('/workflow-templates')
+ *   create: (input) => http.post<WorkflowTemplate>('/workflow-templates', input)
+ *   update: (id, input) => http.patch<WorkflowTemplate>(`/workflow-templates/${id}`, input)
+ *   delete: (id) => http.delete(`/workflow-templates/${id}`)
  */
 export const workflowTemplatesApi = {
   list: async (): Promise<WorkflowTemplate[]> => {
     await delay()
     return [...mockWorkflowTemplates]
+  },
+
+  create: async (input: CreateTemplateInput): Promise<WorkflowTemplate> => {
+    await delay(120)
+    if (input.approverIds.length === 0) throw new Error('At least one approver is required')
+    if (!input.name.trim()) throw new Error('Name is required')
+    const t: WorkflowTemplate = {
+      id: nextTemplateId(),
+      name: input.name.trim(),
+      description: input.description?.trim() || undefined,
+      category: input.category,
+      approverIds: [...input.approverIds],
+    }
+    mockWorkflowTemplates.push(t)
+    return t
+  },
+
+  update: async (id: string, patch: UpdateTemplateInput): Promise<WorkflowTemplate> => {
+    await delay(120)
+    const t = findOrThrow(id)
+    if (patch.approverIds !== undefined && patch.approverIds.length === 0) {
+      throw new Error('At least one approver is required')
+    }
+    if (patch.name !== undefined) {
+      const trimmed = patch.name.trim()
+      if (!trimmed) throw new Error('Name is required')
+      t.name = trimmed
+    }
+    if (patch.description !== undefined) t.description = patch.description.trim() || undefined
+    if (patch.category !== undefined) t.category = patch.category
+    if (patch.approverIds !== undefined) t.approverIds = [...patch.approverIds]
+    return t
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await delay(100)
+    const idx = mockWorkflowTemplates.findIndex((x) => x.id === id)
+    if (idx < 0) throw new Error(`Workflow template ${id} not found`)
+    mockWorkflowTemplates.splice(idx, 1)
   },
 }

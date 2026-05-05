@@ -2,10 +2,15 @@
 
 A modular operations platform for managing **assets, inventory, procurement, maintenance, fleet, tracking, documents, checklists, and quality reports** in one place. Built on top of a feature-first React admin scaffold.
 
-> **Three docs, three audiences:**
+> **Documentation map:**
 > - **`README.md`** (this file) — what the system is, how to run it, where things live.
-> - **[`EMS.md`](./EMS.md)** — the original product spec (entities, workflows, UI/UX standards).
 > - **[`CLAUDE.md`](./CLAUDE.md)** — codebase conventions for AI assistants and contributors.
+> - **[`docs/`](./docs)** — product specs and end-user guides:
+>   - [`docs/ems.md`](./docs/ems.md) — original EMS product spec
+>   - [`docs/ems-specification.md`](./docs/ems-specification.md) — full EMS technical/functional specification
+>   - [`docs/sdms-spec.md`](./docs/sdms-spec.md) — SDMS module spec
+>   - [`docs/sdms-user-guide.md`](./docs/sdms-user-guide.md) — SDMS end-user manual
+>   - [`docs/dark-mode-notes.md`](./docs/dark-mode-notes.md) — dark mode patterns & gotchas
 
 ---
 

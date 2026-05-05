@@ -98,8 +98,8 @@ export function Topbar({ module, sidebarCollapsed, onToggleMobileSidebar, onSear
           {theme === 'light' ? <Moon className="w-[18px] h-[18px]" /> : <Sun className="w-[18px] h-[18px]" />}
         </button>
 
-        {/* Dev-only user switcher */}
-        {import.meta.env.DEV && <UserSwitcher />}
+        {/* TODO: gate or remove when real auth replaces mockAuthAdapter — see features/auth/adapters/index.ts */}
+        <UserSwitcher />
 
         {/* Notifications */}
         <NotificationCenter moduleKey={module.key} />

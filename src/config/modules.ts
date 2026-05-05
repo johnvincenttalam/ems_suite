@@ -24,6 +24,7 @@ import {
   Fuel,
   ClipboardCheck,
   Bell,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureKey } from './features'
@@ -116,6 +117,7 @@ export const modules: EmsModule[] = [
         title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
+          { label: 'Workflow Templates', path: 'workflow-templates', icon: Workflow, feature: 'sdmsWorkflowTemplates' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
         ],
       },

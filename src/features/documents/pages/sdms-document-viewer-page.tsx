@@ -716,23 +716,24 @@ function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onS
           ))}
         </ul>
       )}
-      <div className="flex gap-2">
+      <div className="space-y-2">
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder={disabled ? 'Comments locked — you are not the current approver.' : 'Add a comment…'}
-          rows={2}
+          rows={3}
           disabled={disabled}
-          className="flex-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-[13px] text-zinc-900 placeholder:text-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-400 disabled:opacity-60"
+          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-[13px] text-zinc-900 placeholder:text-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-400 disabled:opacity-60"
         />
         <button
           type="button"
           onClick={onSubmit}
           disabled={disabled || !comment.trim()}
-          title="Send comment with approval"
-          className="w-10 self-stretch rounded-lg bg-accent text-accent-fg flex items-center justify-center hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title="Approve the document with this comment attached"
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-fg text-[13px] font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Send className="w-4 h-4" />
+          Sign &amp; Send
         </button>
       </div>
       {error && <p className="text-[11.5px] text-red-600">{error}</p>}

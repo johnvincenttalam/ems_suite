@@ -47,8 +47,8 @@ export function UserSwitcher() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label="Switch user (dev)"
-        title="Switch user (dev)"
+        aria-label="Switch user"
+        title="Switch user"
         className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
       >
         <Repeat2 className="w-[18px] h-[18px]" />
@@ -56,7 +56,7 @@ export function UserSwitcher() {
       {open && (
         <div className="absolute right-0 top-full mt-1.5 w-80 bg-white rounded-xl border border-zinc-200/60 py-2 z-50 max-h-[70vh] overflow-y-auto">
           <div className="px-3 py-2 border-b border-zinc-100">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">Switch User · Dev</p>
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-medium">Switch User</p>
             <p className="text-[11px] text-zinc-400 mt-0.5">Mock auth — no password needed.</p>
           </div>
           <div className="py-1">
