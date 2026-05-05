@@ -1,0 +1,5 @@
+export { WarehousesPage } from './pages/warehouses-page'
+export { useWarehouses } from './hooks/use-warehouses'
+export { warehousesApi } from './api/warehouses-api'
+export { mockWarehouses } from './data/mock-warehouses'
+export type { Warehouse, WarehouseType } from './types'

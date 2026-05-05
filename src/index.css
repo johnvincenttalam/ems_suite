@@ -1,0 +1,279 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary-50: #fafafa;
+  --color-primary-100: #f4f4f5;
+  --color-primary-200: #e4e4e7;
+  --color-primary-300: #d4d4d8;
+  --color-primary-400: #a1a1aa;
+  --color-primary-500: #18181b;
+  --color-primary-600: #09090b;
+  --color-primary-700: #000000;
+  --color-primary-800: #000000;
+  --color-primary-900: #000000;
+  --color-primary-950: #000000;
+
+  --color-accent: var(--accent-500, #18181b);
+  --color-accent-hover: var(--accent-600, #27272a);
+  --color-accent-fg: var(--accent-fg, #ffffff);
+  --color-accent-light: #eef2ff;
+
+  --color-surface: #fafafa;
+  --color-surface-card: #ffffff;
+  --color-surface-hover: #f4f4f5;
+
+  --color-success-50: #f7fdf9;
+  --color-success-500: #16a34a;
+  --color-success-600: #15803d;
+  --color-success-700: #166534;
+
+  --color-danger-50: #fef7f7;
+  --color-danger-500: #dc2626;
+  --color-danger-600: #b91c1c;
+  --color-danger-700: #991b1b;
+
+  --color-warning-50: #fefcf3;
+  --color-warning-500: #d97706;
+  --color-warning-600: #b45309;
+  --color-warning-700: #92400e;
+
+  --color-sidebar: #09090b;
+  --color-sidebar-hover: #18181b;
+  --color-sidebar-active: #27272a;
+  --color-sidebar-text: #a1a1aa;
+  --color-sidebar-text-active: #ffffff;
+}
+
+@layer base {
+  /* Accent presets — applied as classes on <html> by theme-store */
+  .accent-zinc    { --accent-500: #18181b; --accent-600: #27272a; --accent-fg: #ffffff; }
+  .accent-indigo  { --accent-500: #6366f1; --accent-600: #4f46e5; --accent-fg: #ffffff; }
+  .accent-emerald { --accent-500: #10b981; --accent-600: #059669; --accent-fg: #ffffff; }
+  .accent-rose    { --accent-500: #f43f5e; --accent-600: #e11d48; --accent-fg: #ffffff; }
+
+  /* Dark-mode overrides — accent stays readable on dark backgrounds */
+  .dark.accent-zinc    { --accent-500: #fafafa; --accent-600: #e4e4e7; --accent-fg: #09090b; }
+  .dark.accent-indigo  { --accent-500: #818cf8; --accent-600: #6366f1; --accent-fg: #ffffff; }
+  .dark.accent-emerald { --accent-500: #34d399; --accent-600: #10b981; --accent-fg: #ffffff; }
+  .dark.accent-rose    { --accent-500: #fb7185; --accent-600: #f43f5e; --accent-fg: #ffffff; }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-surface);
+    color: #18181b;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark mode */
+  .dark body,
+  .dark {
+    background-color: #09090b;
+    color: #e4e4e7;
+    /* Tells the browser to render native form controls (date picker icon,
+       autofill chrome, file input) using its dark variant. Without this the
+       calendar glyph in <input type="date"> renders dark-on-dark. */
+    color-scheme: dark;
+  }
+
+  .dark .bg-white { background-color: #18181b !important; }
+  .dark .bg-surface { background-color: #09090b !important; }
+  .dark .bg-zinc-50 { background-color: #1a1a1e !important; }
+  .dark .bg-zinc-50\/50 { background-color: rgba(26, 26, 30, 0.5) !important; }
+  .dark .bg-zinc-100 { background-color: #27272a !important; }
+
+  /* Tinted icon backgrounds in dark mode */
+  .dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.12) !important; }
+  .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+  .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
+  .dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12) !important; }
+  .dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.12) !important; }
+  .dark .bg-indigo-50 { background-color: rgba(99, 102, 241, 0.12) !important; }
+  .dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.12) !important; }
+  .dark .bg-cyan-50 { background-color: rgba(6, 182, 212, 0.12) !important; }
+  .dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.12) !important; }
+
+  .dark .text-zinc-900 { color: #fafafa !important; }
+  .dark .text-zinc-800 { color: #e4e4e7 !important; }
+  .dark .text-zinc-700 { color: #d4d4d8 !important; }
+  .dark .text-zinc-600 { color: #a1a1aa !important; }
+  .dark .text-zinc-500 { color: #a1a1aa !important; }
+  .dark .text-zinc-400 { color: #71717a !important; }
+
+  .dark .border-zinc-200\/60 { border-color: rgba(63, 63, 70, 0.6) !important; }
+  .dark .border-zinc-200 { border-color: #3f3f46 !important; }
+  .dark .border-zinc-100 { border-color: #27272a !important; }
+  .dark .border-zinc-100\/60 { border-color: rgba(39, 39, 42, 0.6) !important; }
+
+  .dark input, .dark select, .dark textarea {
+    background-color: #18181b !important;
+    border-color: #3f3f46 !important;
+    color: #e4e4e7 !important;
+  }
+  .dark input::placeholder, .dark textarea::placeholder {
+    color: #52525b !important;
+  }
+  .dark input:focus, .dark select:focus, .dark textarea:focus {
+    border-color: #52525b !important;
+  }
+
+  .dark .bg-sidebar { background-color: #09090b !important; }
+
+  /* Dropdowns and panels in dark mode */
+  .dark .border-zinc-50 { border-color: #27272a !important; }
+  .dark .bg-zinc-50\/30 { background-color: rgba(39, 39, 42, 0.3) !important; }
+
+  /* Buttons in dark mode — invert primary */
+  .dark button.bg-zinc-900,
+  .dark a.bg-zinc-900,
+  .dark [type="submit"].bg-zinc-900 {
+    background-color: #fafafa !important;
+    color: #09090b !important;
+  }
+  .dark button.bg-zinc-900:hover,
+  .dark a.bg-zinc-900:hover,
+  .dark [type="submit"].bg-zinc-900:hover {
+    background-color: #d4d4d8 !important;
+  }
+  .dark button.bg-zinc-100,
+  .dark a.bg-zinc-100 {
+    background-color: #27272a !important;
+    color: #d4d4d8 !important;
+  }
+  .dark button.bg-zinc-100:hover,
+  .dark a.bg-zinc-100:hover {
+    background-color: #3f3f46 !important;
+  }
+  .dark button.border.border-zinc-200,
+  .dark a.border.border-zinc-200 {
+    border-color: #3f3f46 !important;
+    color: #d4d4d8 !important;
+  }
+  .dark button.border.border-zinc-200:hover {
+    background-color: #27272a !important;
+  }
+
+  .dark .bg-zinc-50\/80 { background-color: rgba(26, 26, 30, 0.8) !important; }
+
+  /* Hover states in dark mode */
+  .dark .hover\:bg-zinc-50:hover { background-color: #1f1f23 !important; }
+  .dark .hover\:bg-zinc-50\/50:hover { background-color: rgba(31, 31, 35, 0.5) !important; }
+  .dark .hover\:bg-zinc-100:hover { background-color: #27272a !important; }
+
+  /* Status badge tints in dark mode */
+  .dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.10) !important; }
+  .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.10) !important; }
+  .dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.10) !important; }
+  .dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.10) !important; }
+
+  /* Alpha-variant tints — used in expand-row detail panels and metric tiles.
+     Tailwind generates these as standalone classes; the dark overrides above
+     don't catch them, so they need explicit rules. */
+  .dark .bg-zinc-50\/40 { background-color: rgba(39, 39, 42, 0.4) !important; }
+  .dark .bg-zinc-50\/60 { background-color: rgba(39, 39, 42, 0.6) !important; }
+  .dark .hover\:bg-zinc-50\/60:hover { background-color: rgba(39, 39, 42, 0.6) !important; }
+  .dark .bg-zinc-200\/60 { background-color: rgba(63, 63, 70, 0.6) !important; }
+  .dark .bg-emerald-50\/40, .dark .bg-emerald-50\/60 { background-color: rgba(16, 185, 129, 0.10) !important; }
+  .dark .bg-amber-50\/40, .dark .bg-amber-50\/60 { background-color: rgba(245, 158, 11, 0.10) !important; }
+  .dark .bg-red-50\/40, .dark .bg-red-50\/60 { background-color: rgba(239, 68, 68, 0.10) !important; }
+  .dark .bg-blue-50\/40, .dark .bg-blue-50\/60 { background-color: rgba(59, 130, 246, 0.10) !important; }
+  .dark .bg-violet-50\/40, .dark .bg-violet-50\/60 { background-color: rgba(139, 92, 246, 0.10) !important; }
+
+  /* Light-100 borders on tinted tiles */
+  .dark .border-emerald-100 { border-color: rgba(16, 185, 129, 0.20) !important; }
+  .dark .border-amber-100 { border-color: rgba(245, 158, 11, 0.20) !important; }
+  .dark .border-blue-100 { border-color: rgba(59, 130, 246, 0.20) !important; }
+
+  /* Tabs active count badge — span.bg-zinc-900 isn't covered by the
+     button-only rule below; in dark mode the literal black blends into the
+     surface, so invert it to white pill with dark text. */
+  .dark span.bg-zinc-900 {
+    background-color: #fafafa !important;
+    color: #09090b !important;
+  }
+
+  /* Status badge borders in dark mode */
+  .dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.25) !important; }
+  .dark .border-red-200 { border-color: rgba(239, 68, 68, 0.25) !important; }
+  .dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.25) !important; }
+  .dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.25) !important; }
+  .dark .border-violet-200 { border-color: rgba(139, 92, 246, 0.25) !important; }
+  .dark .border-zinc-200 { border-color: #3f3f46 !important; }
+
+  /* Status badge text in dark mode - keep readable */
+  .dark .text-emerald-700 { color: #6ee7b7 !important; }
+  .dark .text-red-700 { color: #fca5a5 !important; }
+  .dark .text-amber-700 { color: #fcd34d !important; }
+  .dark .text-blue-700 { color: #93c5fd !important; }
+  .dark .text-violet-700 { color: #c4b5fd !important; }
+  .dark .text-red-500 { color: #f87171 !important; }
+  .dark .text-emerald-600 { color: #34d399 !important; }
+  .dark .text-blue-600 { color: #60a5fa !important; }
+  .dark .text-amber-500 { color: #fbbf24 !important; }
+  .dark .text-violet-500 { color: #a78bfa !important; }
+  .dark .text-indigo-500 { color: #818cf8 !important; }
+  .dark .text-orange-500 { color: #fb923c !important; }
+  .dark .text-cyan-600 { color: #22d3ee !important; }
+
+  /* Topbar / dropdown in dark mode */
+  .dark .bg-white.border-b { background-color: #09090b !important; }
+  .dark .border-b.border-zinc-100 { border-color: #27272a !important; }
+
+  /* Row actions dropdown in dark mode */
+  .dark .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, 0.10) !important; }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #e4e4e7;
+    border-radius: 3px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px white inset !important;
+    -webkit-text-fill-color: #18181b !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #18181b inset !important;
+    -webkit-text-fill-color: #e4e4e7 !important;
+  }
+
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 36px;
+  }
+
+  /* Logo inversion for dark mode — preserves brand hues, flips luminance.
+     Black labels become white; colored marks (blue/green/red/gold) stay correct.
+     White interiors of sub-logos invert to black (acceptable trade for legibility). */
+  .dark .logo-invert {
+    filter: invert(1) hue-rotate(180deg);
+  }
+}

@@ -1,0 +1,398 @@
+import {
+  LayoutDashboard,
+  FolderOpen,
+  Boxes,
+  Package,
+  Truck,
+  ShoppingCart,
+  Wrench,
+  ListChecks,
+  Shield,
+  Users,
+  KeyRound,
+  Building2,
+  Warehouse,
+  Tag,
+  Ruler,
+  ClipboardList,
+  Settings,
+  Activity,
+  Calendar,
+  ArrowLeftRight,
+  UserCheck,
+  Route as RouteIcon,
+  Fuel,
+  GitBranch,
+  Archive,
+  Inbox,
+  ClipboardCheck,
+  Bell,
+  type LucideIcon,
+} from 'lucide-react'
+import type { FeatureKey } from './features'
+
+export type ModuleKey =
+  | 'mis'
+  | 'sdms'
+  | 'inventory'
+  | 'assets'
+  | 'fleet'
+  | 'procurement'
+  | 'maintenance'
+  | 'admin'
+
+export interface ModuleNavItem {
+  label: string
+  /** Module-relative path. Empty string for the module index. */
+  path: string
+  icon: LucideIcon
+  feature: FeatureKey
+}
+
+export interface ModuleNavGroup {
+  title?: string
+  items: ModuleNavItem[]
+}
+
+export interface EmsModule {
+  key: ModuleKey
+  name: string
+  shortName: string
+  description: string
+  icon: LucideIcon
+  /** Tailwind class for the selector card icon color (e.g. `text-blue-600`). */
+  iconColor: string
+  /** Module-relative landing path. Empty string for the index route. */
+  defaultPath: string
+  nav: ModuleNavGroup[]
+}
+
+export const modules: EmsModule[] = [
+  {
+    key: 'mis',
+    name: 'Management Information System',
+    shortName: 'MIS',
+    description: 'Executive dashboards, KPIs, and cross-module visibility.',
+    icon: LayoutDashboard,
+    iconColor: 'text-blue-600',
+    defaultPath: '',
+    nav: [
+      {
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'dashboard' },
+          { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sdms',
+    name: 'Smart Document Management System',
+    shortName: 'SDMS',
+    description: 'Document lifecycle, signatures, version control, and audit trails.',
+    icon: FolderOpen,
+    iconColor: 'text-violet-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'sdmsDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'sdmsAlerts' },
+        ],
+      },
+      {
+        title: 'Documents',
+        items: [
+          { label: 'Inbox', path: 'inbox', icon: Inbox, feature: 'documentsInbox' },
+          { label: 'All Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
+          { label: 'Workflow', path: 'workflow', icon: GitBranch, feature: 'documentsWorkflow' },
+          { label: 'Archive', path: 'archive', icon: Archive, feature: 'documentsArchive' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Calendar', path: 'calendar', icon: Calendar, feature: 'documentsCalendar' },
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'documentsReports' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'sdmsLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'inventory',
+    name: 'Inventory Management System',
+    shortName: 'Inventory',
+    description: 'Item registry, stock movements, transfers, and cycle counting.',
+    icon: Boxes,
+    iconColor: 'text-emerald-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'inventoryDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'inventoryAlerts' },
+        ],
+      },
+      {
+        title: 'Operations',
+        items: [
+          { label: 'Items', path: 'items', icon: Boxes, feature: 'inventory' },
+          { label: 'Movements', path: 'movements', icon: ArrowLeftRight, feature: 'inventoryMovements' },
+          { label: 'Cycle Count', path: 'cycle-count', icon: ClipboardList, feature: 'inventoryCycleCount' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'inventoryReports' },
+        ],
+      },
+      {
+        title: 'Master Data',
+        items: [
+          { label: 'Warehouses', path: 'warehouses', icon: Warehouse, feature: 'warehouses' },
+          { label: 'Categories', path: 'categories', icon: Tag, feature: 'categories' },
+          { label: 'UOM', path: 'uom', icon: Ruler, feature: 'uom' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: Users, feature: 'inventoryUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'inventoryLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'inventorySettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'assets',
+    name: 'Asset Management System',
+    shortName: 'Assets',
+    description: 'Asset registry, assignments, transfers, and lifecycle tracking.',
+    icon: Package,
+    iconColor: 'text-amber-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'assetsDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'assetsAlerts' },
+        ],
+      },
+      {
+        title: 'Operations',
+        items: [
+          { label: 'Registry', path: 'registry', icon: Package, feature: 'assets' },
+          { label: 'Assignments', path: 'assignments', icon: UserCheck, feature: 'assetAssignments' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'assetsReports' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: Users, feature: 'assetsUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'assetsLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'assetsSettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'fleet',
+    name: 'Fleet Management System',
+    shortName: 'Fleet',
+    description: 'Vehicles, trips, fuel, and fleet maintenance scheduling.',
+    icon: Truck,
+    iconColor: 'text-sky-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'fleetDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'fleetAlerts' },
+        ],
+      },
+      {
+        title: 'Operations',
+        items: [
+          { label: 'Vehicles', path: 'vehicles', icon: Truck, feature: 'fleet' },
+          { label: 'Trips', path: 'trips', icon: RouteIcon, feature: 'fleetTrips' },
+          { label: 'Fuel Logs', path: 'fuel-logs', icon: Fuel, feature: 'fleetFuelLogs' },
+          { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'fleetMaintenance' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'fleetReports' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: Users, feature: 'fleetUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'fleetLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'fleetSettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'procurement',
+    name: 'Requisition & Procurement System',
+    shortName: 'Procurement',
+    description: 'Requests, approvals, and supplier management.',
+    icon: ShoppingCart,
+    iconColor: 'text-rose-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'procurementDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'procurementAlerts' },
+        ],
+      },
+      {
+        title: 'Workflow',
+        items: [
+          { label: 'Requests', path: 'requests', icon: ShoppingCart, feature: 'procurement' },
+          { label: 'Approvals', path: 'approvals', icon: ListChecks, feature: 'procurementApprovals' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'procurementReports' },
+        ],
+      },
+      {
+        title: 'Master Data',
+        items: [
+          { label: 'Suppliers', path: 'suppliers', icon: Truck, feature: 'suppliers' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: Users, feature: 'procurementUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'procurementLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'procurementSettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'maintenance',
+    name: 'Maintenance Management System',
+    shortName: 'Maintenance',
+    description: 'Work orders, preventive schedules, and technicians.',
+    icon: Wrench,
+    iconColor: 'text-orange-600',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Overview',
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'maintenanceDashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'maintenanceAlerts' },
+        ],
+      },
+      {
+        title: 'Operations',
+        items: [
+          { label: 'Work Orders', path: 'work-orders', icon: Wrench, feature: 'maintenance' },
+          { label: 'Schedule', path: 'schedule', icon: Calendar, feature: 'maintenanceSchedule' },
+          { label: 'Technicians', path: 'technicians', icon: Users, feature: 'maintenanceTechnicians' },
+        ],
+      },
+      {
+        title: 'Insights',
+        items: [
+          { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'maintenanceReports' },
+        ],
+      },
+      {
+        title: 'Administration',
+        items: [
+          { label: 'Users', path: 'users', icon: UserCheck, feature: 'maintenanceUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'admin',
+    name: 'Administrator & User Management System',
+    shortName: 'Admin',
+    description: 'Users, roles, departments, audit logs, and system configuration.',
+    icon: Shield,
+    iconColor: 'text-zinc-700',
+    defaultPath: '',
+    nav: [
+      {
+        title: 'Access Control',
+        items: [
+          { label: 'Users', path: '', icon: Users, feature: 'users' },
+          { label: 'Roles', path: 'roles', icon: KeyRound, feature: 'roles' },
+        ],
+      },
+      {
+        title: 'Organization',
+        items: [
+          { label: 'Departments', path: 'departments', icon: Building2, feature: 'departments' },
+        ],
+      },
+      {
+        title: 'System',
+        items: [
+          { label: 'Audit Log', path: 'audit-log', icon: ClipboardList, feature: 'auditLog' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'settings' },
+        ],
+      },
+    ],
+  },
+]
+
+const moduleByKey: Record<ModuleKey, EmsModule> = modules.reduce(
+  (acc, m) => {
+    acc[m.key] = m
+    return acc
+  },
+  {} as Record<ModuleKey, EmsModule>,
+)
+
+export function getModule(key: string | undefined | null): EmsModule | null {
+  if (!key) return null
+  return (moduleByKey as Record<string, EmsModule | undefined>)[key] ?? null
+}
+
+export function getModulePath(moduleKey: ModuleKey, relativePath = ''): string {
+  const base = `/module/${moduleKey}`
+  if (!relativePath) return base
+  return `${base}/${relativePath}`
+}
+
+export function getModuleDefaultPath(moduleKey: ModuleKey): string {
+  const m = moduleByKey[moduleKey]
+  return getModulePath(moduleKey, m.defaultPath)
+}

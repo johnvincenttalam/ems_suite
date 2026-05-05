@@ -1,0 +1,5 @@
+export { CategoriesPage } from './pages/categories-page'
+export { useCategories } from './hooks/use-categories'
+export { categoriesApi } from './api/categories-api'
+export { mockCategories } from './data/mock-categories'
+export type { Category, CategoryType } from './types'
