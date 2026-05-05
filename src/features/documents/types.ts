@@ -18,10 +18,34 @@ export type RoutingPurpose = 'review' | 'approval' | 'action' | 'info'
 export type RoutingStatus = 'pending' | 'in_review' | 'completed'
 export type AccessActivity = 'view' | 'download' | 'print' | 'edit'
 
+export type SignatureMethod = 'click-to-sign' | 'pki' | 'otp' | 'biometric'
+export type SignatureReason = 'approval' | 'review' | 'witness' | 'acknowledgment'
+
+/** A named approver chain that can be picked when creating a document, so users
+ * don't have to hand-pick the same sequence every time. */
+export interface WorkflowTemplate {
+  id: string
+  name: string
+  description?: string
+  /** Suggested category this template fits — used to auto-suggest in the form. */
+  category?: DocumentCategory
+  approverIds: string[]
+}
+
 export interface DocumentSignature {
   signerId: string
   signedAt: string
   comment?: string
+  /** How identity was verified at sign time. Mock template uses 'click-to-sign'.
+   * Real PKI deployments would set 'pki' and additionally store certificate data. */
+  method?: SignatureMethod
+  /** Why the signer signed. Defaults to 'approval'. */
+  reason?: SignatureReason
+  /** Snapshot of doc.version at sign time — proves which content was signed. */
+  documentVersion?: number
+  /** Browser/device fingerprint captured client-side. Server-side impls would
+   * also record IP and authentication context. */
+  userAgent?: string
   revokedAt?: string
   revokedBy?: string
   revocationReason?: string
@@ -80,6 +104,9 @@ export interface AppDocument {
   rejectedReason?: string
   rejectedBy?: string
   rejectedAt?: string
+  /** 'final' = author cannot resubmit; 'revision_request' = author can revise
+   * and resend. Defaults to 'final' for backward-compatible mock data. */
+  rejectionType?: 'final' | 'revision_request'
   tags?: string[]
   createdBy: string
   createdAt: string
@@ -125,6 +152,30 @@ export const PRIORITY_LABEL: Record<DocumentPriority, string> = {
   low: 'Low',
   normal: 'Normal',
   urgent: 'Urgent',
+}
+
+export const SIGNATURE_METHOD_LABEL: Record<SignatureMethod, string> = {
+  'click-to-sign': 'Click-to-sign',
+  pki: 'PKI certificate',
+  otp: 'One-time password',
+  biometric: 'Biometric',
+}
+
+export const SIGNATURE_REASON_LABEL: Record<SignatureReason, string> = {
+  approval: 'Approval',
+  review: 'Review',
+  witness: 'Witness',
+  acknowledgment: 'Acknowledgment',
+}
+
+/** SDMS uses "Disapproved" as the user-facing word for the `rejected` status so
+ * the language matches the Approve action. Internal type stays `'rejected'`. */
+export const DOCUMENT_STATUS_LABEL: Record<DocumentStatus, string> = {
+  draft: 'Draft',
+  in_review: 'In Review',
+  approved: 'Approved',
+  rejected: 'Disapproved',
+  archived: 'Archived',
 }
 
 export const CONFIDENTIALITY_LABEL: Record<DocumentConfidentiality, string> = {

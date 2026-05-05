@@ -22,9 +22,6 @@ import {
   UserCheck,
   Route as RouteIcon,
   Fuel,
-  GitBranch,
-  Archive,
-  Inbox,
   ClipboardCheck,
   Bell,
   type LucideIcon,
@@ -47,11 +44,23 @@ export interface ModuleNavItem {
   path: string
   icon: LucideIcon
   feature: FeatureKey
+  /** Route exists, but the sidebar hides it. Useful for action pages reached from inside other pages. */
+  hidden?: boolean
 }
 
 export interface ModuleNavGroup {
   title?: string
   items: ModuleNavItem[]
+}
+
+/**
+ * Module-relative redirect. `to` may be either module-relative (`documents?status=draft`)
+ * or an absolute path starting with `/` (`/module/admin/audit-log`). Used to keep old
+ * URLs working after the sidebar collapses.
+ */
+export interface ModuleRedirect {
+  from: string
+  to: string
 }
 
 export interface EmsModule {
@@ -65,6 +74,7 @@ export interface EmsModule {
   /** Module-relative landing path. Empty string for the index route. */
   defaultPath: string
   nav: ModuleNavGroup[]
+  redirects?: ModuleRedirect[]
 }
 
 export const modules: EmsModule[] = [
@@ -95,36 +105,34 @@ export const modules: EmsModule[] = [
     defaultPath: '',
     nav: [
       {
-        title: 'Overview',
         items: [
           { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'sdmsDashboard' },
-          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'sdmsAlerts' },
-        ],
-      },
-      {
-        title: 'Documents',
-        items: [
-          { label: 'Inbox', path: 'inbox', icon: Inbox, feature: 'documentsInbox' },
-          { label: 'All Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
-          { label: 'Workflow', path: 'workflow', icon: GitBranch, feature: 'documentsWorkflow' },
-          { label: 'Archive', path: 'archive', icon: Archive, feature: 'documentsArchive' },
-        ],
-      },
-      {
-        title: 'Insights',
-        items: [
-          { label: 'Calendar', path: 'calendar', icon: Calendar, feature: 'documentsCalendar' },
+          { label: 'My Tasks', path: 'my-tasks', icon: ListChecks, feature: 'sdmsMyTasks' },
+          { label: 'Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
           { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'documentsReports' },
         ],
       },
       {
-        title: 'Administration',
+        title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'sdmsLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
         ],
       },
+      {
+        items: [
+          { label: 'Create Document', path: 'create-document', icon: FolderOpen, feature: 'sdmsCreateDocument', hidden: true },
+          { label: 'Document Viewer', path: 'documents/:id', icon: FolderOpen, feature: 'sdmsDocumentViewer', hidden: true },
+        ],
+      },
+    ],
+    redirects: [
+      { from: 'inbox', to: 'documents?status=draft' },
+      { from: 'workflow', to: 'documents?status=in-review' },
+      { from: 'archive', to: 'documents?status=archived' },
+      { from: 'alerts', to: 'my-tasks' },
+      { from: 'calendar', to: 'my-tasks' },
+      { from: 'logs', to: '/module/admin/audit-log' },
     ],
   },
   {

@@ -22,6 +22,7 @@ import { useDepartments } from '@/features/departments'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { documentsApi } from '@/features/documents/api/documents-api'
 import {
+  DOCUMENT_STATUS_LABEL,
   RECEIPT_MODE_LABEL,
   ROUTING_PURPOSE_LABEL,
   type AppDocument,
@@ -167,7 +168,7 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
               {tab === 'overview' && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Status"><StatusBadge status={document.status} /></Field>
+                    <Field label="Status"><StatusBadge status={document.status} label={DOCUMENT_STATUS_LABEL[document.status]} /></Field>
                     <Field label="Size">{formatFileSize(document.fileSizeBytes)}</Field>
                     {document.category && <Field label="Category"><CategoryBadge value={document.category} /></Field>}
                     {document.priority && <Field label="Priority"><PriorityBadge value={document.priority} /></Field>}
@@ -301,10 +302,10 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
                   )}
 
                   {document.rejectedReason && (
-                    <Section title="Rejection">
+                    <Section title="Disapproval">
                       <div className="px-3 py-2 rounded-md bg-red-50 border border-red-200">
                         <p className="text-[11px] uppercase tracking-wider text-red-600 font-semibold">
-                          Rejected by {userMap[document.rejectedBy ?? '']?.name ?? '—'}
+                          Disapproved by {userMap[document.rejectedBy ?? '']?.name ?? '—'}
                           {document.rejectedAt && ` · ${format(parseISO(document.rejectedAt), 'MMM dd, HH:mm')}`}
                         </p>
                         <p className="text-[13px] text-red-700 mt-0.5">{document.rejectedReason}</p>

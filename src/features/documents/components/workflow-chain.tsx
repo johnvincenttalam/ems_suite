@@ -44,7 +44,7 @@ export function WorkflowChain({ document, userMap, compact = false }: WorkflowCh
                 <div className="min-w-0">
                   <p className="text-[12px] font-medium text-zinc-900 truncate">{user?.name ?? approverId}</p>
                   <p className="text-[11px] text-zinc-400">
-                    {isRejected ? 'Rejected' : isSigned ? `Signed ${format(parseISO(sig.signedAt), 'MMM dd, HH:mm')}` : isCurrent ? 'Pending' : 'Waiting'}
+                    {isRejected ? 'Disapproved' : isSigned ? `Signed ${format(parseISO(sig.signedAt), 'MMM dd, HH:mm')}` : isCurrent ? 'Pending' : 'Waiting'}
                   </p>
                 </div>
               )}

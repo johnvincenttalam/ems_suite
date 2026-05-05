@@ -13,6 +13,8 @@ import type {
   ReceiptMode,
   RoutingPurpose,
   RoutingStatus,
+  SignatureMethod,
+  SignatureReason,
 } from '@/features/documents/types'
 import { mockDocuments } from '@/features/documents/data/mock-documents'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
@@ -64,6 +66,20 @@ interface UploadDocumentInput {
   confidentiality?: DocumentConfidentiality
   departmentId?: string
   deadline?: string
+}
+
+interface CreateDraftInput {
+  title: string
+  description?: string
+  fileName: string
+  fileType: DocumentFileType
+  fileSizeBytes: number
+  tags?: string[]
+  createdBy: string
+  category?: DocumentCategory
+  priority?: DocumentPriority
+  confidentiality?: DocumentConfidentiality
+  departmentId?: string
 }
 
 function nextDocumentId(): string {
@@ -330,6 +346,46 @@ export const documentsApi = {
   },
 
   /**
+   * Save a new document as a draft without starting a workflow. Approvers are
+   * empty; the user can attach them later via startWorkflow.
+   */
+  createDraft: async (input: CreateDraftInput): Promise<AppDocument> => {
+    await delay(150)
+    const createdAt = new Date().toISOString()
+    const year = Number(createdAt.slice(0, 4))
+    const doc: AppDocument = {
+      id: nextDocumentId(),
+      trackingNumber: nextTrackingNumber(year),
+      title: input.title,
+      description: input.description,
+      fileName: input.fileName,
+      fileType: input.fileType,
+      fileSizeBytes: input.fileSizeBytes,
+      status: 'draft',
+      version: 1,
+      approvers: [],
+      signatures: [],
+      tags: input.tags,
+      createdBy: input.createdBy,
+      createdAt,
+      category: input.category,
+      priority: input.priority,
+      confidentiality: input.confidentiality,
+      departmentId: input.departmentId,
+    }
+    mockDocuments.push(doc)
+
+    recordAudit({
+      userId: input.createdBy,
+      action: 'create',
+      module: 'Documents',
+      detail: `Saved draft "${doc.title}"`,
+    })
+
+    return doc
+  },
+
+  /**
    * Promote a classified draft into the workflow. Sets approvers, flips status
    * to 'in_review', and seeds the routing log with the first approval hop.
    */
@@ -376,8 +432,17 @@ export const documentsApi = {
    * approver pointer; if the last approver has signed, status flips to
    * 'approved'. Throws if the document is not in_review or signerId is not the
    * next expected approver — workflow is sequential per the EMS spec.
+   *
+   * The fourth parameter accepts optional signature metadata (method, reason,
+   * userAgent). The API auto-captures `documentVersion` from the document and
+   * defaults `method` to 'click-to-sign' and `reason` to 'approval'.
    */
-  sign: async (docId: string, signerId: string, comment?: string): Promise<AppDocument> => {
+  sign: async (
+    docId: string,
+    signerId: string,
+    comment?: string,
+    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string },
+  ): Promise<AppDocument> => {
     await delay(150)
     const doc = findOrThrow(docId)
     if (doc.status !== 'in_review') throw new Error(`Document ${docId} is not in review`)
@@ -391,7 +456,11 @@ export const documentsApi = {
     const sig: DocumentSignature = {
       signerId,
       signedAt: new Date().toISOString(),
+      method: metadata?.method ?? 'click-to-sign',
+      reason: metadata?.reason ?? 'approval',
+      documentVersion: doc.version,
       ...(comment ? { comment } : {}),
+      ...(metadata?.userAgent ? { userAgent: metadata.userAgent } : {}),
     }
     doc.signatures = [...doc.signatures, sig]
     doc.currentApproverIndex = expectedIndex + 1
@@ -445,6 +514,7 @@ export const documentsApi = {
     doc.rejectedBy = rejecterId
     doc.rejectedAt = new Date().toISOString()
     doc.rejectedReason = reason
+    doc.rejectionType = 'final'
 
     const pendingRoute = doc.routings?.find(
       (r) => r.recipientId === rejecterId && r.status !== 'completed',
@@ -453,15 +523,105 @@ export const documentsApi = {
       pendingRoute.status = 'completed'
       pendingRoute.completedAt = doc.rejectedAt
       pendingRoute.notes = pendingRoute.notes
-        ? `${pendingRoute.notes} — Rejected: ${reason}`
-        : `Rejected: ${reason}`
+        ? `${pendingRoute.notes} — Disapproved: ${reason}`
+        : `Disapproved: ${reason}`
     }
 
     recordAudit({
       userId: rejecterId,
       action: 'reject',
       module: 'Documents',
-      detail: `Rejected "${doc.title}" — ${reason}`,
+      detail: `Disapproved "${doc.title}" — ${reason}`,
+    })
+
+    return doc
+  },
+
+  /**
+   * Request a revision on a document in review. Same end state as `reject` but
+   * marks rejectionType = 'revision_request' so the author can later call
+   * `resubmitRevision` to re-enter the workflow. Throws if not in review.
+   */
+  requestRevision: async (
+    docId: string,
+    reason: string,
+    requesterId: string,
+  ): Promise<AppDocument> => {
+    await delay(150)
+    const doc = findOrThrow(docId)
+    if (doc.status !== 'in_review') throw new Error(`Document ${docId} is not in review`)
+
+    doc.status = 'rejected'
+    doc.rejectedBy = requesterId
+    doc.rejectedAt = new Date().toISOString()
+    doc.rejectedReason = reason
+    doc.rejectionType = 'revision_request'
+
+    const pendingRoute = doc.routings?.find(
+      (r) => r.recipientId === requesterId && r.status !== 'completed',
+    )
+    if (pendingRoute) {
+      pendingRoute.status = 'completed'
+      pendingRoute.completedAt = doc.rejectedAt
+      pendingRoute.notes = pendingRoute.notes
+        ? `${pendingRoute.notes} — Revision requested: ${reason}`
+        : `Revision requested: ${reason}`
+    }
+
+    recordAudit({
+      userId: requesterId,
+      action: 'update',
+      module: 'Documents',
+      detail: `Requested revision on "${doc.title}" — ${reason}`,
+    })
+
+    return doc
+  },
+
+  /**
+   * Author resubmits a document that had a revision requested. Clears prior
+   * signatures (they signed off on a now-superseded version), restarts the
+   * approval pointer, flips status back to in_review, and seeds a new routing
+   * to the first approver. Throws if status !== 'rejected' or rejectionType is
+   * not 'revision_request', or if the caller is not the document author.
+   */
+  resubmitRevision: async (docId: string, authorId: string): Promise<AppDocument> => {
+    await delay(150)
+    const doc = findOrThrow(docId)
+    if (doc.status !== 'rejected') throw new Error('Document is not in a revisable state')
+    if (doc.rejectionType !== 'revision_request') {
+      throw new Error('This document was disapproved, not flagged for revision')
+    }
+    if (doc.createdBy !== authorId) {
+      throw new Error('Only the original author can resubmit a revision')
+    }
+    if (doc.approvers.length === 0) throw new Error('No approvers configured')
+
+    doc.signatures = []
+    doc.currentApproverIndex = 0
+    doc.status = 'in_review'
+    doc.version = doc.version + 1
+    doc.rejectedReason = undefined
+    doc.rejectedBy = undefined
+    doc.rejectedAt = undefined
+    doc.rejectionType = undefined
+
+    const routing: DocumentRouting = {
+      id: nextRoutingId(docId),
+      routedAt: new Date().toISOString(),
+      senderId: authorId,
+      recipientId: doc.approvers[0],
+      purpose: 'approval',
+      deadline: doc.deadline,
+      status: 'pending',
+    }
+    doc.routings = [...(doc.routings ?? []), routing]
+
+    recordAudit({
+      userId: authorId,
+      action: 'update',
+      module: 'Documents',
+      detail: `Resubmitted "${doc.title}" after revision (now v${doc.version})`,
     })
 
     return doc

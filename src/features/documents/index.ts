@@ -9,7 +9,14 @@ export { SdmsAlertsPage } from './pages/sdms-alerts-page'
 export { SdmsLogsPage } from './pages/sdms-logs-page'
 export { SdmsUsersPage } from './pages/sdms-users-page'
 export { SdmsSettingsPage } from './pages/sdms-settings-page'
+export { SdmsMyTasksPage } from './pages/sdms-my-tasks-page'
+export { SdmsCreateDocumentPage } from './pages/sdms-create-document-page'
+export { SdmsDocumentViewerPage } from './pages/sdms-document-viewer-page'
+export { SdmsTasksBadge } from './components/sdms-tasks-badge'
 export { useDocuments } from './hooks/use-documents'
+export { useWorkflowTemplates } from './hooks/use-workflow-templates'
+export { workflowTemplatesApi } from './api/workflow-templates-api'
+export { mockWorkflowTemplates } from './data/mock-workflow-templates'
 export { documentsApi } from './api/documents-api'
 export { mockDocuments } from './data/mock-documents'
 export type {
@@ -29,6 +36,9 @@ export type {
   RoutingStatus,
   AccessActivity,
   LifecyclePhase,
+  SignatureMethod,
+  SignatureReason,
+  WorkflowTemplate,
 } from './types'
 export {
   CATEGORY_LABEL,
@@ -36,5 +46,7 @@ export {
   CONFIDENTIALITY_LABEL,
   RECEIPT_MODE_LABEL,
   ROUTING_PURPOSE_LABEL,
+  SIGNATURE_METHOD_LABEL,
+  SIGNATURE_REASON_LABEL,
   getLifecyclePhase,
 } from './types'

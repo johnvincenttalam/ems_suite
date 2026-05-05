@@ -144,8 +144,8 @@ export function SdmsSettingsPage() {
                 </div>
                 <div className="flex items-center justify-between py-3">
                   <div>
-                    <p className="text-sm font-medium text-zinc-700">Require reason on rejection</p>
-                    <p className="text-xs text-zinc-400">Approvers must enter a reason before rejecting</p>
+                    <p className="text-sm font-medium text-zinc-700">Require reason on disapproval</p>
+                    <p className="text-xs text-zinc-400">Approvers must enter a reason before disapproving</p>
                   </div>
                   <Toggle
                     checked={settings.requireRejectionReason}
@@ -167,7 +167,7 @@ export function SdmsSettingsPage() {
                   { key: 'approvalNeeded' as const, label: 'Approval needed', desc: "When you're the next approver on a document" },
                   { key: 'routingPending' as const, label: 'Routing pending', desc: 'When a document is routed to you' },
                   { key: 'docApproved' as const, label: 'Document approved', desc: 'When a document you authored is approved' },
-                  { key: 'docRejected' as const, label: 'Document rejected', desc: 'When a document you authored is rejected' },
+                  { key: 'docRejected' as const, label: 'Document disapproved', desc: 'When a document you authored is disapproved' },
                   { key: 'deadlineSoon' as const, label: 'Deadline soon', desc: 'When a document deadline is within 2 days' },
                   { key: 'deadlineOverdue' as const, label: 'Deadline overdue', desc: 'When a document deadline has passed' },
                 ].map((item) => (

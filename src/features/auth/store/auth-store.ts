@@ -15,6 +15,10 @@ interface AuthState {
   restore: () => Promise<void>
   setUser: (user: User) => void
   setSelectedModule: (key: ModuleKey | null) => void
+  /** Dev-only impersonation. Reuses the adapter's login path so the session
+   * persists across reloads. Mock adapter accepts any password; real adapters
+   * should reject this in production. */
+  switchUser: (email: string) => Promise<boolean>
 }
 
 function readStoredModule(): ModuleKey | null {
@@ -61,6 +65,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSelectedModule: (key) => {
     writeStoredModule(key)
     set({ selectedModule: key })
+  },
+
+  switchUser: async (email) => {
+    const user = await authAdapter.login(email, '')
+    if (user) {
+      set({ user, isAuthenticated: true, selectedModule: null })
+      writeStoredModule(null)
+      return true
+    }
+    return false
   },
 }))
 

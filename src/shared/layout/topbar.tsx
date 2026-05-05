@@ -2,7 +2,9 @@ import { cn } from '@/shared/utils/cn'
 import { Menu, Search, LogOut, User, Sun, Moon, LayoutGrid } from 'lucide-react'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useThemeStore } from '@/shared/stores/theme-store'
+import { Avatar } from '@/shared/ui/avatar'
 import { NotificationCenter } from '@/shared/layout/notification-center'
+import { UserSwitcher } from '@/shared/layout/user-switcher'
 import { useClickOutside } from '@/shared/hooks/use-click-outside'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
@@ -30,9 +32,6 @@ export function Topbar({ module, sidebarCollapsed, onToggleMobileSidebar, onSear
     await logout()
     navigate('/')
   }
-
-  const getInitials = (name: string) =>
-    name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
   return (
     <header
@@ -99,6 +98,9 @@ export function Topbar({ module, sidebarCollapsed, onToggleMobileSidebar, onSear
           {theme === 'light' ? <Moon className="w-[18px] h-[18px]" /> : <Sun className="w-[18px] h-[18px]" />}
         </button>
 
+        {/* Dev-only user switcher */}
+        {import.meta.env.DEV && <UserSwitcher />}
+
         {/* Notifications */}
         <NotificationCenter moduleKey={module.key} />
 
@@ -110,11 +112,7 @@ export function Topbar({ module, sidebarCollapsed, onToggleMobileSidebar, onSear
             aria-expanded={showProfile}
             className="flex items-center gap-2.5 p-1.5 pr-3 rounded-lg hover:bg-zinc-50 transition-colors"
           >
-            <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center">
-              <span className="text-accent-fg text-[11px] font-medium">
-                {user ? getInitials(user.name) : 'U'}
-              </span>
-            </div>
+            <Avatar name={user?.name ?? 'User'} size="sm" className="w-7 h-7 text-[10.5px]" />
             <div className="hidden sm:block text-left">
               <p className="text-[13px] font-medium text-zinc-700 leading-tight">
                 {user?.name ?? 'User'}

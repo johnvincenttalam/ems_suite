@@ -6,6 +6,7 @@ import { cn } from '@/shared/utils/cn'
 import { isFeatureEnabled } from '@/config/features'
 import { prefetchFeature } from '@/config/feature-imports'
 import { getModulePath, type EmsModule } from '@/config/modules'
+import { SdmsTasksBadge } from '@/features/documents'
 
 interface SidebarProps {
   module: EmsModule
@@ -25,7 +26,7 @@ export function Sidebar({ module, collapsed, mobileOpen, onToggleCollapse, onClo
         .map((g) => ({
           title: g.title,
           items: g.items
-            .filter((i) => isFeatureEnabled(i.feature))
+            .filter((i) => !i.hidden && isFeatureEnabled(i.feature))
             .map((i) => ({ ...i, absolutePath: getModulePath(module.key, i.path) })),
         }))
         .filter((g) => g.items.length > 0),
@@ -121,6 +122,9 @@ export function Sidebar({ module, collapsed, mobileOpen, onToggleCollapse, onClo
                     >
                       <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && item.feature === 'sdmsMyTasks' && module.key === 'sdms' && (
+                        <SdmsTasksBadge className="ml-auto" />
+                      )}
                     </NavLink>
                   )
                 })}

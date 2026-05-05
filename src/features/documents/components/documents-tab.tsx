@@ -7,22 +7,27 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { Archive, ChevronRight, FileText, GitBranch, Lock, Upload } from 'lucide-react'
+import { Archive, ChevronRight, FileText, GitBranch, Lock, Plus, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getModulePath } from '@/config/modules'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
-import { useDocuments } from '@/features/documents'
+import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { useAuthStore } from '@/features/auth/store/auth-store'
+import { useDepartments } from '@/features/departments'
 import { documentsApi } from '@/features/documents/api/documents-api'
 import {
   CATEGORY_LABEL,
+  CONFIDENTIALITY_LABEL,
+  DOCUMENT_STATUS_LABEL,
   PRIORITY_LABEL,
   getLifecyclePhase,
   type AppDocument,
   type DocumentCategory,
+  type DocumentConfidentiality,
   type DocumentPriority,
   type DocumentStatus,
 } from '@/features/documents/types'
@@ -46,24 +51,57 @@ const statusFilters: { value: DocumentStatus | 'all'; label: string }[] = [
   { value: 'draft', label: 'Draft' },
   { value: 'in_review', label: 'In Review' },
   { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'rejected', label: 'Disapproved' },
+  { value: 'archived', label: 'Archived' },
 ]
+
+const STATUS_URL_VALUES = ['all', 'draft', 'in_review', 'approved', 'rejected', 'archived'] as const
+
+function statusFromUrl(raw: string | null): DocumentStatus | 'all' {
+  if (!raw) return 'all'
+  const normalized = raw.replace(/-/g, '_')
+  return (STATUS_URL_VALUES as readonly string[]).includes(normalized)
+    ? (normalized as DocumentStatus | 'all')
+    : 'all'
+}
+
+function statusToUrl(value: DocumentStatus | 'all'): string {
+  return value === 'all' ? '' : value.replace(/_/g, '-')
+}
 
 export function DocumentsTab() {
   const { data: documents = [], isLoading } = useDocuments()
+  const { data: departments = [] } = useDepartments()
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [globalFilter, setGlobalFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>(() => statusFromUrl(searchParams.get('status')))
   const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | 'all'>('all')
   const [priorityFilter, setPriorityFilter] = useState<DocumentPriority | 'all'>('all')
+  const [confidentialityFilter, setConfidentialityFilter] = useState<DocumentConfidentiality | 'all'>('all')
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all')
   const [showUpload, setShowUpload] = useState(false)
   const [drawerDoc, setDrawerDoc] = useState<AppDocument | null>(null)
   const [classifyTarget, setClassifyTarget] = useState<AppDocument | null>(null)
   const [workflowTarget, setWorkflowTarget] = useState<AppDocument | null>(null)
   const [finalizeTarget, setFinalizeTarget] = useState<AppDocument | null>(null)
+
+  const urlStatus = searchParams.get('status')
+  useEffect(() => {
+    setStatusFilter(statusFromUrl(urlStatus))
+  }, [urlStatus])
+
+  const handleStatusChange = (next: DocumentStatus | 'all') => {
+    setStatusFilter(next)
+    const params = new URLSearchParams(searchParams)
+    const url = statusToUrl(next)
+    if (url) params.set('status', url)
+    else params.delete('status')
+    setSearchParams(params, { replace: true })
+  }
 
   const deepLinkDocId = searchParams.get('doc')
   useEffect(() => {
@@ -94,13 +132,20 @@ export function DocumentsTab() {
     onError: (err) => toast.error('Archive failed', { description: err instanceof Error ? err.message : 'Unknown' }),
   })
 
+  const statusCounts = useMemo(() => {
+    const counts: Record<DocumentStatus, number> = { draft: 0, in_review: 0, approved: 0, rejected: 0, archived: 0 }
+    for (const d of documents) counts[d.status]++
+    return counts
+  }, [documents])
+
   const filtered = useMemo(() => {
     return documents
-      .filter((d) => d.status !== 'archived')
       .filter((d) => statusFilter === 'all' || d.status === statusFilter)
       .filter((d) => categoryFilter === 'all' || d.category === categoryFilter)
       .filter((d) => priorityFilter === 'all' || d.priority === priorityFilter)
-  }, [documents, statusFilter, categoryFilter, priorityFilter])
+      .filter((d) => confidentialityFilter === 'all' || d.confidentiality === confidentialityFilter)
+      .filter((d) => departmentFilter === 'all' || d.departmentId === departmentFilter)
+  }, [documents, statusFilter, categoryFilter, priorityFilter, confidentialityFilter, departmentFilter])
 
   const columns = useMemo<ColumnDef<AppDocument>[]>(() => [
     {
@@ -154,7 +199,10 @@ export function DocumentsTab() {
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ getValue }) => <StatusBadge status={getValue() as string} size="sm" />,
+      cell: ({ getValue }) => {
+        const s = getValue() as DocumentStatus
+        return <StatusBadge status={s} label={DOCUMENT_STATUS_LABEL[s]} size="sm" />
+      },
     },
     {
       id: 'actions',
@@ -218,7 +266,7 @@ export function DocumentsTab() {
           </div>
           <div className="flex gap-2">
             <ExportMenu
-              rows={documents.filter((d) => d.status !== 'archived') as unknown as Record<string, unknown>[]}
+              rows={documents as unknown as Record<string, unknown>[]}
               baseFilename="documents"
               sheetName="Documents"
               pdfTitle="Documents"
@@ -236,11 +284,19 @@ export function DocumentsTab() {
                 { key: 'createdAt', label: 'Created' },
               ]}
             />
-            <Button leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => navigate(getModulePath('sdms', 'create-document'))}>Create Document</Button>
+            <Button variant="ghost" leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
+        <div className="flex flex-col gap-3">
+          <FilterChips
+            options={statusFilters.map((f) => ({
+              ...f,
+              count: f.value === 'all' ? documents.length : statusCounts[f.value],
+            }))}
+            value={statusFilter}
+            onChange={handleStatusChange}
+          />
           <div className="flex gap-2 flex-wrap">
             <Select
               className="h-9 text-[13px]"
@@ -258,6 +314,24 @@ export function DocumentsTab() {
               options={[
                 { value: 'all', label: 'All priorities' },
                 ...(Object.keys(PRIORITY_LABEL) as DocumentPriority[]).map((k) => ({ value: k, label: PRIORITY_LABEL[k] })),
+              ]}
+            />
+            <Select
+              className="h-9 text-[13px]"
+              value={confidentialityFilter}
+              onChange={(e) => setConfidentialityFilter(e.target.value as DocumentConfidentiality | 'all')}
+              options={[
+                { value: 'all', label: 'All confidentiality' },
+                ...(Object.keys(CONFIDENTIALITY_LABEL) as DocumentConfidentiality[]).map((k) => ({ value: k, label: CONFIDENTIALITY_LABEL[k] })),
+              ]}
+            />
+            <Select
+              className="h-9 text-[13px]"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              options={[
+                { value: 'all', label: 'All departments' },
+                ...departments.map((d) => ({ value: d.id, label: d.name })),
               ]}
             />
           </div>

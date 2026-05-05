@@ -76,7 +76,7 @@ export function deriveDocumentNotifications(
         kind: 'doc_rejected',
         severity: 'danger',
         icon: XCircle,
-        title: `${doc.title} rejected`,
+        title: `${doc.title} disapproved`,
         description: doc.rejectedReason ?? 'Please review and revise',
         timestamp: doc.rejectedAt ?? doc.createdAt,
         link: SDMS_DOC_LINK(doc.id),

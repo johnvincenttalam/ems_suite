@@ -154,7 +154,7 @@ export function ReportsTab() {
         <StatCard title="In Workflow" value={stats.inWorkflow} icon={Clock} iconBg="bg-blue-50" iconColor="text-blue-600" index={2} />
         <StatCard title="Approved" value={stats.approved} icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={3} />
         <StatCard title="Archived" value={stats.archived} icon={Archive} iconBg="bg-zinc-100" iconColor="text-zinc-600" index={4} />
-        <StatCard title="Rejected" value={stats.rejected} icon={TriangleAlert} iconBg="bg-red-50" iconColor="text-red-600" index={5} />
+        <StatCard title="Disapproved" value={stats.rejected} icon={TriangleAlert} iconBg="bg-red-50" iconColor="text-red-600" index={5} />
         <StatCard title="Overdue" value={stats.overdue} subtitle="In review past deadline" icon={TriangleAlert} iconBg="bg-amber-50" iconColor="text-amber-600" index={6} />
         <StatCard title="Confidential" value={byConfidentiality.find((b) => b.key === 'confidential')?.count ?? 0} icon={FileText} iconBg="bg-red-50" iconColor="text-red-600" index={7} />
       </div>

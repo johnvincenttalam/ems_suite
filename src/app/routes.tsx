@@ -61,6 +61,9 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   sdmsLogs:            lazy(() => featureImports.sdmsLogs().then((m: any) => ({ default: m.SdmsLogsPage }))),
   sdmsUsers:           lazy(() => featureImports.sdmsUsers().then((m: any) => ({ default: m.SdmsUsersPage }))),
   sdmsSettings:        lazy(() => featureImports.sdmsSettings().then((m: any) => ({ default: m.SdmsSettingsPage }))),
+  sdmsMyTasks:         lazy(() => featureImports.sdmsMyTasks().then((m: any) => ({ default: m.SdmsMyTasksPage }))),
+  sdmsCreateDocument:  lazy(() => featureImports.sdmsCreateDocument().then((m: any) => ({ default: m.SdmsCreateDocumentPage }))),
+  sdmsDocumentViewer:  lazy(() => featureImports.sdmsDocumentViewer().then((m: any) => ({ default: m.SdmsDocumentViewerPage }))),
   fleet:               lazy(() => featureImports.fleet().then((m: any) => ({ default: m.VehiclesPage }))),
   fleetTrips:          lazy(() => featureImports.fleetTrips().then((m: any) => ({ default: m.TripsPage }))),
   fleetFuelLogs:       lazy(() => featureImports.fleetFuelLogs().then((m: any) => ({ default: m.FuelLogsPage }))),
@@ -103,7 +106,7 @@ function Lazy({ children }: { children: React.ReactNode }) {
 }
 
 function renderModuleChildRoutes(module: EmsModule) {
-  return module.nav
+  const navRoutes = module.nav
     .flatMap((g) => g.items)
     .filter((i) => isFeatureEnabled(i.feature))
     .map((item) => {
@@ -113,6 +116,16 @@ function renderModuleChildRoutes(module: EmsModule) {
       }
       return <Route key={`${module.key}-${item.path}`} path={item.path} element={<Lazy><Page /></Lazy>} />
     })
+
+  const redirectRoutes = (module.redirects ?? []).map((r) => (
+    <Route
+      key={`${module.key}-redirect-${r.from}`}
+      path={r.from}
+      element={<Navigate to={r.to} replace />}
+    />
+  ))
+
+  return [...navRoutes, ...redirectRoutes]
 }
 
 export function AppRoutes() {

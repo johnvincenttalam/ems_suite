@@ -37,7 +37,7 @@ const actionFilters: { value: AuditAction | 'all'; label: string }[] = [
   { value: 'update', label: 'Update' },
   { value: 'delete', label: 'Delete' },
   { value: 'approve', label: 'Approve' },
-  { value: 'reject', label: 'Reject' },
+  { value: 'reject', label: 'Disapprove' },
 ]
 
 export function SdmsLogsPage() {

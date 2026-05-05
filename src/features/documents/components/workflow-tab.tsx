@@ -59,7 +59,9 @@ export function WorkflowTab() {
   const signMutation = useMutation({
     mutationFn: ({ doc, comment }: { doc: AppDocument; comment?: string }) => {
       if (!user) throw new Error('Not signed in')
-      return documentsApi.sign(doc.id, user.id, comment)
+      return documentsApi.sign(doc.id, user.id, comment, {
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      })
     },
     onSuccess: (updated) => {
       toast.success(updated.status === 'approved' ? `${updated.id} approved — final signature` : `${updated.id} signed`)
@@ -76,11 +78,11 @@ export function WorkflowTab() {
       return documentsApi.reject(doc.id, reason, user.id)
     },
     onSuccess: (updated) => {
-      toast.success(`${updated.id} rejected`)
+      toast.success(`${updated.id} disapproved`)
       invalidate()
     },
     onError: (err) => {
-      toast.error('Reject failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+      toast.error('Disapprove failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     },
   })
 
@@ -161,7 +163,7 @@ export function WorkflowTab() {
                 </div>
               </button>
               <div className="flex flex-col gap-2 flex-shrink-0">
-                <Button size="sm" variant="outline" leftIcon={<XCircle className="w-4 h-4" />} onClick={() => setRejectTarget(doc)}>Reject</Button>
+                <Button size="sm" variant="outline" leftIcon={<XCircle className="w-4 h-4" />} onClick={() => setRejectTarget(doc)}>Disapprove</Button>
                 <Button size="sm" variant="success" leftIcon={<PenLine className="w-4 h-4" />} onClick={() => setSignTarget(doc)}>Sign</Button>
               </div>
             </div>
@@ -194,7 +196,7 @@ export function WorkflowTab() {
         </form>
       </Modal>
 
-      <Modal open={!!rejectTarget} onClose={() => { setRejectTarget(null); rejectForm.reset() }} title={`Reject ${rejectTarget?.title ?? ''}`} size="md">
+      <Modal open={!!rejectTarget} onClose={() => { setRejectTarget(null); rejectForm.reset() }} title={`Disapprove ${rejectTarget?.title ?? ''}`} size="md">
         <form onSubmit={rejectForm.handleSubmit(onReject)} className="space-y-4">
           <p className="text-[13px] text-zinc-500">
             The author will see this in the audit log and may revise and resubmit.
@@ -202,7 +204,7 @@ export function WorkflowTab() {
           <Textarea label="Reason *" {...rejectForm.register('reason')} rows={3} error={rejectForm.formState.errors.reason?.message} placeholder="e.g. Section 3 contradicts the new policy — please revise" />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" fullWidth onClick={() => { setRejectTarget(null); rejectForm.reset() }} disabled={rejectMutation.isPending}>Cancel</Button>
-            <Button type="submit" variant="danger" fullWidth loading={rejectMutation.isPending}>Confirm Rejection</Button>
+            <Button type="submit" variant="danger" fullWidth loading={rejectMutation.isPending}>Confirm Disapproval</Button>
           </div>
         </form>
       </Modal>
