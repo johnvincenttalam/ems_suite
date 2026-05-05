@@ -96,7 +96,7 @@ export const modules: EmsModule[] = [
         title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
-          { label: 'Workflow Templates', path: 'workflow-templates', icon: Workflow, feature: 'sdmsWorkflowTemplates' },
+          { label: 'Workflow', path: 'workflow-templates', icon: Workflow, feature: 'sdmsWorkflowTemplates' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
         ],
       },

@@ -59,6 +59,7 @@ export const usersApi = {
       status: input.status ?? 'active',
       createdAt: new Date().toISOString().slice(0, 10),
       modules: input.modules ?? [],
+      moduleAdmins: [],
     }
     mockUsers.push(u)
     recordAudit({
@@ -105,5 +106,92 @@ export const usersApi = {
       module: 'Admin',
       detail: `Deleted user ${removed.name} (${removed.email})`,
     })
+  },
+
+  /**
+   * Invite a user to a specific module. If the email already exists, grants
+   * access to that module; otherwise creates a new user and grants access.
+   * The audit entry is tagged with the inviting module's display name so it
+   * surfaces in that module's logs view. Caller authorization (isModuleAdmin
+   * for the target module) is enforced in the calling component.
+   */
+  inviteToModule: async (input: {
+    name: string
+    email: string
+    phone?: string
+    moduleKey: ModuleKey
+    auditModule: string
+    invitedBy: string
+  }): Promise<{ user: User; created: boolean }> => {
+    await delay(120)
+    const existing = mockUsers.find((u) => u.email.toLowerCase() === input.email.toLowerCase())
+    if (existing) {
+      if (existing.modules.includes(input.moduleKey)) {
+        throw new Error(`${existing.name} already has access to this module`)
+      }
+      existing.modules = [...existing.modules, input.moduleKey]
+      recordAudit({
+        userId: input.invitedBy,
+        action: 'update',
+        module: input.auditModule,
+        detail: `Granted ${existing.name} access`,
+      })
+      return { user: existing, created: false }
+    }
+    const u: User = {
+      id: nextUserId(),
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      role: 'admin',
+      status: 'active',
+      createdAt: new Date().toISOString().slice(0, 10),
+      modules: [input.moduleKey],
+      moduleAdmins: [],
+    }
+    mockUsers.push(u)
+    recordAudit({
+      userId: input.invitedBy,
+      action: 'create',
+      module: input.auditModule,
+      detail: `Invited ${u.name} (${u.email}) and granted access`,
+    })
+    return { user: u, created: true }
+  },
+
+  /**
+   * Revoke a user's access to a specific module. Their global record stays —
+   * other modules they belong to are unaffected. Throws if the user doesn't
+   * have access in the first place. Module admins themselves cannot be revoked
+   * from a module they administer (would orphan admin power); demote them
+   * first by editing moduleAdmins.
+   */
+  removeFromModule: async (
+    userId: string,
+    moduleKey: ModuleKey,
+    auditModule: string,
+    removedBy: string,
+  ): Promise<User> => {
+    await delay(120)
+    const idx = mockUsers.findIndex((u) => u.id === userId)
+    if (idx === -1) throw new Error(`User ${userId} not found`)
+    const u = mockUsers[idx]
+    if (!u.modules.includes(moduleKey)) {
+      throw new Error(`${u.name} doesn't have access to this module`)
+    }
+    if (u.moduleAdmins.includes(moduleKey)) {
+      throw new Error(`${u.name} is an admin of this module — demote first`)
+    }
+    if (userId === removedBy) {
+      throw new Error('You cannot revoke your own access')
+    }
+    u.modules = u.modules.filter((m) => m !== moduleKey)
+    recordAudit({
+      userId: removedBy,
+      action: 'update',
+      module: auditModule,
+      detail: `Revoked ${u.name}'s access`,
+    })
+    return u
   },
 }

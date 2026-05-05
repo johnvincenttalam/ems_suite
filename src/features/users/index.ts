@@ -1,4 +1,5 @@
 export { useUsers } from './hooks/use-users'
 export { usersApi } from './api/users-api'
 export { mockUsers } from './data/mock-users'
+export { InviteUserModal } from './components/invite-user-modal'
 export type { User, UserRole } from './types'

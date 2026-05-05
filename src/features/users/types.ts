@@ -13,4 +13,8 @@ export interface User {
   createdAt: string
   /** Modules this user can access. An empty list means no module access. */
   modules: ModuleKey[]
+  /** Modules this user can administer (invite users, grant/revoke access,
+   * toggle status). Subset of `modules`. Empty when the user is a regular
+   * member of every module they belong to. */
+  moduleAdmins: ModuleKey[]
 }

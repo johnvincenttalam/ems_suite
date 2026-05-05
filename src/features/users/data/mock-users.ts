@@ -16,6 +16,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-01-15',
     modules: ALL_MODULES,
+    moduleAdmins: ALL_MODULES,
   },
   {
     id: 'U002',
@@ -26,6 +27,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-02-01',
     modules: ['mis', 'sdms', 'inventory', 'assets', 'fleet', 'maintenance'],
+    moduleAdmins: ['inventory', 'fleet', 'maintenance'],
   },
   {
     id: 'U003',
@@ -36,6 +38,7 @@ export const mockUsers: User[] = [
     status: 'inactive',
     createdAt: '2024-11-05',
     modules: ALL_MODULES,
+    moduleAdmins: [],
   },
   {
     id: 'U004',
@@ -46,6 +49,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-02-10',
     modules: ['mis', 'sdms'],
+    moduleAdmins: ['sdms'],
   },
   {
     id: 'U005',
@@ -56,6 +60,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-03-01',
     modules: ['mis', 'sdms', 'procurement'],
+    moduleAdmins: ['sdms'],
   },
   {
     id: 'U006',
@@ -66,6 +71,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-03-05',
     modules: ['mis', 'sdms', 'procurement', 'maintenance'],
+    moduleAdmins: [],
   },
   {
     id: 'U007',
@@ -76,6 +82,7 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-03-12',
     modules: ['mis', 'sdms', 'procurement', 'inventory'],
+    moduleAdmins: [],
   },
   {
     id: 'U008',
@@ -86,5 +93,6 @@ export const mockUsers: User[] = [
     status: 'active',
     createdAt: '2025-03-15',
     modules: ['mis', 'sdms'],
+    moduleAdmins: [],
   },
 ]

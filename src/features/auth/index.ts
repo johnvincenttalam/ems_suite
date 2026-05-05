@@ -1,5 +1,5 @@
 export { LoginPage } from './pages/login-page'
 export { ProtectedRoute } from './components/protected-route'
 export { useAuthStore } from './store/auth-store'
-export { hasModuleAccess } from './lib/access'
+export { hasModuleAccess, isModuleAdmin } from './lib/access'
 export { AccessDeniedPage } from './pages/access-denied-page'

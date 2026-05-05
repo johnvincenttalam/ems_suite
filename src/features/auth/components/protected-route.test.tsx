@@ -17,6 +17,7 @@ const userWithSdmsOnly: User = {
   status: 'active',
   createdAt: '2025-01-01',
   modules: ['sdms'],
+  moduleAdmins: [],
 }
 
 function renderProtected(opts: { module?: typeof inventoryModule; loginPath?: string }) {

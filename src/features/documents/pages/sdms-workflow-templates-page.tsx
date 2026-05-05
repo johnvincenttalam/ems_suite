@@ -123,7 +123,7 @@ export function SdmsWorkflowTemplatesPage() {
               </thead>
               <tbody>
                 {templates.map((t) => (
-                  <tr key={t.id} className="border-b border-zinc-100/60 last:border-0 hover:bg-zinc-50/40">
+                  <tr key={t.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">
                     <td className="px-4 py-3 align-top">
                       <p className="text-[13px] font-medium text-zinc-900">{t.name}</p>
                       {t.description && (

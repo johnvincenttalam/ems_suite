@@ -10,6 +10,7 @@ const baseUser: User = {
   status: 'active',
   createdAt: '2025-01-01',
   modules: ['mis', 'sdms'],
+  moduleAdmins: [],
 }
 
 describe('hasModuleAccess', () => {
