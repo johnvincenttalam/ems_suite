@@ -33,7 +33,7 @@ describe('SDMS module configuration', () => {
   it('preserves legacy URLs via redirects', () => {
     const fromPaths = (sdms.redirects ?? []).map((r) => r.from)
     expect(fromPaths).toEqual(
-      expect.arrayContaining(['inbox', 'workflow', 'archive', 'alerts', 'calendar', 'logs']),
+      expect.arrayContaining(['inbox', 'workflow', 'archive', 'alerts', 'calendar']),
     )
   })
 })

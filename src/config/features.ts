@@ -63,19 +63,14 @@ export const features = {
   fleetSettings: true,
   fleetReports: true,
 
-  // EMS — administration
-  users: true,
-  roles: true,
-  departments: true,
+  // EMS — administration / master data
   warehouses: true,
   categories: true,
   uom: true,
   suppliers: true,
-  auditLog: true,
 
   // Account
   profile: true,
-  settings: true,
 
   // Template demo pages — disabled for EMS, code retained for reference
   charts: false,

@@ -14,8 +14,6 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   charts:              lazy(() => featureImports.charts().then((m: any) => ({ default: m.ChartsPage }))),
   table:               lazy(() => featureImports.table().then((m: any) => ({ default: m.AdvancedTablePage }))),
   forms:               lazy(() => featureImports.forms().then((m: any) => ({ default: m.FormsPage }))),
-  users:               lazy(() => featureImports.users().then((m: any) => ({ default: m.UsersPage }))),
-  roles:               lazy(() => featureImports.roles().then((m: any) => ({ default: m.RolesPage }))),
   inventory:           lazy(() => featureImports.inventory().then((m: any) => ({ default: m.ItemsPage }))),
   inventoryMovements:  lazy(() => featureImports.inventoryMovements().then((m: any) => ({ default: m.MovementsPage }))),
   inventoryCycleCount: lazy(() => featureImports.inventoryCycleCount().then((m: any) => ({ default: m.CycleCountPage }))),
@@ -75,16 +73,13 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   fleetUsers:          lazy(() => featureImports.fleetUsers().then((m: any) => ({ default: m.FleetUsersPage }))),
   fleetSettings:       lazy(() => featureImports.fleetSettings().then((m: any) => ({ default: m.FleetSettingsPage }))),
   fleetReports:        lazy(() => featureImports.fleetReports().then((m: any) => ({ default: m.FleetReportsPage }))),
-  departments:         lazy(() => featureImports.departments().then((m: any) => ({ default: m.DepartmentsPage }))),
   warehouses:          lazy(() => featureImports.warehouses().then((m: any) => ({ default: m.WarehousesPage }))),
   categories:          lazy(() => featureImports.categories().then((m: any) => ({ default: m.CategoriesPage }))),
   uom:                 lazy(() => featureImports.uom().then((m: any) => ({ default: m.UomPage }))),
   suppliers:           lazy(() => featureImports.suppliers().then((m: any) => ({ default: m.SuppliersPage }))),
-  auditLog:            lazy(() => featureImports.auditLog().then((m: any) => ({ default: m.AuditLogPage }))),
   activity:            lazy(() => featureImports.activity().then((m: any) => ({ default: m.ActivityPage }))),
   profile:             lazy(() => featureImports.profile().then((m: any) => ({ default: m.ProfilePage }))),
   uiKit:               lazy(() => featureImports.uiKit().then((m: any) => ({ default: m.UIKitPage }))),
-  settings:            lazy(() => featureImports.settings().then((m: any) => ({ default: m.SettingsPage }))),
 }
 
 const ProfilePage = featurePages.profile

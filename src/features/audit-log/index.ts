@@ -1,4 +1,3 @@
-export { AuditLogPage } from './pages/audit-log-page'
 export { useAuditLog } from './hooks/use-audit-log'
 export { auditLogApi } from './api/audit-log-api'
 export { mockAuditLog } from './data/mock-audit'

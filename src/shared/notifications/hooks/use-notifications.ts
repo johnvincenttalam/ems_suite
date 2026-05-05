@@ -23,8 +23,8 @@ interface UseNotificationsResult {
   markAllRead: () => void
 }
 
-/** MIS and Admin show every module's notifications (cross-module super-consoles). */
-const GLOBAL_MODULES: ReadonlySet<ModuleKey> = new Set<ModuleKey>(['mis', 'admin'])
+/** MIS shows every module's notifications (cross-module super-console). */
+const GLOBAL_MODULES: ReadonlySet<ModuleKey> = new Set<ModuleKey>(['mis'])
 
 export function useNotifications(moduleKey?: ModuleKey): UseNotificationsResult {
   const { data: documents = [] } = useDocuments()

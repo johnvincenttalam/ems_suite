@@ -13,8 +13,6 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   charts:      () => import('@/features/charts'),
   table:       () => import('@/features/orders'),
   forms:       () => import('@/features/forms'),
-  users:       () => import('@/features/users'),
-  roles:       () => import('@/features/roles'),
   inventory:           () => import('@/features/inventory'),
   inventoryMovements:  () => import('@/features/inventory'),
   inventoryCycleCount: () => import('@/features/inventory'),
@@ -74,16 +72,13 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   fleetUsers:       () => import('@/features/fleet'),
   fleetSettings:    () => import('@/features/fleet'),
   fleetReports:     () => import('@/features/fleet'),
-  departments: () => import('@/features/departments'),
   warehouses:  () => import('@/features/warehouses'),
   categories:  () => import('@/features/categories'),
   uom:         () => import('@/features/uom'),
   suppliers:   () => import('@/features/suppliers'),
-  auditLog:    () => import('@/features/audit-log'),
   activity:    () => import('@/features/activity'),
   profile:     () => import('@/features/profile'),
   uiKit:       () => import('@/features/ui-kit'),
-  settings:    () => import('@/features/settings'),
 }
 
 export function prefetchFeature(key: FeatureKey) {

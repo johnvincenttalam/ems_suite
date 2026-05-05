@@ -85,14 +85,14 @@ export function LoginPage({ module }: LoginPageProps) {
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-center gap-2.5">
-            <ModuleIcon className={cn('w-5 h-5 flex-shrink-0', module.iconColor)} strokeWidth={1.75} />
-            <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">
+          <div className="flex items-center justify-center gap-3">
+            <ModuleIcon className={cn('w-7 h-7 flex-shrink-0', module.iconColor)} strokeWidth={1.75} />
+            <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
               Sign in to {module.shortName}
             </h1>
           </div>
           {showSubtitle && (
-            <p className="text-[13px] text-zinc-500 mt-1.5 text-center">{module.name}</p>
+            <p className="text-[15px] text-zinc-500 mt-2 text-center">{module.name}</p>
           )}
         </div>
 
@@ -152,7 +152,7 @@ export function LoginPage({ module }: LoginPageProps) {
             loading={loading}
             className="bg-zinc-900 hover:bg-zinc-800 text-white focus:ring-zinc-300"
           >
-            {loading ? 'Signing in...' : `Sign in to ${module.shortName}`}
+            {loading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
 

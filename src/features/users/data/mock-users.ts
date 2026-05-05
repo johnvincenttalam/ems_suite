@@ -3,7 +3,7 @@ import type { ModuleKey } from '@/config/modules'
 
 const ALL_MODULES: ModuleKey[] = [
   'mis', 'sdms', 'inventory', 'assets', 'fleet',
-  'procurement', 'maintenance', 'admin',
+  'procurement', 'maintenance',
 ]
 
 export const mockUsers: User[] = [
@@ -85,6 +85,6 @@ export const mockUsers: User[] = [
     phone: '+1 555 000 0008',
     status: 'active',
     createdAt: '2025-03-15',
-    modules: ['mis', 'sdms', 'admin'],
+    modules: ['mis', 'sdms'],
   },
 ]

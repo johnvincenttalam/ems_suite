@@ -28,7 +28,7 @@ describe('hasModuleAccess', () => {
 
   it('returns false when the module is not in the user list', () => {
     expect(hasModuleAccess(baseUser, 'inventory')).toBe(false)
-    expect(hasModuleAccess(baseUser, 'admin')).toBe(false)
+    expect(hasModuleAccess(baseUser, 'fleet')).toBe(false)
   })
 
   it('returns false when the user has no modules', () => {

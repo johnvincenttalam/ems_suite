@@ -41,7 +41,7 @@ vi.mock('@/config/features', async () => {
       uiKit: true,
       settings: true,
     },
-    isFeatureEnabled: (key: string) => enabledFlags[key] ?? false,
+    isFeatureEnabled: (key: string) => enabledFlags[key] ?? true,
   }
 })
 
@@ -91,14 +91,15 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /audit log/i })).not.toBeInTheDocument()
   })
 
-  it('renders only the items in the selected module (Admin)', () => {
-    renderSidebarFor('admin', '/module/admin')
-    expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /roles/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /audit log/i })).toBeInTheDocument()
+  it('renders only the items in the selected module (Procurement)', () => {
+    renderSidebarFor('procurement', '/module/procurement')
+    expect(screen.getByRole('link', { name: /requests/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /approvals/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /suppliers/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument()
     // Items from other modules should not appear
     expect(screen.queryByRole('link', { name: /inventory/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /fleet/i })).not.toBeInTheDocument()
   })
 
   it('filters out items whose feature is disabled', () => {

@@ -16,7 +16,7 @@ interface RecordAuditInput {
 /**
  * Append an audit entry to the in-memory log. Looks up the user's display name
  * from `mockUsers`. Cross-module mutations (e.g. procurement.approve) call this
- * so every state change is reflected in `/module/admin/audit-log`.
+ * so every state change is reflected in each module's logs / audit views.
  *
  * In a real backend this would POST to `/api/audit-log`; here it just unshifts
  * onto the mock array, which the React Query cache picks up after invalidation.

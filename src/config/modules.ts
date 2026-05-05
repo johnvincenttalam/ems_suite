@@ -7,10 +7,7 @@ import {
   ShoppingCart,
   Wrench,
   ListChecks,
-  Shield,
   Users,
-  KeyRound,
-  Building2,
   Warehouse,
   Tag,
   Ruler,
@@ -37,7 +34,6 @@ export type ModuleKey =
   | 'fleet'
   | 'procurement'
   | 'maintenance'
-  | 'admin'
 
 export interface ModuleNavItem {
   label: string
@@ -56,7 +52,7 @@ export interface ModuleNavGroup {
 
 /**
  * Module-relative redirect. `to` may be either module-relative (`documents?status=draft`)
- * or an absolute path starting with `/` (`/module/admin/audit-log`). Used to keep old
+ * or an absolute path starting with `/` (`/module/sdms/documents`). Used to keep old
  * URLs working after the sidebar collapses.
  */
 export interface ModuleRedirect {
@@ -79,23 +75,6 @@ export interface EmsModule {
 }
 
 export const modules: EmsModule[] = [
-  {
-    key: 'mis',
-    name: 'Management Information System',
-    shortName: 'MIS',
-    description: 'Executive dashboards, KPIs, and cross-module visibility.',
-    icon: LayoutDashboard,
-    iconColor: 'text-blue-600',
-    defaultPath: '',
-    nav: [
-      {
-        items: [
-          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'dashboard' },
-          { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
-        ],
-      },
-    ],
-  },
   {
     key: 'sdms',
     name: 'Smart Document Management System',
@@ -134,7 +113,6 @@ export const modules: EmsModule[] = [
       { from: 'archive', to: 'documents?status=archived' },
       { from: 'alerts', to: 'my-tasks' },
       { from: 'calendar', to: 'my-tasks' },
-      { from: 'logs', to: '/module/admin/audit-log' },
     ],
   },
   {
@@ -311,6 +289,23 @@ export const modules: EmsModule[] = [
     ],
   },
   {
+    key: 'mis',
+    name: 'Management Information System',
+    shortName: 'MIS',
+    description: 'Executive dashboards, KPIs, and cross-module visibility.',
+    icon: LayoutDashboard,
+    iconColor: 'text-blue-600',
+    defaultPath: '',
+    nav: [
+      {
+        items: [
+          { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'dashboard' },
+          { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
+        ],
+      },
+    ],
+  },
+  {
     key: 'maintenance',
     name: 'Maintenance Management System',
     shortName: 'Maintenance',
@@ -346,37 +341,6 @@ export const modules: EmsModule[] = [
           { label: 'Users', path: 'users', icon: UserCheck, feature: 'maintenanceUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'admin',
-    name: 'Administrator & User Management System',
-    shortName: 'Admin',
-    description: 'Users, roles, departments, audit logs, and system configuration.',
-    icon: Shield,
-    iconColor: 'text-zinc-700',
-    defaultPath: '',
-    nav: [
-      {
-        title: 'Access Control',
-        items: [
-          { label: 'Users', path: '', icon: Users, feature: 'users' },
-          { label: 'Roles', path: 'roles', icon: KeyRound, feature: 'roles' },
-        ],
-      },
-      {
-        title: 'Organization',
-        items: [
-          { label: 'Departments', path: 'departments', icon: Building2, feature: 'departments' },
-        ],
-      },
-      {
-        title: 'System',
-        items: [
-          { label: 'Audit Log', path: 'audit-log', icon: ClipboardList, feature: 'auditLog' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'settings' },
         ],
       },
     ],
