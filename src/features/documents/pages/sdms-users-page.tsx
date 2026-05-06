@@ -9,9 +9,9 @@ import {
 } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Users, ShieldCheck, FolderOpen, UserPlus, UserX, Crown } from 'lucide-react'
+import { Users, ShieldCheck, FolderOpen, UserPlus, UserX, Crown, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUsers, InviteUserModal } from '@/features/users'
+import { useUsers, CreateEditUserModal } from '@/features/users'
 import { usersApi } from '@/features/users/api/users-api'
 import type { User } from '@/features/users/types'
 import { useDocuments } from '@/features/documents'
@@ -41,7 +41,8 @@ export function SdmsUsersPage() {
   const queryClient = useQueryClient()
 
   const [globalFilter, setGlobalFilter] = useState('')
-  const [inviteOpen, setInviteOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<User | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<User | null>(null)
 
   const canManage = isModuleAdmin(currentUser, 'sdms')
@@ -161,14 +162,24 @@ export function SdmsUsersPage() {
               return <span className="text-[11px] text-zinc-300">—</span>
             }
             return (
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<UserX className="w-3.5 h-3.5" />}
-                onClick={() => setRevokeTarget(u)}
-              >
-                Revoke
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  leftIcon={<Pencil className="w-3.5 h-3.5" />}
+                  onClick={() => setEditTarget(u)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  leftIcon={<UserX className="w-3.5 h-3.5" />}
+                  onClick={() => setRevokeTarget(u)}
+                >
+                  Revoke
+                </Button>
+              </div>
             )
           },
         })
@@ -221,8 +232,8 @@ export function SdmsUsersPage() {
               ]}
             />
             {canManage && (
-              <Button leftIcon={<UserPlus className="w-4 h-4" />} onClick={() => setInviteOpen(true)}>
-                Invite User
+              <Button leftIcon={<UserPlus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
+                Create User
               </Button>
             )}
           </div>
@@ -299,17 +310,18 @@ export function SdmsUsersPage() {
 
       <p className="text-[12px] text-zinc-400 mt-3">
         {canManage
-          ? 'You can invite new users and revoke SDMS access. Other modules are managed by their own admins.'
-          : 'Read-only view. Ask an SDMS admin (look for the Admin badge) to invite users or change access.'}
+          ? 'You can create users, edit details, and revoke SDMS access. Other modules are managed by their own admins.'
+          : 'Read-only view. Ask an SDMS admin (look for the Admin badge) to manage users or change access.'}
       </p>
 
-      <InviteUserModal
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
+      <CreateEditUserModal
+        open={createOpen || !!editTarget}
+        onClose={() => { setCreateOpen(false); setEditTarget(null) }}
+        user={editTarget}
         moduleKey="sdms"
         auditModule="Documents"
         moduleLabel="SDMS"
-        onInvited={invalidate}
+        onSaved={invalidate}
       />
 
       <ConfirmDialog

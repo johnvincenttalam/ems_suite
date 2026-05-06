@@ -9,6 +9,9 @@ export interface User {
   role: UserRole
   avatar?: string
   phone?: string
+  employeeId?: string
+  departmentId?: string
+  position?: string
   status: 'active' | 'inactive'
   createdAt: string
   /** Modules this user can access. An empty list means no module access. */

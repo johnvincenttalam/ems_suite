@@ -11,6 +11,9 @@ interface AddUserInput {
   name: string
   email: string
   phone: string
+  employeeId?: string
+  departmentId?: string
+  position?: string
   status?: 'active' | 'inactive'
   modules?: ModuleKey[]
   createdBy: string
@@ -20,6 +23,9 @@ interface UpdateUserInput {
   name?: string
   email?: string
   phone?: string
+  employeeId?: string
+  departmentId?: string
+  position?: string
   status?: 'active' | 'inactive'
   modules?: ModuleKey[]
   updatedBy: string
@@ -31,6 +37,14 @@ function nextUserId(): string {
     return Number.isFinite(n) && n > m ? n : m
   }, 0)
   return `U${String(max + 1).padStart(3, '0')}`
+}
+
+export function nextEmployeeId(): string {
+  const max = mockUsers.reduce((m, u) => {
+    const n = Number(u.employeeId?.replace(/^EMP-/, ''))
+    return Number.isFinite(n) && n > m ? n : m
+  }, 0)
+  return `EMP-${String(max + 1).padStart(3, '0')}`
 }
 
 /**
@@ -55,6 +69,9 @@ export const usersApi = {
       name: input.name,
       email: input.email,
       phone: input.phone,
+      employeeId: input.employeeId,
+      departmentId: input.departmentId,
+      position: input.position,
       role: 'admin',
       status: input.status ?? 'active',
       createdAt: new Date().toISOString().slice(0, 10),
