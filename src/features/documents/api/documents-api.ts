@@ -441,7 +441,7 @@ export const documentsApi = {
     docId: string,
     signerId: string,
     comment?: string,
-    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string },
+    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string; signatureImage?: string },
   ): Promise<AppDocument> => {
     await delay(150)
     const doc = findOrThrow(docId)
@@ -461,6 +461,7 @@ export const documentsApi = {
       documentVersion: doc.version,
       ...(comment ? { comment } : {}),
       ...(metadata?.userAgent ? { userAgent: metadata.userAgent } : {}),
+      ...(metadata?.signatureImage ? { signatureImage: metadata.signatureImage } : {}),
     }
     doc.signatures = [...doc.signatures, sig]
     doc.currentApproverIndex = expectedIndex + 1

@@ -46,6 +46,8 @@ export interface DocumentSignature {
   /** Browser/device fingerprint captured client-side. Server-side impls would
    * also record IP and authentication context. */
   userAgent?: string
+  /** Base64-encoded PNG of the signer's captured signature (drawn or uploaded). */
+  signatureImage?: string
   revokedAt?: string
   revokedBy?: string
   revocationReason?: string

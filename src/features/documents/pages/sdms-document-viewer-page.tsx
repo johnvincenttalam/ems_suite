@@ -39,6 +39,7 @@ import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } from '@/features/documents/components/document-meta'
 import { formatFileSize } from '@/features/documents/components/file-icon'
 import { cn } from '@/shared/utils/cn'
+import { SignatureModal } from '@/features/documents/components/signature'
 
 type ViewerTab = 'preview' | 'metadata' | 'versions' | 'audit'
 
@@ -60,6 +61,7 @@ export function SdmsDocumentViewerPage() {
   const [comment, setComment] = useState('')
   const [commentError, setCommentError] = useState<string | null>(null)
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false)
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false)
 
   const accessMutation = useMutation({
     mutationFn: ({ docId, activity }: { docId: string; activity: 'view' | 'download' }) => {
@@ -84,10 +86,11 @@ export function SdmsDocumentViewerPage() {
   }
 
   const signMutation = useMutation({
-    mutationFn: ({ docId, comment }: { docId: string; comment?: string }) => {
+    mutationFn: ({ docId, comment, signatureImage }: { docId: string; comment?: string; signatureImage?: string }) => {
       if (!user) throw new Error('Not signed in')
       return documentsApi.sign(docId, user.id, comment, {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        signatureImage,
       })
     },
     onSuccess: (updated) => {
@@ -184,7 +187,14 @@ export function SdmsDocumentViewerPage() {
 
   const onApprove = () => {
     setCommentError(null)
-    signMutation.mutate({ docId: doc.id, comment: comment.trim() || undefined })
+    setSignatureModalOpen(true)
+  }
+
+  const onSignatureConfirm = (signatureImage: string, modalComment?: string) => {
+    signMutation.mutate(
+      { docId: doc.id, comment: modalComment, signatureImage },
+      { onSettled: () => setSignatureModalOpen(false) },
+    )
   }
 
   const onDisapprove = () => {
@@ -383,6 +393,14 @@ export function SdmsDocumentViewerPage() {
         tone="warning"
         busy={resubmitMutation.isPending}
       />
+
+      <SignatureModal
+        open={signatureModalOpen}
+        onClose={() => setSignatureModalOpen(false)}
+        onConfirm={onSignatureConfirm}
+        title={`Sign ${doc.title}`}
+        busy={signMutation.isPending}
+      />
     </motion.div>
   )
 }
@@ -488,6 +506,9 @@ function VersionsView({ doc, userMap }: { doc: AppDocument; userMap: Record<stri
                   </span>
                 )}
               </div>
+              {s.signatureImage && (
+                <img src={s.signatureImage} alt={`Signature by ${userMap[s.signerId]?.name ?? s.signerId}`} className="mt-2 max-h-[60px] rounded border border-zinc-200 bg-white p-1" />
+              )}
               {!active && (
                 <p className="text-[12px] text-red-700 mt-1">
                   Revoked

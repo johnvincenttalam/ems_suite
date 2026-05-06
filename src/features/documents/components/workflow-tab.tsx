@@ -22,16 +22,12 @@ import { FileIcon, formatFileSize } from './file-icon'
 import { WorkflowChain } from './workflow-chain'
 import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } from './document-meta'
 import { DocumentDetailDrawer } from './document-detail-drawer'
-
-const signSchema = z.object({
-  comment: z.string().optional(),
-})
+import { SignatureModal } from './signature'
 
 const rejectSchema = z.object({
   reason: z.string().min(2, 'Reason is required'),
 })
 
-type SignForm = z.infer<typeof signSchema>
 type RejectForm = z.infer<typeof rejectSchema>
 
 export function WorkflowTab() {
@@ -48,7 +44,6 @@ export function WorkflowTab() {
   const [rejectTarget, setRejectTarget] = useState<AppDocument | null>(null)
   const [drawerDoc, setDrawerDoc] = useState<AppDocument | null>(null)
 
-  const signForm = useForm<SignForm>({ resolver: zodResolver(signSchema) })
   const rejectForm = useForm<RejectForm>({ resolver: zodResolver(rejectSchema) })
 
   const invalidate = () => {
@@ -57,10 +52,11 @@ export function WorkflowTab() {
   }
 
   const signMutation = useMutation({
-    mutationFn: ({ doc, comment }: { doc: AppDocument; comment?: string }) => {
+    mutationFn: ({ doc, comment, signatureImage }: { doc: AppDocument; comment?: string; signatureImage?: string }) => {
       if (!user) throw new Error('Not signed in')
       return documentsApi.sign(doc.id, user.id, comment, {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        signatureImage,
       })
     },
     onSuccess: (updated) => {
@@ -86,11 +82,11 @@ export function WorkflowTab() {
     },
   })
 
-  const onSign = (data: SignForm) => {
+  const onSignatureConfirm = (signatureImage: string, comment?: string) => {
     if (!signTarget) return
     signMutation.mutate(
-      { doc: signTarget, comment: data.comment },
-      { onSettled: () => { setSignTarget(null); signForm.reset() } },
+      { doc: signTarget, comment, signatureImage },
+      { onSettled: () => setSignTarget(null) },
     )
   }
 
@@ -183,18 +179,13 @@ export function WorkflowTab() {
 
       <DocumentDetailDrawer document={drawerDoc} onClose={() => setDrawerDoc(null)} />
 
-      <Modal open={!!signTarget} onClose={() => { setSignTarget(null); signForm.reset() }} title={`Sign ${signTarget?.title ?? ''}`} size="md">
-        <form onSubmit={signForm.handleSubmit(onSign)} className="space-y-4">
-          <p className="text-[13px] text-zinc-500">
-            Your digital signature will be recorded with a timestamp.
-          </p>
-          <Textarea label="Comment (optional)" {...signForm.register('comment')} rows={3} placeholder="Reviewed and approved..." />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setSignTarget(null); signForm.reset() }} disabled={signMutation.isPending}>Cancel</Button>
-            <Button type="submit" variant="success" fullWidth loading={signMutation.isPending}>Confirm Signature</Button>
-          </div>
-        </form>
-      </Modal>
+      <SignatureModal
+        open={!!signTarget}
+        onClose={() => setSignTarget(null)}
+        onConfirm={onSignatureConfirm}
+        title={`Sign ${signTarget?.title ?? ''}`}
+        busy={signMutation.isPending}
+      />
 
       <Modal open={!!rejectTarget} onClose={() => { setRejectTarget(null); rejectForm.reset() }} title={`Disapprove ${rejectTarget?.title ?? ''}`} size="md">
         <form onSubmit={rejectForm.handleSubmit(onReject)} className="space-y-4">
