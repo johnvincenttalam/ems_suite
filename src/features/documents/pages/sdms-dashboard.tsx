@@ -27,11 +27,11 @@ import {
   isAfter,
   isToday,
 } from 'date-fns'
-import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { useSdmsTaskBuckets } from '@/features/documents/hooks/use-sdms-task-buckets'
 import { useUsers } from '@/features/users'
 import { StatCard } from '@/shared/ui/stat-card'
+import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import {
@@ -71,7 +71,6 @@ function isOverdue(doc: AppDocument): boolean {
 }
 
 export function SdmsDashboard() {
-  const { user } = useAuthStore()
   const { data: documents = [], isLoading } = useDocuments()
   const { data: users = [] } = useUsers()
   const navigate = useNavigate()
@@ -165,24 +164,21 @@ export function SdmsDashboard() {
     )
   }
 
-  const firstName = user?.name?.split(' ')[0] ?? ''
-
   return (
     <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
-      <motion.div variants={itemVariants} className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">Dashboard</h1>
-          <p className="text-[13px] text-zinc-500 mt-1">
-            Welcome back{firstName ? `, ${firstName}` : ''}! Here&rsquo;s what&rsquo;s happening today.
-          </p>
-        </div>
-        <Link
-          to="create-document"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-accent-fg text-[13px] font-medium hover:bg-accent-hover transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create Document
-        </Link>
+      <motion.div variants={itemVariants}>
+        <DashboardGreeting
+          subtitle="Documents in flight, approvals, and signing activity at a glance."
+          actions={
+            <Link
+              to="create-document"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-accent-fg text-[13px] font-medium hover:bg-accent-hover transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Document
+            </Link>
+          }
+        />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">

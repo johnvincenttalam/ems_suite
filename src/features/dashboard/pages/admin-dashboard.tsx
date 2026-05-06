@@ -4,14 +4,13 @@ import {
   Boxes, Package, ShoppingCart, Wrench,
   TrendingUp, ArrowRight,
 } from 'lucide-react'
-import { format } from 'date-fns'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useReportsData } from '@/features/reports/hooks/use-reports-data'
 import { StatCard } from '@/shared/ui/stat-card'
+import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { formatCompactCurrency, formatCurrency } from '@/shared/utils/format'
@@ -42,7 +41,6 @@ const tooltipStyle = {
 }
 
 export function AdminDashboard() {
-  const { user } = useAuthStore()
   const data = useReportsData()
   const k = data.kpis
 
@@ -71,10 +69,7 @@ export function AdminDashboard() {
   return (
     <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
       <motion.div variants={itemVariants}>
-        <h1 className="text-lg font-semibold text-zinc-900 tracking-tight">Executive Overview</h1>
-        <p className="text-[13px] text-zinc-500 mt-1">
-          Welcome back, {user?.name?.split(' ')[0]}. Today is {format(new Date(), 'EEEE, MMMM d, yyyy')}.
-        </p>
+        <DashboardGreeting subtitle="Executive overview across inventory, assets, procurement, and maintenance." />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">

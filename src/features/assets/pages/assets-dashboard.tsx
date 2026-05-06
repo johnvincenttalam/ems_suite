@@ -23,14 +23,14 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { format, formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
-import { useAuthStore } from '@/features/auth/store/auth-store'
+import { formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
 import { useAssets, useAssetAssignments } from '@/features/assets'
 import { useCategories } from '@/features/categories'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
 import { useUsers } from '@/features/users'
 import { StatCard } from '@/shared/ui/stat-card'
+import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { formatCompactCurrency } from '@/shared/utils/format'
@@ -67,7 +67,6 @@ const tooltipStyle = {
 const ASSET_KINDS = new Set(['asset_in_maintenance', 'asset_assignment_open'])
 
 export function AssetsDashboard() {
-  const { user } = useAuthStore()
   const { data: assets = [], isLoading } = useAssets()
   const { data: assignments = [] } = useAssetAssignments()
   const { data: categories = [] } = useCategories()
@@ -163,35 +162,31 @@ export function AssetsDashboard() {
 
   return (
     <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
-      <motion.div variants={itemVariants} className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-[12px] text-zinc-400">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-          <h1 className="text-xl font-semibold text-zinc-900 tracking-tight mt-1">
-            Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
-          </h1>
-          <p className="text-[13px] text-zinc-500 mt-1">
-            Asset registry, assignments, and lifecycle health.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="alerts"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-[13px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            Alerts
-            {unreadCount > 0 && (
-              <span className="px-1.5 py-0.5 bg-red-50 text-red-600 text-[11px] font-medium rounded-full">{unreadCount}</span>
-            )}
-          </Link>
-          <Link
-            to="registry"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[13px] hover:bg-zinc-800 transition-colors"
-          >
-            <Package className="w-4 h-4" />
-            Open Registry
-          </Link>
-        </div>
+      <motion.div variants={itemVariants}>
+        <DashboardGreeting
+          subtitle="Asset registry, assignments, and lifecycle health."
+          actions={
+            <>
+              <Link
+                to="alerts"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-[13px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                Alerts
+                {unreadCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-red-50 text-red-600 text-[11px] font-medium rounded-full">{unreadCount}</span>
+                )}
+              </Link>
+              <Link
+                to="registry"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[13px] hover:bg-zinc-800 transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                Open Registry
+              </Link>
+            </>
+          }
+        />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
