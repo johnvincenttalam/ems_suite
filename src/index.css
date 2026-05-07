@@ -86,8 +86,20 @@
   .dark .bg-white { background-color: #18181b !important; }
   .dark .bg-surface { background-color: #09090b !important; }
   .dark .bg-zinc-50 { background-color: #1a1a1e !important; }
+  .dark .bg-zinc-50\/30 { background-color: rgba(26, 26, 30, 0.3) !important; }
+  .dark .bg-zinc-50\/40 { background-color: rgba(26, 26, 30, 0.4) !important; }
   .dark .bg-zinc-50\/50 { background-color: rgba(26, 26, 30, 0.5) !important; }
+  .dark .bg-zinc-50\/60 { background-color: rgba(26, 26, 30, 0.6) !important; }
   .dark .bg-zinc-100 { background-color: #27272a !important; }
+  .dark .bg-zinc-100\/50 { background-color: rgba(39, 39, 42, 0.5) !important; }
+  .dark .bg-zinc-200\/60 { background-color: rgba(63, 63, 70, 0.6) !important; }
+
+  /* bg-white with high alpha would render near-white on the dark surface
+     (PDF toolbar etc). bg-white/10 and bg-white/20 are intentional overlays
+     on already-dark surfaces (sidebar menu buttons) so they're left alone. */
+  .dark .bg-white\/95 { background-color: rgba(24, 24, 27, 0.95) !important; }
+  .dark .bg-white\/90 { background-color: rgba(24, 24, 27, 0.9) !important; }
+  .dark .bg-white\/80 { background-color: rgba(24, 24, 27, 0.8) !important; }
 
   /* Tinted icon backgrounds in dark mode */
   .dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.12) !important; }
@@ -100,17 +112,65 @@
   .dark .bg-cyan-50 { background-color: rgba(6, 182, 212, 0.12) !important; }
   .dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.12) !important; }
 
+  /* Tinted backgrounds with alpha modifiers — used for hover/selected states
+     and subtle banners. Without these, /30..60 alphas render the raw light
+     50-shade over the dark surface, making the panel pop bright. */
+  .dark .bg-emerald-50\/30 { background-color: rgba(16, 185, 129, 0.04) !important; }
+  .dark .bg-emerald-50\/40 { background-color: rgba(16, 185, 129, 0.05) !important; }
+  .dark .bg-emerald-50\/50 { background-color: rgba(16, 185, 129, 0.06) !important; }
+  .dark .bg-emerald-50\/60 { background-color: rgba(16, 185, 129, 0.07) !important; }
+  .dark .bg-amber-50\/30 { background-color: rgba(245, 158, 11, 0.04) !important; }
+  .dark .bg-amber-50\/40 { background-color: rgba(245, 158, 11, 0.05) !important; }
+  .dark .bg-amber-50\/60 { background-color: rgba(245, 158, 11, 0.07) !important; }
+  .dark .bg-blue-50\/40 { background-color: rgba(59, 130, 246, 0.05) !important; }
+  .dark .bg-blue-50\/60 { background-color: rgba(59, 130, 246, 0.07) !important; }
+  .dark .bg-red-50\/40 { background-color: rgba(239, 68, 68, 0.05) !important; }
+
   .dark .text-zinc-900 { color: #fafafa !important; }
   .dark .text-zinc-800 { color: #e4e4e7 !important; }
   .dark .text-zinc-700 { color: #d4d4d8 !important; }
   .dark .text-zinc-600 { color: #a1a1aa !important; }
   .dark .text-zinc-500 { color: #a1a1aa !important; }
   .dark .text-zinc-400 { color: #71717a !important; }
+  /* text-zinc-300 is the "barely-there" placeholder color in light mode
+     (dimmed empty-state icons, em-dash placeholders). Without this override
+     it would render as #d4d4d8 — almost white — on dark surfaces. */
+  .dark .text-zinc-300 { color: #52525b !important; }
+  /* text-zinc-200 is even fainter — used as the donut "track" (gap behind
+     filled arcs). Without this it'd be near-white in dark mode. */
+  .dark .text-zinc-200 { color: #3f3f46 !important; }
+
+  /* Recharts uses inline SVG presentation attributes (stroke, fill) on grid
+     lines and tick labels which CSS without !important won't reach for
+     `style=""` attribute values. !important on a class selector wins, and
+     these recharts class names are stable across versions. */
+  .dark .recharts-cartesian-grid line { stroke: #27272a !important; }
+  .dark .recharts-cartesian-axis-tick-value { fill: #71717a !important; }
+  .dark .recharts-text { fill: #a1a1aa !important; }
+  .dark .recharts-default-tooltip {
+    background-color: #18181b !important;
+    border-color: #3f3f46 !important;
+    color: #e4e4e7 !important;
+  }
 
   .dark .border-zinc-200\/60 { border-color: rgba(63, 63, 70, 0.6) !important; }
+  .dark .border-zinc-200\/80 { border-color: rgba(63, 63, 70, 0.8) !important; }
   .dark .border-zinc-200 { border-color: #3f3f46 !important; }
   .dark .border-zinc-100 { border-color: #27272a !important; }
   .dark .border-zinc-100\/60 { border-color: rgba(39, 39, 42, 0.6) !important; }
+
+  /* divide-* utilities apply border-color to a child selector
+     (`> :not([hidden]) ~ :not([hidden])`) which the .border-* overrides
+     above don't reach. Mirror them here so divide-y dividers stay dark. */
+  .dark .divide-zinc-100 > :not([hidden]) ~ :not([hidden]) { border-color: #27272a !important; }
+  .dark .divide-zinc-200 > :not([hidden]) ~ :not([hidden]) { border-color: #3f3f46 !important; }
+  .dark .divide-zinc-100\/60 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(39, 39, 42, 0.6) !important; }
+  .dark .divide-zinc-200\/60 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(63, 63, 70, 0.6) !important; }
+
+  /* Surfaces that represent printed paper — signature canvases, signature
+     previews, rendered document pages. Stay white in both modes because the
+     content (dark ink, dark glyphs) needs the white substrate to be readable. */
+  .surface-paper { background-color: #ffffff !important; }
 
   .dark input, .dark select, .dark textarea {
     background-color: #18181b !important;

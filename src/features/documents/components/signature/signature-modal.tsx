@@ -81,7 +81,7 @@ export function SignatureModal({ open, onClose, onConfirm, title, busy }: Signat
         {signatureImage && (
           <div>
             <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-1.5">Preview</p>
-            <div className="rounded-lg border border-zinc-200 bg-white p-2 flex items-center justify-center">
+            <div className="surface-paper rounded-lg border border-zinc-200 p-2 flex items-center justify-center">
               <img src={signatureImage} alt="Signature preview" className="max-h-[120px] object-contain" />
             </div>
           </div>

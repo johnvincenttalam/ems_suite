@@ -199,20 +199,21 @@ export function CycleCountPage() {
               No sessions yet — schedule your first count to get started.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-100">
-              {sessions.map((s) => {
+            <ul>
+              {sessions.map((s, i) => {
                 const counted = s.lines.filter((l) => l.actualQty !== undefined).length
                 const total = s.lines.length
                 const progress = total > 0 ? Math.round((counted / total) * 100) : 0
                 const isSelected = selected?.id === s.id
+                const isLast = i === sessions.length - 1
                 return (
-                  <li key={s.id}>
+                  <li key={s.id} className={cn(!isLast && 'border-b border-zinc-100')}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(s.id)}
                       className={cn(
                         'w-full text-left px-5 py-4 hover:bg-zinc-50/50 transition-colors',
-                        isSelected && 'bg-zinc-50/70',
+                        isSelected && 'bg-zinc-50',
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -535,7 +536,7 @@ function SummaryDonut({ total, match, variance, notCounted }: { total: number; m
   return (
     <div className="flex items-center justify-center">
       <svg viewBox="0 0 100 100" className="w-32 h-32 -rotate-90">
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="#e4e4e7" strokeWidth="14" />
+        <circle cx="50" cy="50" r={radius} fill="none" stroke="currentColor" className="text-zinc-200" strokeWidth="14" />
         {match > 0 && (
           <circle
             cx="50"
@@ -565,16 +566,17 @@ function SummaryDonut({ total, match, variance, notCounted }: { total: number; m
             cy="50"
             r={radius}
             fill="none"
-            stroke="#d4d4d8"
+            stroke="currentColor"
+            className="text-zinc-300"
             strokeWidth="14"
             strokeDasharray={`${notCountedLen} ${circumference - notCountedLen}`}
             strokeDashoffset={-(matchLen + varianceLen)}
           />
         )}
-        <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="600" fill="#18181b" transform="rotate(90, 50, 50)">
+        <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="14" fontWeight="600" fill="currentColor" className="text-zinc-900" transform="rotate(90, 50, 50)">
           {total}
         </text>
-        <text x="50" y="62" textAnchor="middle" dominantBaseline="central" fontSize="6" fill="#71717a" transform="rotate(90, 50, 50)">
+        <text x="50" y="62" textAnchor="middle" dominantBaseline="central" fontSize="6" fill="currentColor" className="text-zinc-400" transform="rotate(90, 50, 50)">
           ITEMS
         </text>
       </svg>
@@ -593,7 +595,7 @@ function FinalizePreview({ session, itemMap }: { session: CycleCountSession; ite
     )
   }
   return (
-    <div className="rounded-md border border-zinc-200/60 bg-zinc-50/40 max-h-48 overflow-y-auto">
+    <div className="rounded-md border border-zinc-200/60 bg-zinc-50/50 max-h-48 overflow-y-auto">
       <table className="w-full text-[12px]">
         <thead>
           <tr className="text-zinc-400">

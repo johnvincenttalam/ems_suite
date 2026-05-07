@@ -35,7 +35,7 @@ export function SignaturePad({ onCapture, onClear }: SignaturePadProps) {
 
   return (
     <div className="space-y-2">
-      <div className="rounded-lg border border-zinc-200 bg-white cursor-crosshair overflow-hidden">
+      <div className="surface-paper rounded-lg border border-zinc-200 cursor-crosshair overflow-hidden">
         <SignatureCanvas
           ref={sigRef}
           penColor="#18181b"

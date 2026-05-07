@@ -540,7 +540,7 @@ function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaP
   if (isImage && safeUrl) {
     return (
       <div className="rounded-lg border border-zinc-200/60 bg-zinc-100/50 p-4">
-        <div className="relative mx-auto bg-white shadow-sm" style={{ maxWidth: 800 }}>
+        <div className="surface-paper relative mx-auto shadow-sm" style={{ maxWidth: 800 }}>
           <img
             src={safeUrl}
             alt={doc.title}
@@ -673,7 +673,7 @@ function VersionsView({ doc, userMap, currentUserId, onRevoke, onReposition }: V
                 )}
               </div>
               {s.signatureImage && (
-                <img src={s.signatureImage} alt={`Signature by ${userMap[s.signerId]?.name ?? s.signerId}`} className="mt-2 max-h-[60px] rounded border border-zinc-200 bg-white p-1" />
+                <img src={s.signatureImage} alt={`Signature by ${userMap[s.signerId]?.name ?? s.signerId}`} className="surface-paper mt-2 max-h-[60px] rounded border border-zinc-200 p-1" />
               )}
               {!active && (
                 <p className="text-[12px] text-red-700 mt-1">

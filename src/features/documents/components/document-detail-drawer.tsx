@@ -281,7 +281,7 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
                                 <p className={cn('text-[13px] mt-2', active ? 'text-zinc-700' : 'text-zinc-500 line-through')}>{s.comment}</p>
                               )}
                               {s.signatureImage && (
-                                <img src={s.signatureImage} alt={`Signature by ${userMap[s.signerId]?.name ?? s.signerId}`} className="mt-2 max-h-[60px] rounded border border-zinc-200 bg-white p-1" />
+                                <img src={s.signatureImage} alt={`Signature by ${userMap[s.signerId]?.name ?? s.signerId}`} className="surface-paper mt-2 max-h-[60px] rounded border border-zinc-200 p-1" />
                               )}
                               {!active && (
                                 <p className="text-[12px] text-red-700 mt-2">

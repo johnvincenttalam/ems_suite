@@ -45,7 +45,7 @@ export function SignatureUpload({ signatureImage, onCapture, onRemove }: Signatu
   if (signatureImage) {
     return (
       <div className="space-y-2">
-        <div className="rounded-lg border border-zinc-200 bg-white p-3 flex items-center justify-center">
+        <div className="surface-paper rounded-lg border border-zinc-200 p-3 flex items-center justify-center">
           <img src={signatureImage} alt="Uploaded signature" className="max-h-[160px] object-contain" />
         </div>
         <Button type="button" variant="ghost" size="sm" leftIcon={<X className="w-3.5 h-3.5" />} onClick={onRemove}>

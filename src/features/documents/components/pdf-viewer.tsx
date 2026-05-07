@@ -143,7 +143,7 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
                 key={page}
                 ref={setPageRef(page)}
                 data-page={page}
-                className="relative mx-auto bg-white shadow-sm"
+                className="surface-paper relative mx-auto shadow-sm"
                 style={{ maxWidth: 800 }}
               >
                 <Page pageNumber={page} width={Math.min(width - 32, 800)} renderAnnotationLayer={false} renderTextLayer={false} />

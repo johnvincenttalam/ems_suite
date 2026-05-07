@@ -178,7 +178,7 @@ export function SignatureSlotEditor({ referenceUrl, slots, onChange, approverNam
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="relative mx-auto bg-white border border-zinc-200/60 shadow-sm select-none touch-none"
+        className="surface-paper relative mx-auto border border-zinc-200/60 shadow-sm select-none touch-none"
         style={{ maxWidth: 720, cursor: op?.kind === 'draw' ? 'crosshair' : 'default' }}
       >
         {!safeUrl ? (
