@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -502,13 +502,28 @@ interface ActualInputProps {
 
 function ActualInput({ line, disabled, onCommit }: ActualInputProps) {
   const [draft, setDraft] = useState<string>(line.actualQty !== undefined ? String(line.actualQty) : '')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sync from external updates (e.g. another counter recorded this line)
+  // unless the field is currently focused — don't clobber typing in progress.
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) return
+    setDraft(line.actualQty !== undefined ? String(line.actualQty) : '')
+  }, [line.actualQty])
+
   return (
     <input
+      ref={inputRef}
       type="number"
       min={0}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
+        // Empty / whitespace-only → leave the line uncounted; do NOT commit 0.
+        if (draft.trim() === '') {
+          setDraft(line.actualQty !== undefined ? String(line.actualQty) : '')
+          return
+        }
         const n = Number(draft)
         if (!Number.isFinite(n) || n < 0) {
           setDraft(line.actualQty !== undefined ? String(line.actualQty) : '')

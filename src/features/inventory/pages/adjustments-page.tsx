@@ -150,7 +150,7 @@ export function AdjustmentsPage() {
 
   const itemOptions = items.map((i) => ({ value: i.id, label: `${i.sku} — ${i.name}` }))
   const approverOptions = users
-    .filter((u) => u.status === 'active' && u.modules.includes('inventory') && u.name !== currentUser?.name)
+    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('inventory') && u.name !== currentUser?.name)
     .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
   return (

@@ -311,7 +311,12 @@ export function InventoryDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between flex">
             <CardTitle>Stock Trend (Last 6 Months)</CardTitle>
-            <span className="text-[11px] text-zinc-400">Total stock value</span>
+            <span
+              className="text-[11px] text-zinc-400"
+              title="Estimated: historical months are valued at the current unit cost. Real cost-history isn't tracked yet."
+            >
+              Estimated value
+            </span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div style={{ width: '100%', height: 240 }}>

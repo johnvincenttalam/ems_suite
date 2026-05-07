@@ -90,15 +90,18 @@ export function InventoryReportsPage() {
   const [tab, setTab] = useState<ReportsTab>('generate')
 
   const stats = useMemo(() => {
+    // Movement stats only count *applied* movements — pending/rejected
+    // submissions shouldn't show up in turnover or recent-activity counts.
+    const applied = movements.filter((m) => m.status === 'applied')
     const total = items.length
     const stockOuts = items.filter((i) => i.quantity === 0).length
     const lowStock = items.filter((i) => i.quantity > 0 && i.quantity <= i.reorderLevel).length
     const totalValue = items.reduce((s, i) => s + i.quantity * (i.unitCost ?? 0), 0)
     const today = new Date()
     const last30 = subDays(today, 30)
-    const recentMovements = movements.filter((m) => isAfter(parseISO(m.createdAt), last30)).length
-    const inMovements = movements.filter((m) => m.type === 'in').length
-    const outMovements = movements.filter((m) => m.type === 'out').length
+    const recentMovements = applied.filter((m) => isAfter(parseISO(m.createdAt), last30)).length
+    const inMovements = applied.filter((m) => m.type === 'in').length
+    const outMovements = applied.filter((m) => m.type === 'out').length
     const turnoverHint = total === 0 ? 0 : Math.round((outMovements / total) * 100) / 100
     return { total, stockOuts, lowStock, totalValue, recentMovements, inMovements, outMovements, turnoverHint }
   }, [items, movements])
@@ -133,7 +136,7 @@ export function InventoryReportsPage() {
     const last90 = subDays(today, 90)
     const movedItemIds = new Set(
       movements
-        .filter((m) => isAfter(parseISO(m.createdAt), last90))
+        .filter((m) => m.status === 'applied' && isAfter(parseISO(m.createdAt), last90))
         .map((m) => m.itemId),
     )
     return items
@@ -265,9 +268,16 @@ function GenerateReportPanel({ warehouses, categories }: { warehouses: { id: str
 
   const meta = REPORT_TYPES.find((r) => r.value === selectedType)!
 
+  const dateRangeError =
+    dateFrom && dateTo && dateFrom > dateTo ? 'Start date must be on or before end date' : null
+
   const handleGenerate = () => {
     if (!currentUser) {
       toast.error('Not signed in')
+      return
+    }
+    if (dateRangeError) {
+      toast.error(dateRangeError)
       return
     }
     const r = record({
@@ -282,11 +292,15 @@ function GenerateReportPanel({ warehouses, categories }: { warehouses: { id: str
       },
       generatedBy: currentUser.name,
     })
-    toast.success(`${r.name} generated`, { description: `${r.id} · ${r.format.toUpperCase()}` })
+    toast.success(`${r.name} queued`, {
+      description: `${r.id} · ${r.format.toUpperCase()} — generation will run on the backend (mock)`,
+    })
   }
 
   const handleDownload = (id: string, name: string) => {
-    toast.info(`Downloading ${id}`, { description: `Mock download for ${name}` })
+    toast.info('Download not available yet', {
+      description: `${id} (${name}) is recorded but won't deliver a file until the report backend is wired up.`,
+    })
   }
 
   const warehouseOptions = [{ value: '', label: 'All warehouses' }, ...warehouses.map((w) => ({ value: w.id, label: w.name }))]
@@ -333,14 +347,23 @@ function GenerateReportPanel({ warehouses, categories }: { warehouses: { id: str
             <p className="text-[13px] font-semibold text-zinc-900">{meta.label}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Date from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <Input
+              label="Date from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              error={dateRangeError ?? undefined}
+            />
             <Input label="Date to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             <Select label="Warehouse" options={warehouseOptions} value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} />
             <Select label="Category" options={categoryOptions} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} />
             <Select label="Format" options={FORMAT_OPTIONS} value={reportFormat} onChange={(e) => setReportFormat(e.target.value as InventoryReportFormat)} />
           </div>
+          <p className="text-[11px] text-zinc-400 mt-3">
+            Generation is mocked — submitted requests are recorded for audit, but no file is produced until the backend reporting service is wired up.
+          </p>
           <div className="flex justify-end mt-4">
-            <Button onClick={handleGenerate} leftIcon={<FileText className="w-4 h-4" />}>
+            <Button onClick={handleGenerate} disabled={!!dateRangeError} leftIcon={<FileText className="w-4 h-4" />}>
               Generate Report
             </Button>
           </div>
