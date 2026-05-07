@@ -195,12 +195,12 @@ describe('inventoryApi.addMovement', () => {
     expect(targetAfter.quantity).toBe(startingQty - 2)
   })
 
-  it('leaves the bound item quantity unchanged on transfer', async () => {
+  it('leaves the bound item quantity unchanged on transfer (pending until approved)', async () => {
     const itemsBefore = await inventoryApi.listItems()
     const target = itemsBefore[0]
     const startingQty = target.quantity
 
-    await inventoryApi.addMovement({
+    const m = await inventoryApi.addMovement({
       itemId: target.id,
       type: 'transfer',
       quantity: 3,
@@ -208,10 +208,117 @@ describe('inventoryApi.addMovement', () => {
       destinationLocationId: 'W002',
       reason: 'unit test transfer',
       createdBy: 'Admin User',
+      approverId: 'Jane Doe',
     })
+
+    expect(m.status).toBe('pending')
 
     const itemsAfter = await inventoryApi.listItems()
     const targetAfter = itemsAfter.find((i) => i.id === target.id)!
     expect(targetAfter.quantity).toBe(startingQty)
+  })
+
+  it('throws when transfer is submitted without an approver', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+    await expect(
+      inventoryApi.addMovement({
+        itemId: target.id,
+        type: 'transfer',
+        quantity: 3,
+        sourceLocationId: 'W001',
+        destinationLocationId: 'W002',
+        reason: 'unit test transfer no approver',
+        createdBy: 'Admin User',
+      }),
+    ).rejects.toThrow(/approver/i)
+  })
+})
+
+describe('inventoryApi.approveMovement / rejectMovement', () => {
+  it('approving an adjustment posts the stock change and flips status to applied', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+    const startingQty = target.quantity
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'adjustment',
+      quantity: -5,
+      sourceLocationId: target.warehouseId,
+      reason: 'unit test adjustment',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+    expect(submitted.status).toBe('pending')
+
+    const approved = await inventoryApi.approveMovement(submitted.id, 'Jane Doe')
+    expect(approved.status).toBe('applied')
+    expect(approved.approvedBy).toBe('Jane Doe')
+
+    const itemsAfter = await inventoryApi.listItems()
+    const targetAfter = itemsAfter.find((i) => i.id === target.id)!
+    expect(targetAfter.quantity).toBe(startingQty - 5)
+  })
+
+  it('rejecting leaves stock unchanged and stamps the reason', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+    const startingQty = target.quantity
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'adjustment',
+      quantity: -7,
+      sourceLocationId: target.warehouseId,
+      reason: 'unit test rejection',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+
+    const rejected = await inventoryApi.rejectMovement(submitted.id, 'Variance too large', 'Jane Doe')
+    expect(rejected.status).toBe('rejected')
+    expect(rejected.rejectedReason).toBe('Variance too large')
+
+    const itemsAfter = await inventoryApi.listItems()
+    const targetAfter = itemsAfter.find((i) => i.id === target.id)!
+    expect(targetAfter.quantity).toBe(startingQty)
+  })
+
+  it('throws when a non-approver tries to approve', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'transfer',
+      quantity: 1,
+      sourceLocationId: 'W001',
+      destinationLocationId: 'W002',
+      reason: 'wrong approver test',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+
+    await expect(inventoryApi.approveMovement(submitted.id, 'Mike Thompson')).rejects.toThrow(/not the assigned approver/i)
+  })
+
+  it('throws when approving an already-applied movement', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'transfer',
+      quantity: 1,
+      sourceLocationId: 'W001',
+      destinationLocationId: 'W002',
+      reason: 'double approve test',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+
+    await inventoryApi.approveMovement(submitted.id, 'Jane Doe')
+    await expect(inventoryApi.approveMovement(submitted.id, 'Jane Doe')).rejects.toThrow(/not pending/i)
   })
 })

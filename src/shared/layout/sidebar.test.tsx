@@ -15,6 +15,9 @@ vi.mock('@/config/features', async () => {
       roles: true,
       inventory: true,
       inventoryMovements: true,
+      inventoryStockInOut: true,
+      inventoryTransfers: true,
+      inventoryAdjustments: true,
       inventoryCycleCount: true,
       assets: true,
       assetAssignments: true,
@@ -67,7 +70,7 @@ describe('Sidebar', () => {
     enabledFlags = {
       dashboard: true, charts: true, table: true, forms: true,
       users: true, roles: true,
-      inventory: true, inventoryMovements: true, inventoryCycleCount: true,
+      inventory: true, inventoryMovements: true, inventoryStockInOut: true, inventoryTransfers: true, inventoryAdjustments: true, inventoryCycleCount: true,
       assets: true, assetAssignments: true,
       procurement: true, procurementApprovals: true,
       maintenance: true, maintenanceSchedule: true, maintenanceTechnicians: true,
@@ -80,8 +83,10 @@ describe('Sidebar', () => {
 
   it('renders only the items in the selected module (Inventory)', () => {
     renderSidebarFor('inventory', '/module/inventory')
-    expect(screen.getByRole('link', { name: /items/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /movements/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^items$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /stock in \/ out/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^transfers$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^adjustments$/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /cycle count/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /warehouses/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /categories/i })).toBeInTheDocument()

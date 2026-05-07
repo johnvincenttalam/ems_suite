@@ -16,6 +16,37 @@ interface AddMovementInput {
   destinationLocationId?: string
   reason?: string
   createdBy: string
+  /** Required for transfer/adjustment — the approver picked at submission. */
+  approverId?: string
+  batchNumber?: string
+  referenceNumber?: string
+}
+
+/**
+ * Apply a movement's stock change to the bound item. Centralizes the
+ * arithmetic so addMovement (in/out) and approveMovement (transfer/
+ * adjustment) stay in sync.
+ *
+ * - in:         destination += qty
+ * - out:        source -= qty
+ * - transfer:   source -= qty, destination += qty
+ * - adjustment: source += qty (positive replenishes, negative removes)
+ */
+function applyStockChange(movement: StockMovement): void {
+  const item = mockInventoryItems.find((i) => i.id === movement.itemId)
+  if (!item) return
+  if (movement.type === 'in') {
+    item.quantity += movement.quantity
+  } else if (movement.type === 'out') {
+    item.quantity -= movement.quantity
+  } else if (movement.type === 'transfer') {
+    // Both source and destination resolve to warehouses; for the demo we
+    // track stock on the item itself, so a transfer is net-zero on the
+    // item's quantity but still posted for audit. A future per-warehouse
+    // stock model would split this into two-sided ledger lines.
+  } else if (movement.type === 'adjustment') {
+    item.quantity += movement.quantity
+  }
 }
 
 interface AddItemInput {
@@ -144,12 +175,22 @@ export const inventoryApi = {
   },
 
   /**
-   * Records a stock movement and updates the bound item's `quantity`.
-   * Emits an audit log entry. Used by procurement.approve to close the
-   * Request → Approve → Stock In loop from the EMS spec.
+   * Records a stock movement.
+   *
+   * In/out movements apply immediately and start as 'applied'. Transfers
+   * and adjustments require approval — they start as 'pending' with no
+   * stock change posted. The approver runs `approveMovement` to apply, or
+   * `rejectMovement` to decline.
+   *
+   * Used by procurement.approve to close the Request → Approve → Stock In
+   * loop from the EMS spec (procurement passes type='in').
    */
   addMovement: async (input: AddMovementInput): Promise<StockMovement> => {
     movementCounter += 1
+    const requiresApproval = input.type === 'transfer' || input.type === 'adjustment'
+    if (requiresApproval && !input.approverId) {
+      throw new Error(`${input.type === 'transfer' ? 'Transfer' : 'Adjustment'} requires an approver`)
+    }
     const movement: StockMovement = {
       id: `MV-${String(movementCounter).padStart(4, '0')}`,
       itemId: input.itemId,
@@ -160,23 +201,87 @@ export const inventoryApi = {
       reason: input.reason,
       createdAt: new Date().toISOString(),
       createdBy: input.createdBy,
+      status: requiresApproval ? 'pending' : 'applied',
+      approverId: requiresApproval ? input.approverId : undefined,
+      batchNumber: input.batchNumber,
+      referenceNumber: input.referenceNumber,
     }
     mockStockMovements.unshift(movement)
 
-    const item = mockInventoryItems.find((i) => i.id === movement.itemId)
-    if (item) {
-      if (movement.type === 'in') item.quantity += movement.quantity
-      else if (movement.type === 'out') item.quantity -= movement.quantity
-      else if (movement.type === 'adjustment') item.quantity += movement.quantity
+    if (!requiresApproval) {
+      applyStockChange(movement)
     }
 
+    const item = mockInventoryItems.find((i) => i.id === movement.itemId)
+    const verb =
+      movement.type === 'in' ? 'Stock in'
+      : movement.type === 'out' ? 'Stock out'
+      : movement.type === 'transfer' ? 'Submitted transfer'
+      : 'Submitted adjustment'
     recordAudit({
       userId: input.createdBy,
-      action: movement.type === 'adjustment' ? 'update' : 'create',
+      action: requiresApproval ? 'update' : 'create',
       module: 'Inventory',
-      detail: `${movement.type === 'in' ? 'Stock in' : movement.type === 'out' ? 'Stock out' : movement.type === 'transfer' ? 'Transfer' : 'Adjustment'} ${movement.quantity > 0 ? '+' : ''}${movement.quantity} of ${item?.name ?? movement.itemId}${input.reason ? ` — ${input.reason}` : ''}`,
+      detail: `${verb} ${movement.quantity > 0 ? '+' : ''}${movement.quantity} of ${item?.name ?? movement.itemId}${input.reason ? ` — ${input.reason}` : ''}`,
     })
 
     return movement
+  },
+
+  /**
+   * Approve a pending transfer or adjustment. Posts the stock change and
+   * flips status to 'applied'. Throws if the movement isn't pending or the
+   * acting user isn't the named approver.
+   */
+  approveMovement: async (movementId: string, approverName: string): Promise<StockMovement> => {
+    await delay(120)
+    const m = mockStockMovements.find((x) => x.id === movementId)
+    if (!m) throw new Error(`Movement ${movementId} not found`)
+    if (m.status !== 'pending') throw new Error(`Movement ${movementId} is not pending`)
+    if (m.approverId && m.approverId !== approverName) {
+      throw new Error(`${approverName} is not the assigned approver`)
+    }
+    m.status = 'applied'
+    m.approvedBy = approverName
+    m.approvedAt = new Date().toISOString()
+    applyStockChange(m)
+
+    const item = mockInventoryItems.find((i) => i.id === m.itemId)
+    recordAudit({
+      userId: approverName,
+      action: 'approve',
+      module: 'Inventory',
+      detail: `Approved ${m.type} ${m.quantity > 0 ? '+' : ''}${m.quantity} of ${item?.name ?? m.itemId}${m.reason ? ` — ${m.reason}` : ''}`,
+    })
+
+    return m
+  },
+
+  /**
+   * Reject a pending transfer or adjustment. Status flips to 'rejected'
+   * and the stock change is never posted. The reason is stored for audit.
+   */
+  rejectMovement: async (movementId: string, reason: string, rejecterName: string): Promise<StockMovement> => {
+    await delay(120)
+    const m = mockStockMovements.find((x) => x.id === movementId)
+    if (!m) throw new Error(`Movement ${movementId} not found`)
+    if (m.status !== 'pending') throw new Error(`Movement ${movementId} is not pending`)
+    if (m.approverId && m.approverId !== rejecterName) {
+      throw new Error(`${rejecterName} is not the assigned approver`)
+    }
+    m.status = 'rejected'
+    m.rejectedBy = rejecterName
+    m.rejectedAt = new Date().toISOString()
+    m.rejectedReason = reason
+
+    const item = mockInventoryItems.find((i) => i.id === m.itemId)
+    recordAudit({
+      userId: rejecterName,
+      action: 'reject',
+      module: 'Inventory',
+      detail: `Rejected ${m.type} ${m.quantity > 0 ? '+' : ''}${m.quantity} of ${item?.name ?? m.itemId} — ${reason}`,
+    })
+
+    return m
   },
 }

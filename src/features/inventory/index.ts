@@ -1,5 +1,8 @@
 export { ItemsPage } from './pages/items-page'
 export { MovementsPage } from './pages/movements-page'
+export { StockInOutPage } from './pages/stock-in-out-page'
+export { TransfersPage } from './pages/transfers-page'
+export { AdjustmentsPage } from './pages/adjustments-page'
 export { CycleCountPage } from './pages/cycle-count-page'
 export { InventoryDashboard } from './pages/inventory-dashboard'
 export { InventoryAlertsPage } from './pages/inventory-alerts-page'

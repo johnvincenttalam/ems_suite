@@ -16,6 +16,8 @@ import {
   Activity,
   Calendar,
   ArrowLeftRight,
+  ArrowDownUp,
+  Edit3,
   UserCheck,
   Route as RouteIcon,
   Fuel,
@@ -136,8 +138,15 @@ export const modules: EmsModule[] = [
         title: 'Operations',
         items: [
           { label: 'Items', path: 'items', icon: Boxes, feature: 'inventory' },
-          { label: 'Movements', path: 'movements', icon: ArrowLeftRight, feature: 'inventoryMovements' },
+          { label: 'Stock In / Out', path: 'stock-in-out', icon: ArrowDownUp, feature: 'inventoryStockInOut' },
+          { label: 'Transfers', path: 'transfers', icon: ArrowLeftRight, feature: 'inventoryTransfers' },
+          { label: 'Adjustments', path: 'adjustments', icon: Edit3, feature: 'inventoryAdjustments' },
           { label: 'Cycle Count', path: 'cycle-count', icon: ClipboardList, feature: 'inventoryCycleCount' },
+        ],
+      },
+      {
+        items: [
+          { label: 'Movements', path: 'movements', icon: ArrowLeftRight, feature: 'inventoryMovements', hidden: true },
         ],
       },
       {

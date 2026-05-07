@@ -5,6 +5,9 @@ export const features = {
   // EMS — operational modules
   inventory: true,
   inventoryMovements: true,
+  inventoryStockInOut: true,
+  inventoryTransfers: true,
+  inventoryAdjustments: true,
   inventoryCycleCount: true,
   inventoryDashboard: true,
   inventoryAlerts: true,
