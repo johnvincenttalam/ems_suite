@@ -1,3 +1,7 @@
 export { SignatureModal } from './signature-modal'
 export { SignaturePad } from './signature-pad'
 export { SignatureUpload } from './signature-upload'
+export { SignatureLayer } from './signature-layer'
+export { SignatureOverlay } from './signature-overlay'
+export { SignatureSlotEditor } from './signature-slot-editor'
+export { toPixels } from './signature-coords'

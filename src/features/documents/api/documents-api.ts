@@ -15,6 +15,7 @@ import type {
   RoutingStatus,
   SignatureMethod,
   SignatureReason,
+  SignatureSlot,
 } from '@/features/documents/types'
 import { mockDocuments } from '@/features/documents/data/mock-documents'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
@@ -66,6 +67,8 @@ interface UploadDocumentInput {
   confidentiality?: DocumentConfidentiality
   departmentId?: string
   deadline?: string
+  signatureSlots?: SignatureSlot[]
+  assetUrl?: string
 }
 
 interface CreateDraftInput {
@@ -80,6 +83,8 @@ interface CreateDraftInput {
   priority?: DocumentPriority
   confidentiality?: DocumentConfidentiality
   departmentId?: string
+  signatureSlots?: SignatureSlot[]
+  assetUrl?: string
 }
 
 function nextDocumentId(): string {
@@ -332,6 +337,8 @@ export const documentsApi = {
       confidentiality: input.confidentiality,
       departmentId: input.departmentId,
       deadline: input.deadline,
+      signatureSlots: input.signatureSlots && input.signatureSlots.length > 0 ? input.signatureSlots : undefined,
+      assetUrl: input.assetUrl,
     }
     mockDocuments.push(doc)
 
@@ -372,6 +379,8 @@ export const documentsApi = {
       priority: input.priority,
       confidentiality: input.confidentiality,
       departmentId: input.departmentId,
+      signatureSlots: input.signatureSlots && input.signatureSlots.length > 0 ? input.signatureSlots : undefined,
+      assetUrl: input.assetUrl,
     }
     mockDocuments.push(doc)
 
@@ -441,7 +450,7 @@ export const documentsApi = {
     docId: string,
     signerId: string,
     comment?: string,
-    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string; signatureImage?: string },
+    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string; signatureImage?: string; slotKey?: string },
   ): Promise<AppDocument> => {
     await delay(150)
     const doc = findOrThrow(docId)
@@ -462,6 +471,7 @@ export const documentsApi = {
       ...(comment ? { comment } : {}),
       ...(metadata?.userAgent ? { userAgent: metadata.userAgent } : {}),
       ...(metadata?.signatureImage ? { signatureImage: metadata.signatureImage } : {}),
+      ...(metadata?.slotKey ? { slotKey: metadata.slotKey } : {}),
     }
     doc.signatures = [...doc.signatures, sig]
     doc.currentApproverIndex = expectedIndex + 1

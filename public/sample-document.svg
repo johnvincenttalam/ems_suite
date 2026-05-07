@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100" width="800" height="1100" preserveAspectRatio="xMidYMid meet" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <rect width="800" height="1100" fill="#ffffff" />
+  <rect x="0" y="0" width="800" height="6" fill="#0f172a" />
+
+  <text x="50" y="80" font-size="11" letter-spacing="2" font-weight="600" fill="#64748b">SDMS-2026-0008 · MEMORANDUM OF AGREEMENT</text>
+  <text x="50" y="130" font-size="32" font-weight="700" fill="#0f172a">Memorandum of Agreement</text>
+  <text x="50" y="160" font-size="14" fill="#475569">Between Acme Industrial Supply Co. and Northwind Operations Pte. Ltd.</text>
+
+  <line x1="50" y1="190" x2="750" y2="190" stroke="#e2e8f0" stroke-width="1" />
+
+  <text x="50" y="225" font-size="12" font-weight="600" fill="#0f172a">RECITALS</text>
+  <text x="50" y="250" font-size="12" fill="#475569">WHEREAS, the parties wish to establish the terms governing the supply of</text>
+  <text x="50" y="270" font-size="12" fill="#475569">industrial materials for the calendar year 2026;</text>
+
+  <text x="50" y="305" font-size="12" font-weight="600" fill="#0f172a">1. SCOPE OF AGREEMENT</text>
+  <text x="50" y="328" font-size="12" fill="#475569">Acme shall deliver materials per the schedule attached as Exhibit A. Northwind</text>
+  <text x="50" y="346" font-size="12" fill="#475569">shall settle invoices within thirty (30) calendar days of receipt.</text>
+
+  <text x="50" y="385" font-size="12" font-weight="600" fill="#0f172a">2. TERM AND TERMINATION</text>
+  <text x="50" y="408" font-size="12" fill="#475569">This agreement is effective from 1 May 2026 and remains valid until 30 April 2027</text>
+  <text x="50" y="426" font-size="12" fill="#475569">unless terminated earlier in accordance with Section 6.</text>
+
+  <text x="50" y="465" font-size="12" font-weight="600" fill="#0f172a">3. GOVERNING LAW</text>
+  <text x="50" y="488" font-size="12" fill="#475569">This agreement shall be governed by and construed in accordance with the laws</text>
+  <text x="50" y="506" font-size="12" fill="#475569">of the Republic of Singapore.</text>
+
+  <text x="50" y="550" font-size="12" font-weight="600" fill="#0f172a">4. EXECUTED BY THE PARTIES BELOW</text>
+
+  <line x1="80" y1="780" x2="360" y2="780" stroke="#94a3b8" stroke-width="1" />
+  <text x="80" y="800" font-size="11" font-weight="600" fill="#0f172a">For Acme Industrial Supply Co.</text>
+  <text x="80" y="816" font-size="10" fill="#94a3b8">Authorized Signatory · Date</text>
+
+  <line x1="440" y1="780" x2="720" y2="780" stroke="#94a3b8" stroke-width="1" />
+  <text x="440" y="800" font-size="11" font-weight="600" fill="#0f172a">For Northwind Operations Pte. Ltd.</text>
+  <text x="440" y="816" font-size="10" fill="#94a3b8">Authorized Signatory · Date</text>
+
+  <line x1="80" y1="940" x2="360" y2="940" stroke="#94a3b8" stroke-width="1" />
+  <text x="80" y="960" font-size="11" font-weight="600" fill="#0f172a">Witnessed by Legal Counsel</text>
+  <text x="80" y="976" font-size="10" fill="#94a3b8">Authorized Signatory · Date</text>
+
+  <text x="50" y="1070" font-size="10" fill="#94a3b8">Page 1 of 1 · Generated for SDMS demo</text>
+</svg>

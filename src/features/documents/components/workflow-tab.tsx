@@ -54,9 +54,11 @@ export function WorkflowTab() {
   const signMutation = useMutation({
     mutationFn: ({ doc, comment, signatureImage }: { doc: AppDocument; comment?: string; signatureImage?: string }) => {
       if (!user) throw new Error('Not signed in')
+      const slotKey = doc.signatureSlots?.[doc.currentApproverIndex ?? 0]?.key
       return documentsApi.sign(doc.id, user.id, comment, {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         signatureImage,
+        slotKey,
       })
     },
     onSuccess: (updated) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -10,6 +10,7 @@ import {
   FileText,
   RotateCcw,
   Send,
+  ShieldOff,
   X,
   XCircle,
 } from 'lucide-react'
@@ -39,7 +40,11 @@ import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } from '@/features/documents/components/document-meta'
 import { formatFileSize } from '@/features/documents/components/file-icon'
 import { cn } from '@/shared/utils/cn'
-import { SignatureModal } from '@/features/documents/components/signature'
+import { Button } from '@/shared/ui/button'
+import { SignatureLayer, SignatureModal } from '@/features/documents/components/signature'
+import { RevokeSignatureModal } from '@/features/documents/components/revoke-signature-modal'
+
+const PdfViewer = lazy(() => import('@/features/documents/components/pdf-viewer'))
 
 type ViewerTab = 'preview' | 'metadata' | 'versions' | 'audit'
 
@@ -62,6 +67,7 @@ export function SdmsDocumentViewerPage() {
   const [commentError, setCommentError] = useState<string | null>(null)
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false)
   const [signatureModalOpen, setSignatureModalOpen] = useState(false)
+  const [revokeOpen, setRevokeOpen] = useState(false)
 
   const accessMutation = useMutation({
     mutationFn: ({ docId, activity }: { docId: string; activity: 'view' | 'download' }) => {
@@ -86,11 +92,12 @@ export function SdmsDocumentViewerPage() {
   }
 
   const signMutation = useMutation({
-    mutationFn: ({ docId, comment, signatureImage }: { docId: string; comment?: string; signatureImage?: string }) => {
+    mutationFn: ({ docId, comment, signatureImage, slotKey }: { docId: string; comment?: string; signatureImage?: string; slotKey?: string }) => {
       if (!user) throw new Error('Not signed in')
       return documentsApi.sign(docId, user.id, comment, {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         signatureImage,
+        slotKey,
       })
     },
     onSuccess: (updated) => {
@@ -191,8 +198,9 @@ export function SdmsDocumentViewerPage() {
   }
 
   const onSignatureConfirm = (signatureImage: string, modalComment?: string) => {
+    const slotKey = doc.signatureSlots?.[doc.currentApproverIndex ?? 0]?.key
     signMutation.mutate(
-      { docId: doc.id, comment: modalComment, signatureImage },
+      { docId: doc.id, comment: modalComment, signatureImage, slotKey },
       { onSettled: () => setSignatureModalOpen(false) },
     )
   }
@@ -286,9 +294,9 @@ export function SdmsDocumentViewerPage() {
             <Tabs items={tabs} value={tab} onChange={(v) => setTab(v as ViewerTab)} />
           </div>
           <div className="p-5">
-            {tab === 'preview' && <PreviewArea doc={doc} />}
+            {tab === 'preview' && <PreviewArea doc={doc} userMap={userMap} />}
             {tab === 'metadata' && <MetadataView doc={doc} authorName={userMap[doc.createdBy]?.name} departmentName={dept?.name} />}
-            {tab === 'versions' && <VersionsView doc={doc} userMap={userMap} />}
+            {tab === 'versions' && <VersionsView doc={doc} userMap={userMap} currentUserId={user?.id} onRevoke={() => setRevokeOpen(true)} />}
             {tab === 'audit' && <AuditTrailView doc={doc} entries={auditEntries} />}
           </div>
         </div>
@@ -401,11 +409,36 @@ export function SdmsDocumentViewerPage() {
         title={`Sign ${doc.title}`}
         busy={signMutation.isPending}
       />
+
+      <RevokeSignatureModal document={revokeOpen ? doc : null} onClose={() => setRevokeOpen(false)} />
     </motion.div>
   )
 }
 
-function PreviewArea({ doc }: { doc: AppDocument }) {
+function PreviewArea({ doc, userMap }: { doc: AppDocument; userMap: Record<string, { name: string }> }) {
+  const isImage = (doc.fileType === 'png' || doc.fileType === 'jpg') && !!doc.assetUrl
+  if (isImage && doc.assetUrl) {
+    return (
+      <div className="rounded-lg border border-zinc-200/60 bg-zinc-100/50 p-4">
+        <div className="relative mx-auto bg-white shadow-sm" style={{ maxWidth: 800 }}>
+          <img
+            src={doc.assetUrl}
+            alt={doc.title}
+            className="block w-full h-auto select-none"
+            draggable={false}
+          />
+          <SignatureLayer doc={doc} userMap={userMap} />
+        </div>
+      </div>
+    )
+  }
+  if (doc.fileType === 'pdf' && doc.assetUrl) {
+    return (
+      <Suspense fallback={<div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[480px] flex items-center justify-center"><Spinner size="lg" /></div>}>
+        <PdfViewer doc={doc} url={doc.assetUrl} userMap={userMap} />
+      </Suspense>
+    )
+  }
   return (
     <div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[480px] flex flex-col items-center justify-center p-8 text-center">
       <div className="w-16 h-16 rounded-xl bg-white border border-zinc-200 flex items-center justify-center mb-4 shadow-sm">
@@ -461,7 +494,14 @@ function MetadataView({ doc, authorName, departmentName }: { doc: AppDocument; a
   )
 }
 
-function VersionsView({ doc, userMap }: { doc: AppDocument; userMap: Record<string, { name: string }> }) {
+interface VersionsViewProps {
+  doc: AppDocument
+  userMap: Record<string, { name: string }>
+  currentUserId?: string
+  onRevoke: () => void
+}
+
+function VersionsView({ doc, userMap, currentUserId, onRevoke }: VersionsViewProps) {
   if (doc.signatures.length === 0) {
     return (
       <div className="text-center py-12">
@@ -470,10 +510,12 @@ function VersionsView({ doc, userMap }: { doc: AppDocument; userMap: Record<stri
       </div>
     )
   }
+  const finalized = isFinalized(doc)
   return (
     <ul className="space-y-2">
       {doc.signatures.map((s, i) => {
         const active = isSignatureActive(s)
+        const canRevoke = active && !finalized && !!currentUserId && s.signerId === currentUserId
         return (
           <li
             key={i}
@@ -515,6 +557,13 @@ function VersionsView({ doc, userMap }: { doc: AppDocument; userMap: Record<stri
                   {s.revokedAt && ` ${format(parseISO(s.revokedAt), 'MMM d, HH:mm')}`}
                   {s.revocationReason && ` — ${s.revocationReason}`}
                 </p>
+              )}
+              {canRevoke && (
+                <div className="mt-2">
+                  <Button size="sm" variant="outline" leftIcon={<ShieldOff className="w-3.5 h-3.5" />} onClick={onRevoke}>
+                    Revoke
+                  </Button>
+                </div>
               )}
             </div>
           </li>

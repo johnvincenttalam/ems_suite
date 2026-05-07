@@ -21,6 +21,20 @@ export type AccessActivity = 'view' | 'download' | 'print' | 'edit'
 export type SignatureMethod = 'click-to-sign' | 'pki' | 'otp' | 'biometric'
 export type SignatureReason = 'approval' | 'review' | 'witness' | 'acknowledgment'
 
+/**
+ * A signature slot is a placement region on a document. Coordinates are
+ * normalized (0..1) so they survive zoom and viewport changes; rendering code
+ * multiplies by the container size to get pixel positions.
+ */
+export interface SignatureSlot {
+  key: string
+  page: number
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 /** A named approver chain that can be picked when creating a document, so users
  * don't have to hand-pick the same sequence every time. */
 export interface WorkflowTemplate {
@@ -30,6 +44,14 @@ export interface WorkflowTemplate {
   /** Suggested category this template fits — used to auto-suggest in the form. */
   category?: DocumentCategory
   approverIds: string[]
+  /** Predefined signature slot positions inherited by documents created from
+   * this template. Slot order should align with approverIds order so signer N
+   * lands in slot N. */
+  signatureSlots?: SignatureSlot[]
+  /** URL of a sample/reference document (image or PDF) used as the visual
+   * canvas in the slot editor. Documents created from the template can also
+   * inherit this URL for demo purposes. */
+  referenceUrl?: string
 }
 
 export interface DocumentSignature {
@@ -48,6 +70,8 @@ export interface DocumentSignature {
   userAgent?: string
   /** Base64-encoded PNG of the signer's captured signature (drawn or uploaded). */
   signatureImage?: string
+  /** Slot the signature was placed in. Maps to AppDocument.signatureSlots[].key. */
+  slotKey?: string
   revokedAt?: string
   revokedBy?: string
   revocationReason?: string
@@ -129,6 +153,11 @@ export interface AppDocument {
   finalizedBy?: string
   /** Optional approval checklist template — surfaces a compliance review pre-flight inside the detail drawer. */
   checklistId?: string
+  /** Absolute or root-relative URL to a renderable preview asset. PreviewArea
+   * dispatches by fileType: png/jpg renders as an image, pdf renders via PdfViewer. */
+  assetUrl?: string
+  /** Predefined signature placement regions on the document. */
+  signatureSlots?: SignatureSlot[]
 }
 
 export function isFinalized(doc: AppDocument): boolean {

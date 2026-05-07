@@ -12,9 +12,11 @@ export function SignaturePad({ onCapture, onClear }: SignaturePadProps) {
   const sigRef = useRef<SignatureCanvas | null>(null)
 
   const handleEnd = useCallback(() => {
-    if (sigRef.current && !sigRef.current.isEmpty()) {
-      onCapture(sigRef.current.toDataURL('image/png'))
-    }
+    const ref = sigRef.current
+    if (!ref || ref.isEmpty()) return
+    const trim = (ref as unknown as { getTrimmedCanvas?: () => HTMLCanvasElement }).getTrimmedCanvas
+    const canvas = typeof trim === 'function' ? trim.call(ref) : ref.getCanvas()
+    onCapture(canvas.toDataURL('image/png'))
   }, [onCapture])
 
   const handleClear = useCallback(() => {

@@ -19,6 +19,7 @@ import {
   type DocumentConfidentiality,
   type DocumentFileType,
   type DocumentPriority,
+  type SignatureSlot,
 } from '@/features/documents/types'
 import { getModulePath } from '@/config/modules'
 import { Button } from '@/shared/ui/button'
@@ -75,6 +76,8 @@ export function SdmsCreateDocumentPage() {
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [approvers, setApprovers] = useState<string[]>([])
+  const [signatureSlots, setSignatureSlots] = useState<SignatureSlot[]>([])
+  const [assetUrl, setAssetUrl] = useState<string | undefined>(undefined)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
 
@@ -141,12 +144,25 @@ export function SdmsCreateDocumentPage() {
 
   const applyTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId)
-    if (!templateId) return
+    if (!templateId) {
+      setSignatureSlots([])
+      setAssetUrl(undefined)
+      return
+    }
     const t = templates.find((x) => x.id === templateId)
     if (!t) return
     setApprovers(t.approverIds)
+    setSignatureSlots(t.signatureSlots ?? [])
+    setAssetUrl(t.referenceUrl)
     if (t.category) setValue('category', t.category)
-    toast.success(`Applied template: ${t.name}`)
+    if (t.referenceUrl && !getValues('fileName')) {
+      const inferredName = t.referenceUrl.split('/').pop() || 'document.pdf'
+      setValue('fileName', inferredName, { shouldValidate: true })
+    }
+    const slotSuffix = t.signatureSlots?.length
+      ? ` · ${t.signatureSlots.length} signature slot${t.signatureSlots.length === 1 ? '' : 's'} preset`
+      : ''
+    toast.success(`Applied template: ${t.name}${slotSuffix}`)
   }
 
   const removeTag = (t: string) => setTags(tags.filter((x) => x !== t))
@@ -172,6 +188,8 @@ export function SdmsCreateDocumentPage() {
       departmentId: values.departmentId,
       tags: tags.length ? tags : undefined,
       createdBy: user.id,
+      signatureSlots: signatureSlots.length ? signatureSlots : undefined,
+      assetUrl,
     })
   }
 
@@ -197,6 +215,8 @@ export function SdmsCreateDocumentPage() {
       confidentiality: values.confidentiality,
       departmentId: values.departmentId,
       createdBy: user.id,
+      signatureSlots: signatureSlots.length ? signatureSlots : undefined,
+      assetUrl,
     })
   }
 
@@ -349,6 +369,11 @@ export function SdmsCreateDocumentPage() {
             {selectedTemplateId && (
               <p className="text-[11px] text-zinc-500 mt-2">
                 {templates.find((t) => t.id === selectedTemplateId)?.description}
+              </p>
+            )}
+            {signatureSlots.length > 0 && (
+              <p className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200">
+                {signatureSlots.length} signature slot{signatureSlots.length === 1 ? '' : 's'} preset
               </p>
             )}
             <p className="text-[11px] text-zinc-400 mt-2">

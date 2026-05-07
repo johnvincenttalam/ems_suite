@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2, Workflow, X } from 'lucide-react'
+import { MapPin, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUsers } from '@/features/users'
 import { useWorkflowTemplates } from '@/features/documents/hooks/use-workflow-templates'
@@ -12,8 +12,10 @@ import { workflowTemplatesApi } from '@/features/documents/api/workflow-template
 import {
   CATEGORY_LABEL,
   type DocumentCategory,
+  type SignatureSlot,
   type WorkflowTemplate,
 } from '@/features/documents/types'
+import { SignatureSlotEditor } from '@/features/documents/components/signature'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -117,6 +119,7 @@ export function SdmsWorkflowTemplatesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Category</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Approver Chain</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Slots</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider">Used By</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -149,6 +152,19 @@ export function SdmsWorkflowTemplatesPage() {
                           )
                         })}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {t.signatureSlots && t.signatureSlots.length > 0 ? (
+                        <span
+                          title="Documents created from this template inherit these slot positions."
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          {t.signatureSlots.length} preset
+                        </span>
+                      ) : (
+                        <span className="text-zinc-300 text-[12px]">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 align-top text-right">
                       <span className="text-[13px] tabular-nums text-zinc-700">{usageMap.get(t.id) ?? 0}</span>
@@ -232,6 +248,8 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
   const { data: users = [] } = useUsers()
   const [approvers, setApprovers] = useState<string[]>([])
   const [approversTouched, setApproversTouched] = useState(false)
+  const [referenceUrl, setReferenceUrl] = useState<string>('')
+  const [slots, setSlots] = useState<SignatureSlot[]>([])
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -248,9 +266,13 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
         category: template.category,
       })
       setApprovers([...template.approverIds])
+      setReferenceUrl(template.referenceUrl ?? '')
+      setSlots(template.signatureSlots ? [...template.signatureSlots] : [])
     } else {
       reset({ name: '', description: '', category: undefined })
       setApprovers([])
+      setReferenceUrl('')
+      setSlots([])
     }
     setApproversTouched(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,6 +285,8 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
         description: values.description,
         category: values.category as DocumentCategory | undefined,
         approverIds: approvers,
+        signatureSlots: slots,
+        referenceUrl: referenceUrl,
       }
       return mode === 'create'
         ? workflowTemplatesApi.create(payload)
@@ -309,7 +333,7 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
       open={open}
       onClose={saveMutation.isPending ? () => {} : onClose}
       title={mode === 'create' ? 'New Workflow Template' : `Edit ${template?.name ?? ''}`}
-      size="lg"
+      size="xl"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saveMutation.isPending}>Cancel</Button>
@@ -385,6 +409,34 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
           </div>
           {approversTouched && approvers.length === 0 && (
             <p className="text-xs text-red-600 mt-2">Add at least one approver.</p>
+          )}
+        </div>
+
+        <div className="border-t border-zinc-200/60 pt-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <label className="text-[13px] font-medium text-zinc-700">Signature Slot Positions</label>
+            <span className="text-[11px] text-zinc-400">optional · slot N pairs with approver N</span>
+          </div>
+          <Input
+            label="Reference document URL"
+            placeholder="e.g. /sample-document.pdf or https://example.com/doc.png"
+            value={referenceUrl}
+            onChange={(e) => setReferenceUrl(e.target.value)}
+            helperText="Image (.png/.jpg/.svg) or PDF. Used as the visual canvas for placing slots — documents created from this template inherit it."
+          />
+          {referenceUrl ? (
+            <div className="mt-3 p-3 rounded-lg border border-zinc-200/60 bg-zinc-50/40">
+              <SignatureSlotEditor
+                referenceUrl={referenceUrl}
+                slots={slots}
+                onChange={setSlots}
+                approverNames={approvers.map((id) => users.find((u) => u.id === id)?.name ?? id)}
+              />
+            </div>
+          ) : (
+            <p className="text-[12px] text-zinc-500 mt-3 px-3 py-2 rounded-md bg-zinc-50 border border-zinc-100">
+              Add a reference URL above to enable the visual editor. Without slots, signatures are still recorded but won&rsquo;t be placed on the document.
+            </p>
           )}
         </div>
       </form>

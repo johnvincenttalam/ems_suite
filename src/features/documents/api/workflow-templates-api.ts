@@ -1,4 +1,4 @@
-import type { DocumentCategory, WorkflowTemplate } from '../types'
+import type { DocumentCategory, SignatureSlot, WorkflowTemplate } from '../types'
 import { mockWorkflowTemplates } from '../data/mock-workflow-templates'
 
 const delay = (ms?: number) =>
@@ -9,6 +9,8 @@ interface CreateTemplateInput {
   description?: string
   category?: DocumentCategory
   approverIds: string[]
+  signatureSlots?: SignatureSlot[]
+  referenceUrl?: string
 }
 
 type UpdateTemplateInput = Partial<CreateTemplateInput>
@@ -50,6 +52,8 @@ export const workflowTemplatesApi = {
       description: input.description?.trim() || undefined,
       category: input.category,
       approverIds: [...input.approverIds],
+      signatureSlots: input.signatureSlots && input.signatureSlots.length > 0 ? input.signatureSlots : undefined,
+      referenceUrl: input.referenceUrl?.trim() || undefined,
     }
     mockWorkflowTemplates.push(t)
     return t
@@ -69,6 +73,10 @@ export const workflowTemplatesApi = {
     if (patch.description !== undefined) t.description = patch.description.trim() || undefined
     if (patch.category !== undefined) t.category = patch.category
     if (patch.approverIds !== undefined) t.approverIds = [...patch.approverIds]
+    if (patch.signatureSlots !== undefined) {
+      t.signatureSlots = patch.signatureSlots.length > 0 ? patch.signatureSlots : undefined
+    }
+    if (patch.referenceUrl !== undefined) t.referenceUrl = patch.referenceUrl.trim() || undefined
     return t
   },
 
