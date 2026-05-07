@@ -22,6 +22,14 @@ import type { StockMovementType } from '@/features/inventory/types'
 
 type Mode = 'in' | 'out'
 
+let refSequence = 0
+function generateRefNumber(prefix: string): string {
+  refSequence += 1
+  // Combine a millisecond suffix with a session-monotonic counter so two
+  // submissions in the same tick can't collide.
+  return `${prefix}-${Date.now().toString().slice(-6)}-${String(refSequence).padStart(3, '0')}`
+}
+
 export function StockInOutPage() {
   const [mode, setMode] = useState<Mode>('in')
   const { data: items = [] } = useInventoryItems()
@@ -52,7 +60,7 @@ export function StockInOutPage() {
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { itemId: '', quantity: 0, batchNumber: '', referenceNumber: '', reason: '' },
+    defaultValues: { itemId: '', batchNumber: '', referenceNumber: '', reason: '' },
   })
 
   const watchedItemId = useWatch({ control, name: 'itemId' })
@@ -71,7 +79,7 @@ export function StockInOutPage() {
       const item = itemMap[values.itemId]
       const explicitRef = values.referenceNumber?.trim()
       const generatedRef = settings.autoGenerateReferenceNumber && !explicitRef
-        ? `${mode === 'in' ? 'RCPT' : 'ISSUE'}-${Date.now().toString().slice(-6)}`
+        ? generateRefNumber(mode === 'in' ? 'RCPT' : 'ISSUE')
         : undefined
       return inventoryApi.addMovement({
         itemId: values.itemId,

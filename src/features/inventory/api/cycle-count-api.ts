@@ -1,6 +1,7 @@
 import type { CycleCountSession, StockMovement } from '@/features/inventory/types'
 import { mockCycleCountSessions, mockInventoryItems, mockStockMovements } from '@/features/inventory/data/mock-inventory'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
+import { nextMovementId } from '@/features/inventory/api/inventory-api'
 // import { http } from '@/shared/lib/http'
 
 const delay = (ms?: number) =>
@@ -129,7 +130,7 @@ export const cycleCountApi = {
       const variance = actual - item.quantity
       if (variance === 0) continue
       const movement: StockMovement = {
-        id: `MV-CC-${s.id}-${line.itemId}`,
+        id: nextMovementId(),
         itemId: line.itemId,
         type: 'adjustment',
         quantity: variance,

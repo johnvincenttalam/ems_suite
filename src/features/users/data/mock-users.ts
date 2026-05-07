@@ -44,7 +44,7 @@ export const mockUsers: User[] = [
     employeeId: 'EMP-003',
     departmentId: 'D002',
     position: 'IT Specialist',
-    status: 'inactive',
+    status: 'active',
     createdAt: '2024-11-05',
     modules: ALL_MODULES,
     moduleAdmins: [],

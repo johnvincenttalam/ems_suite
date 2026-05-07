@@ -7,7 +7,19 @@ import { useInventorySettings } from '@/features/inventory/store/inventory-setti
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 400 + 250))
 
-let movementCounter = mockStockMovements.length
+// Seed from the highest existing MV-XXXX in mock data so synthetic IDs don't
+// collide with existing seed records (MV-2xxx range).
+let movementCounter = mockStockMovements.reduce((max, m) => {
+  const n = Number(m.id.replace(/^MV-/, ''))
+  return Number.isFinite(n) && n > max ? n : max
+}, 0)
+
+/** Reserve the next sequential movement ID. Shared with cycle-count-api so all
+ * movements use a single MV-XXXX namespace. */
+export function nextMovementId(): string {
+  movementCounter += 1
+  return `MV-${String(movementCounter).padStart(4, '0')}`
+}
 
 interface AddMovementInput {
   itemId: string
@@ -190,7 +202,6 @@ export const inventoryApi = {
    * loop from the EMS spec (procurement passes type='in').
    */
   addMovement: async (input: AddMovementInput): Promise<StockMovement> => {
-    movementCounter += 1
     const requiresApproval = input.type === 'transfer' || input.type === 'adjustment'
     if (requiresApproval && !input.approverId) {
       throw new Error(`${input.type === 'transfer' ? 'Transfer' : 'Adjustment'} requires an approver`)
@@ -209,8 +220,10 @@ export const inventoryApi = {
         }
       }
     }
+    // ID is reserved only after all validation passes, so failed submissions
+    // don't leave gaps in the sequence.
     const movement: StockMovement = {
-      id: `MV-${String(movementCounter).padStart(4, '0')}`,
+      id: nextMovementId(),
       itemId: input.itemId,
       type: input.type,
       quantity: input.quantity,

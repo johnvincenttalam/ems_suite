@@ -84,7 +84,7 @@ export function TransfersPage() {
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { itemId: '', sourceLocationId: '', destinationLocationId: '', quantity: 0, approverId: '', reason: '' },
+    defaultValues: { itemId: '', sourceLocationId: '', destinationLocationId: '', approverId: '', reason: '' },
   })
 
   const invalidate = () => {
