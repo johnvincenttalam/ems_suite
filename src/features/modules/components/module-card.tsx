@@ -25,7 +25,7 @@ export function ModuleCard({ module, locked = false, onSelect }: ModuleCardProps
       aria-disabled={locked}
       aria-label={locked ? `${module.name} — no access` : `Open ${module.name}`}
       className={cn(
-        'group relative text-left bg-white rounded-2xl border border-zinc-200',
+        'group relative text-left bg-white rounded-2xl border border-zinc-200 h-full flex flex-col',
         'transition-colors duration-200',
         'focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:ring-offset-2 focus:ring-offset-surface',
         locked
@@ -33,7 +33,7 @@ export function ModuleCard({ module, locked = false, onSelect }: ModuleCardProps
           : 'hover:border-zinc-300',
       )}
     >
-      <div className="p-6">
+      <div className="p-6 flex flex-col h-full">
         <div className="flex items-start justify-between mb-7">
           <Icon className={cn('w-7 h-7', module.iconColor)} strokeWidth={1.75} />
 

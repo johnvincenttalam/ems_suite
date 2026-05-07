@@ -66,7 +66,7 @@ export function LoginPage({ module }: LoginPageProps) {
   }
 
   const ModuleIcon = module.icon
-  const showSubtitle = module.shortName !== module.name
+  const iconBgClass = module.iconColor.replace('text-', 'bg-').replace('-600', '-50')
 
   return (
     <div className="min-h-screen bg-surface px-4 pt-16 pb-16">
@@ -84,16 +84,16 @@ export function LoginPage({ module }: LoginPageProps) {
           />
         </div>
 
-        <div className="mb-8">
-          <div className="flex items-center justify-center gap-3">
-            <ModuleIcon className={cn('w-7 h-7 flex-shrink-0', module.iconColor)} strokeWidth={1.75} />
-            <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
-              Sign in to {module.shortName}
-            </h1>
+        <div className="mb-10 flex flex-col items-center text-center">
+          <div className={cn('w-16 h-16 rounded-2xl flex items-center justify-center mb-5', iconBgClass)}>
+            <ModuleIcon className={cn('w-8 h-8', module.iconColor)} strokeWidth={1.75} />
           </div>
-          {showSubtitle && (
-            <p className="text-[15px] text-zinc-500 mt-2 text-center">{module.name}</p>
-          )}
+          <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-medium mb-2">
+            Sign in to
+          </p>
+          <h1 className="text-[28px] font-bold text-zinc-900 tracking-tight leading-tight max-w-xs">
+            {module.name}
+          </h1>
         </div>
 
         {error && (
