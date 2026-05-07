@@ -7,7 +7,7 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { Archive, ChevronRight, FileText, GitBranch, Lock, Plus, Upload } from 'lucide-react'
+import { Archive, ChevronRight, FileText, GitBranch, Lock, Pencil, Plus, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getModulePath } from '@/config/modules'
@@ -41,7 +41,6 @@ import { FilterChips } from '@/shared/ui/filter-chips'
 import { FileIcon, formatFileSize } from './file-icon'
 import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } from './document-meta'
 import { UploadModal } from './upload-modal'
-import { DocumentDetailDrawer } from './document-detail-drawer'
 import { ClassifyModal } from './classify-modal'
 import { StartWorkflowModal } from './start-workflow-modal'
 import { FinalizeModal } from './finalize-modal'
@@ -84,7 +83,6 @@ export function DocumentsTab() {
   const [confidentialityFilter, setConfidentialityFilter] = useState<DocumentConfidentiality | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
   const [showUpload, setShowUpload] = useState(false)
-  const [drawerDoc, setDrawerDoc] = useState<AppDocument | null>(null)
   const [classifyTarget, setClassifyTarget] = useState<AppDocument | null>(null)
   const [workflowTarget, setWorkflowTarget] = useState<AppDocument | null>(null)
   const [finalizeTarget, setFinalizeTarget] = useState<AppDocument | null>(null)
@@ -107,17 +105,8 @@ export function DocumentsTab() {
   useEffect(() => {
     if (!deepLinkDocId || documents.length === 0) return
     const target = documents.find((d) => d.id === deepLinkDocId)
-    if (target) setDrawerDoc(target)
-  }, [deepLinkDocId, documents])
-
-  const closeDrawer = () => {
-    setDrawerDoc(null)
-    if (searchParams.has('doc')) {
-      const next = new URLSearchParams(searchParams)
-      next.delete('doc')
-      setSearchParams(next, { replace: true })
-    }
-  }
+    if (target) navigate(getModulePath('sdms', `documents/${target.id}`))
+  }, [deepLinkDocId, documents, navigate])
 
   const archiveMutation = useMutation({
     mutationFn: (doc: AppDocument) => {
@@ -212,6 +201,16 @@ export function DocumentsTab() {
         const phase = getLifecyclePhase(doc)
         return (
           <div className="flex items-center gap-1 justify-end">
+            {doc.status === 'draft' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                leftIcon={<Pencil className="w-3.5 h-3.5" />}
+                onClick={(e) => { e.stopPropagation(); navigate(`${getModulePath('sdms', 'create-document')}?edit=${doc.id}`) }}
+              >
+                Edit
+              </Button>
+            )}
             {phase === 'inbox' && (
               <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setClassifyTarget(doc) }}>
                 Classify
@@ -243,7 +242,7 @@ export function DocumentsTab() {
         )
       },
     },
-  ], [archiveMutation])
+  ], [archiveMutation, navigate])
 
   const table = useReactTable({
     data: filtered,
@@ -356,7 +355,7 @@ export function DocumentsTab() {
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => setDrawerDoc(row.original)}
+                  onClick={() => navigate(getModulePath('sdms', `documents/${row.original.id}`))}
                   className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -376,7 +375,6 @@ export function DocumentsTab() {
       </div>
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} />
-      <DocumentDetailDrawer document={drawerDoc} onClose={closeDrawer} />
       <ClassifyModal document={classifyTarget} onClose={() => setClassifyTarget(null)} />
       <StartWorkflowModal document={workflowTarget} onClose={() => setWorkflowTarget(null)} />
       <FinalizeModal document={finalizeTarget} onClose={() => setFinalizeTarget(null)} />

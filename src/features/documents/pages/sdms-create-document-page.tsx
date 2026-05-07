@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { ArrowLeft, FileText, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUsers } from '@/features/users'
@@ -29,9 +30,12 @@ import { Textarea } from '@/shared/ui/textarea'
 import { Avatar } from '@/shared/ui/avatar'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { formatFileSize } from '@/features/documents/components/file-icon'
 import { cn } from '@/shared/utils/cn'
 
-const KNOWN_EXTENSIONS: DocumentFileType[] = ['pdf', 'docx', 'xlsx', 'png', 'jpg']
+const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'] as const
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+const FILE_INPUT_ACCEPT = '.pdf,.docx,.xlsx,.png,.jpg,.jpeg,.svg,application/pdf,image/png,image/jpeg,image/svg+xml'
 
 const schema = z.object({
   title: z.string().min(2, 'Title is required'),
@@ -62,7 +66,16 @@ const CONFIDENTIALITY_OPTIONS = (Object.keys(CONFIDENTIALITY_LABEL) as DocumentC
 
 function deriveFileType(fileName: string): DocumentFileType {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
-  return (KNOWN_EXTENSIONS.includes(ext as DocumentFileType) ? ext : 'pdf') as DocumentFileType
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'docx') return 'docx'
+  if (ext === 'xlsx') return 'xlsx'
+  if (ext === 'jpg' || ext === 'jpeg') return 'jpg'
+  // png and svg both render through the image path in PreviewArea
+  return 'png'
+}
+
+function isAllowedExtension(ext: string): boolean {
+  return (ALLOWED_EXTENSIONS as readonly string[]).includes(ext)
 }
 
 export function SdmsCreateDocumentPage() {
@@ -70,16 +83,33 @@ export function SdmsCreateDocumentPage() {
   const { data: users = [] } = useUsers()
   const { data: departments = [] } = useDepartments()
   const { data: templates = [] } = useWorkflowTemplates()
+  const { data: allDocuments = [] } = useDocuments()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
+
+  const editId = searchParams.get('edit')
+  const editingDoc = editId ? allDocuments.find((d) => d.id === editId) : undefined
+  const isEditMode = !!editId
+  const editLoading = isEditMode && allDocuments.length === 0
+  const editNotFound = isEditMode && allDocuments.length > 0 && !editingDoc
+  const editLocked = isEditMode && !!editingDoc && editingDoc.status !== 'draft'
 
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [approvers, setApprovers] = useState<string[]>([])
   const [signatureSlots, setSignatureSlots] = useState<SignatureSlot[]>([])
-  const [assetUrl, setAssetUrl] = useState<string | undefined>(undefined)
+  const [pickedFile, setPickedFile] = useState<File | null>(null)
+  const [pickedFileUrl, setPickedFileUrl] = useState<string | null>(null)
+  const [existingAssetUrl, setExistingAssetUrl] = useState<string | undefined>(undefined)
+  const [dragOver, setDragOver] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const editPrefilledRef = useRef(false)
+
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
+  const effectiveAssetUrl = pickedFileUrl ?? existingAssetUrl ?? selectedTemplate?.referenceUrl
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, getValues } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -95,6 +125,22 @@ export function SdmsCreateDocumentPage() {
   })
 
   const fileName = watch('fileName')
+
+  // Prefill the form once from the editing doc when it arrives.
+  useEffect(() => {
+    if (!isEditMode || !editingDoc || editPrefilledRef.current) return
+    editPrefilledRef.current = true
+    setValue('title', editingDoc.title)
+    setValue('description', editingDoc.description ?? '')
+    setValue('fileName', editingDoc.fileName)
+    if (editingDoc.category) setValue('category', editingDoc.category)
+    if (editingDoc.priority) setValue('priority', editingDoc.priority)
+    if (editingDoc.confidentiality) setValue('confidentiality', editingDoc.confidentiality)
+    if (editingDoc.departmentId) setValue('departmentId', editingDoc.departmentId)
+    setTags(editingDoc.tags ?? [])
+    setSignatureSlots(editingDoc.signatureSlots ?? [])
+    setExistingAssetUrl(editingDoc.assetUrl)
+  }, [isEditMode, editingDoc, setValue])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['documents'] })
@@ -113,6 +159,21 @@ export function SdmsCreateDocumentPage() {
     },
   })
 
+  const updateDraftMutation = useMutation({
+    mutationFn: ({ docId, patch }: { docId: string; patch: Parameters<typeof documentsApi.updateDraft>[1] }) => {
+      if (!user) throw new Error('Not signed in')
+      return documentsApi.updateDraft(docId, patch, user.id)
+    },
+    onSuccess: (doc) => {
+      invalidate()
+      toast.success(`Updated draft ${doc.trackingNumber ?? doc.id}`)
+      navigate(getModulePath('sdms', 'documents'))
+    },
+    onError: (err) => {
+      toast.error('Update failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    },
+  })
+
   const submitMutation = useMutation({
     mutationFn: documentsApi.upload,
     onSuccess: (doc) => {
@@ -125,10 +186,77 @@ export function SdmsCreateDocumentPage() {
     },
   })
 
-  const pickMockFile = () => {
-    const fake = `document-${Date.now()}.pdf`
-    setValue('fileName', fake, { shouldValidate: true })
-    toast.info(`Mock file selected: ${fake}`)
+  const updateAndStartMutation = useMutation({
+    mutationFn: async ({ docId, patch, approverIds }: { docId: string; patch: Parameters<typeof documentsApi.updateDraft>[1]; approverIds: string[] }) => {
+      if (!user) throw new Error('Not signed in')
+      await documentsApi.updateDraft(docId, patch, user.id)
+      return documentsApi.startWorkflow(docId, approverIds, user.id)
+    },
+    onSuccess: (doc) => {
+      invalidate()
+      toast.success(`Submitted ${doc.trackingNumber ?? doc.id} — workflow started`)
+      navigate(getModulePath('sdms', 'my-tasks'))
+    },
+    onError: (err) => {
+      toast.error('Submit failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    },
+  })
+
+  const captureFile = (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    if (!isAllowedExtension(ext)) {
+      toast.error(`Unsupported file type: .${ext || '?'}`, {
+        description: 'Allowed: PDF, DOCX, XLSX, PNG, JPG, SVG',
+      })
+      return
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error('File too large', { description: `Maximum size is ${formatFileSize(MAX_FILE_BYTES)}` })
+      return
+    }
+    // Replacing a previously-picked file: revoke the old blob URL since it's
+    // about to be orphaned. We DON'T revoke on unmount — submitted documents
+    // need the URL to stay alive for the rest of the session so other users
+    // (via the user-switcher) can open the doc and render it.
+    if (pickedFileUrl) URL.revokeObjectURL(pickedFileUrl)
+    const url = URL.createObjectURL(file)
+    setPickedFile(file)
+    setPickedFileUrl(url)
+    setValue('fileName', file.name, { shouldValidate: true })
+    toast.success(`File ready: ${file.name}`)
+  }
+
+  const removeFile = () => {
+    if (pickedFileUrl) URL.revokeObjectURL(pickedFileUrl)
+    setPickedFile(null)
+    setPickedFileUrl(null)
+    if (selectedTemplate?.referenceUrl) {
+      const inferredName = selectedTemplate.referenceUrl.split('/').pop() || ''
+      setValue('fileName', inferredName, { shouldValidate: true })
+    } else {
+      setValue('fileName', '', { shouldValidate: true })
+    }
+  }
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) captureFile(file)
+    e.target.value = ''
+  }
+
+  const onDropzoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!dragOver) setDragOver(true)
+  }
+  const onDropzoneDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+  }
+  const onDropzoneDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) captureFile(file)
   }
 
   const addTag = () => {
@@ -146,16 +274,15 @@ export function SdmsCreateDocumentPage() {
     setSelectedTemplateId(templateId)
     if (!templateId) {
       setSignatureSlots([])
-      setAssetUrl(undefined)
       return
     }
     const t = templates.find((x) => x.id === templateId)
     if (!t) return
     setApprovers(t.approverIds)
     setSignatureSlots(t.signatureSlots ?? [])
-    setAssetUrl(t.referenceUrl)
     if (t.category) setValue('category', t.category)
-    if (t.referenceUrl && !getValues('fileName')) {
+    // Only seed the filename from the template if the user hasn't picked a file.
+    if (!pickedFile && t.referenceUrl && !getValues('fileName')) {
       const inferredName = t.referenceUrl.split('/').pop() || 'document.pdf'
       setValue('fileName', inferredName, { shouldValidate: true })
     }
@@ -176,21 +303,25 @@ export function SdmsCreateDocumentPage() {
       toast.error('Not signed in')
       return
     }
-    draftMutation.mutate({
+    const sharedFields = {
       title: values.title,
       description: values.description,
       fileName: values.fileName,
       fileType: deriveFileType(values.fileName),
-      fileSizeBytes: Math.floor(100_000 + Math.random() * 900_000),
+      fileSizeBytes: pickedFile?.size ?? editingDoc?.fileSizeBytes ?? Math.floor(100_000 + Math.random() * 900_000),
       category: values.category,
       priority: values.priority,
       confidentiality: values.confidentiality,
       departmentId: values.departmentId,
       tags: tags.length ? tags : undefined,
-      createdBy: user.id,
       signatureSlots: signatureSlots.length ? signatureSlots : undefined,
-      assetUrl,
-    })
+      assetUrl: effectiveAssetUrl,
+    }
+    if (isEditMode && editingDoc) {
+      updateDraftMutation.mutate({ docId: editingDoc.id, patch: sharedFields })
+    } else {
+      draftMutation.mutate({ ...sharedFields, createdBy: user.id })
+    }
   }
 
   const onSubmitForApproval = (values: FormValues) => {
@@ -202,26 +333,67 @@ export function SdmsCreateDocumentPage() {
       toast.error('Add at least one approver before submitting')
       return
     }
-    submitMutation.mutate({
+    const sharedFields = {
       title: values.title,
       description: values.description,
       fileName: values.fileName,
       fileType: deriveFileType(values.fileName),
-      fileSizeBytes: Math.floor(100_000 + Math.random() * 900_000),
-      approvers,
+      fileSizeBytes: pickedFile?.size ?? editingDoc?.fileSizeBytes ?? Math.floor(100_000 + Math.random() * 900_000),
       tags: tags.length ? tags : undefined,
       category: values.category,
       priority: values.priority,
       confidentiality: values.confidentiality,
       departmentId: values.departmentId,
-      createdBy: user.id,
       signatureSlots: signatureSlots.length ? signatureSlots : undefined,
-      assetUrl,
-    })
+      assetUrl: effectiveAssetUrl,
+    }
+    if (isEditMode && editingDoc) {
+      updateAndStartMutation.mutate({ docId: editingDoc.id, patch: sharedFields, approverIds: approvers })
+    } else {
+      submitMutation.mutate({ ...sharedFields, approvers, createdBy: user.id })
+    }
   }
 
-  const busy = draftMutation.isPending || submitMutation.isPending
+  const busy = draftMutation.isPending || submitMutation.isPending || updateDraftMutation.isPending || updateAndStartMutation.isPending
   const activeUsers = users.filter((u) => u.status === 'active' && u.id !== user?.id)
+
+  if (editLoading) {
+    return <div className="py-16 text-center text-[13px] text-zinc-500">Loading draft…</div>
+  }
+  if (editNotFound) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-[14px] font-medium text-zinc-900">Draft not found</p>
+        <p className="text-[12px] text-zinc-500 mt-1">It may have been deleted. Return to the documents list.</p>
+        <button
+          type="button"
+          onClick={() => navigate(getModulePath('sdms', 'documents'))}
+          className="mt-4 inline-flex items-center gap-1 text-[13px] text-accent hover:underline"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to Documents
+        </button>
+      </div>
+    )
+  }
+  if (editLocked && editingDoc) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-[14px] font-medium text-zinc-900">This document is no longer a draft</p>
+        <p className="text-[12px] text-zinc-500 mt-1">
+          Status is <span className="font-mono">{editingDoc.status}</span>. Only drafts can be edited.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(getModulePath('sdms', `documents/${editingDoc.id}`))}
+          className="mt-4 inline-flex items-center gap-1 text-[13px] text-accent hover:underline"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Open document
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -235,44 +407,85 @@ export function SdmsCreateDocumentPage() {
           Documents
         </button>
         <span>/</span>
-        <span className="text-zinc-700">New</span>
+        <span className="text-zinc-700">{isEditMode ? `Edit ${editingDoc?.trackingNumber ?? editingDoc?.id ?? ''}` : 'New'}</span>
       </div>
 
       <PageHeader
-        title="Create Document"
-        subtitle="Upload a file, add metadata, choose approvers, and submit for approval."
+        title={isEditMode ? 'Edit Document' : 'Create Document'}
+        subtitle={isEditMode
+          ? 'Update draft details, file, approvers, and slot positions, then save or submit for approval.'
+          : 'Upload a file, add metadata, choose approvers, and submit for approval.'}
       />
 
       <form className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <section className="rounded-xl border border-zinc-200/60 bg-white p-5">
             <h2 className="text-[13px] font-semibold text-zinc-900 mb-3">File</h2>
-            <button
-              type="button"
-              onClick={pickMockFile}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={FILE_INPUT_ACCEPT}
+              onChange={onFileInputChange}
+              className="hidden"
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  fileInputRef.current?.click()
+                }
+              }}
+              onDragOver={onDropzoneDragOver}
+              onDragLeave={onDropzoneDragLeave}
+              onDrop={onDropzoneDrop}
               className={cn(
-                'w-full border border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center transition-colors',
-                fileName
+                'w-full border border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900/10',
+                dragOver
+                  ? 'border-emerald-400 bg-emerald-50/60'
+                  : pickedFile
                   ? 'border-emerald-300 bg-emerald-50/50 hover:border-emerald-400'
+                  : fileName
+                  ? 'border-zinc-300 bg-zinc-50/40 hover:border-zinc-400'
                   : errors.fileName
                   ? 'border-red-300 bg-red-50/40 hover:border-red-400'
                   : 'border-zinc-300 hover:border-zinc-400',
               )}
             >
-              {fileName ? (
+              {pickedFile ? (
                 <>
                   <FileText className="w-7 h-7 text-emerald-600 mb-2" />
-                  <p className="text-[13px] text-zinc-900 font-medium">{fileName}</p>
-                  <p className="text-[11px] text-zinc-500 mt-1">Click to choose a different file</p>
+                  <p className="text-[13px] text-zinc-900 font-medium">{pickedFile.name}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1">{formatFileSize(pickedFile.size)} · click to replace</p>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeFile() }}
+                    className="mt-3 inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-red-600"
+                  >
+                    <X className="w-3 h-3" />
+                    Remove file
+                  </button>
+                </>
+              ) : fileName ? (
+                <>
+                  <FileText className="w-7 h-7 text-zinc-400 mb-2" />
+                  <p className="text-[13px] text-zinc-700 font-medium">{fileName}</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    {editingDoc
+                      ? `${formatFileSize(editingDoc.fileSizeBytes)} · click to replace`
+                      : 'From template — click to upload your own file'}
+                  </p>
                 </>
               ) : (
                 <>
                   <Upload className="w-7 h-7 text-zinc-400 mb-2" />
                   <p className="text-[13px] text-zinc-700 font-medium">Drag &amp; drop a file here, or click to browse</p>
-                  <p className="text-[11px] text-zinc-400 mt-1">PDF, DOCX, XLSX, PNG, JPG up to 50 MB</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">PDF, DOCX, XLSX, PNG, JPG, SVG — up to 50 MB</p>
                 </>
               )}
-            </button>
+            </div>
             <input type="hidden" {...register('fileName')} />
             {errors.fileName && <p className="text-xs text-red-600 mt-2">{errors.fileName.message}</p>}
           </section>
@@ -436,16 +649,16 @@ export function SdmsCreateDocumentPage() {
                 variant="secondary"
                 fullWidth
                 disabled={busy}
-                loading={draftMutation.isPending}
+                loading={draftMutation.isPending || updateDraftMutation.isPending}
                 onClick={handleSubmit(onSaveDraft)}
               >
-                Save Draft
+                {isEditMode ? 'Save Changes' : 'Save Draft'}
               </Button>
               <Button
                 type="button"
                 fullWidth
                 disabled={busy}
-                loading={submitMutation.isPending}
+                loading={submitMutation.isPending || updateAndStartMutation.isPending}
                 onClick={handleSubmit(onSubmitForApproval)}
               >
                 Submit for Approval

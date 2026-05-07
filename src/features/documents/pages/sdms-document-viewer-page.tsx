@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Download,
   FileText,
+  Move,
   RotateCcw,
   Send,
   ShieldOff,
@@ -27,6 +28,7 @@ import {
   isFinalized,
   isSignatureActive,
   type AppDocument,
+  type SignatureSlot,
 } from '@/features/documents/types'
 import { useUsers } from '@/features/users'
 import { useDepartments } from '@/features/departments'
@@ -41,7 +43,7 @@ import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } fro
 import { formatFileSize } from '@/features/documents/components/file-icon'
 import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/button'
-import { SignatureLayer, SignatureModal } from '@/features/documents/components/signature'
+import { PlacementOverlay, SignatureLayer, SignatureModal } from '@/features/documents/components/signature'
 import { RevokeSignatureModal } from '@/features/documents/components/revoke-signature-modal'
 
 const PdfViewer = lazy(() => import('@/features/documents/components/pdf-viewer'))
@@ -68,6 +70,9 @@ export function SdmsDocumentViewerPage() {
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false)
   const [signatureModalOpen, setSignatureModalOpen] = useState(false)
   const [revokeOpen, setRevokeOpen] = useState(false)
+  const [placementMode, setPlacementMode] = useState(false)
+  const [placementSlot, setPlacementSlot] = useState<Omit<SignatureSlot, 'key'> | null>(null)
+  const [repositioningSlotKey, setRepositioningSlotKey] = useState<string | null>(null)
 
   const accessMutation = useMutation({
     mutationFn: ({ docId, activity }: { docId: string; activity: 'view' | 'download' }) => {
@@ -92,12 +97,13 @@ export function SdmsDocumentViewerPage() {
   }
 
   const signMutation = useMutation({
-    mutationFn: ({ docId, comment, signatureImage, slotKey }: { docId: string; comment?: string; signatureImage?: string; slotKey?: string }) => {
+    mutationFn: ({ docId, comment, signatureImage, slotKey, placementSlot }: { docId: string; comment?: string; signatureImage?: string; slotKey?: string; placementSlot?: Omit<SignatureSlot, 'key'> }) => {
       if (!user) throw new Error('Not signed in')
       return documentsApi.sign(docId, user.id, comment, {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         signatureImage,
         slotKey,
+        placementSlot,
       })
     },
     onSuccess: (updated) => {
@@ -154,6 +160,20 @@ export function SdmsDocumentViewerPage() {
     },
   })
 
+  const moveSlotMutation = useMutation({
+    mutationFn: ({ docId, slotKey, coords }: { docId: string; slotKey: string; coords: Omit<SignatureSlot, 'key'> }) => {
+      if (!user) throw new Error('Not signed in')
+      return documentsApi.moveSlot(docId, slotKey, coords, user.id)
+    },
+    onSuccess: () => {
+      toast.success('Signature repositioned')
+      invalidate()
+    },
+    onError: (err) => {
+      toast.error('Reposition failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -184,6 +204,8 @@ export function SdmsDocumentViewerPage() {
   const currentApproverId = doc.status === 'in_review' ? doc.approvers[idx] : undefined
   const isCurrentApprover = !!user && currentApproverId === user.id
   const finalized = isFinalized(doc)
+  const preDefinedSlot = doc.signatureSlots?.[idx]
+  const needsPlacement = isCurrentApprover && !preDefinedSlot
 
   const tabs = [
     { value: 'preview', label: 'Preview' },
@@ -194,15 +216,64 @@ export function SdmsDocumentViewerPage() {
 
   const onApprove = () => {
     setCommentError(null)
+    const preDefinedSlot = doc.signatureSlots?.[doc.currentApproverIndex ?? 0]
+    if (preDefinedSlot) {
+      // Slot already exists for this approver — open modal directly.
+      setSignatureModalOpen(true)
+    } else {
+      // No slot — enter placement mode and let the user draw one.
+      setPlacementMode(true)
+      setTab('preview')
+    }
+  }
+
+  const onSlotPlaced = (slot: Omit<SignatureSlot, 'key'>) => {
+    if (repositioningSlotKey) {
+      moveSlotMutation.mutate(
+        { docId: doc.id, slotKey: repositioningSlotKey, coords: slot },
+        { onSettled: () => { setPlacementMode(false); setRepositioningSlotKey(null) } },
+      )
+      return
+    }
+    setPlacementSlot(slot)
+    setPlacementMode(false)
     setSignatureModalOpen(true)
   }
 
+  const cancelPlacement = () => {
+    setPlacementMode(false)
+    setPlacementSlot(null)
+    setRepositioningSlotKey(null)
+  }
+
+  const startReposition = (slotKey: string) => {
+    setRepositioningSlotKey(slotKey)
+    setPlacementMode(true)
+    setTab('preview')
+  }
+
   const onSignatureConfirm = (signatureImage: string, modalComment?: string) => {
-    const slotKey = doc.signatureSlots?.[doc.currentApproverIndex ?? 0]?.key
+    const preDefinedSlot = doc.signatureSlots?.[doc.currentApproverIndex ?? 0]
     signMutation.mutate(
-      { docId: doc.id, comment: modalComment, signatureImage, slotKey },
-      { onSettled: () => setSignatureModalOpen(false) },
+      {
+        docId: doc.id,
+        comment: modalComment,
+        signatureImage,
+        slotKey: preDefinedSlot?.key,
+        placementSlot: !preDefinedSlot && placementSlot ? placementSlot : undefined,
+      },
+      {
+        onSettled: () => {
+          setSignatureModalOpen(false)
+          setPlacementSlot(null)
+        },
+      },
     )
+  }
+
+  const onSignatureModalClose = () => {
+    setSignatureModalOpen(false)
+    setPlacementSlot(null)
   }
 
   const onDisapprove = () => {
@@ -240,8 +311,8 @@ export function SdmsDocumentViewerPage() {
   return (
     <motion.div
       className="space-y-4"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.25 }}
     >
       <div className="flex items-center gap-2 text-[12px] text-zinc-500">
@@ -294,14 +365,47 @@ export function SdmsDocumentViewerPage() {
             <Tabs items={tabs} value={tab} onChange={(v) => setTab(v as ViewerTab)} />
           </div>
           <div className="p-5">
-            {tab === 'preview' && <PreviewArea doc={doc} userMap={userMap} />}
+            {tab === 'preview' && (
+              <>
+                {placementMode && (
+                  <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-emerald-200 bg-emerald-50 text-[12px] text-emerald-800">
+                    <span>
+                      {repositioningSlotKey ? (
+                        <>
+                          <span className="font-semibold">Reposition your signature.</span>{' '}
+                          Click and drag on the document to set a new rectangle.
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-semibold">Place your signature.</span>{' '}
+                          Click and drag on the document to draw a rectangle where it should land.
+                        </>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={cancelPlacement}
+                      className="text-[12px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <PreviewArea
+                  doc={doc}
+                  userMap={userMap}
+                  placementMode={placementMode}
+                  onSlotPlaced={onSlotPlaced}
+                />
+              </>
+            )}
             {tab === 'metadata' && <MetadataView doc={doc} authorName={userMap[doc.createdBy]?.name} departmentName={dept?.name} />}
-            {tab === 'versions' && <VersionsView doc={doc} userMap={userMap} currentUserId={user?.id} onRevoke={() => setRevokeOpen(true)} />}
+            {tab === 'versions' && <VersionsView doc={doc} userMap={userMap} currentUserId={user?.id} onRevoke={() => setRevokeOpen(true)} onReposition={startReposition} />}
             {tab === 'audit' && <AuditTrailView doc={doc} entries={auditEntries} />}
           </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 lg:sticky lg:top-[72px] lg:self-start">
           <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} />
 
           <div className="bg-white rounded-xl border border-zinc-200/60 p-4 space-y-3">
@@ -343,6 +447,12 @@ export function SdmsDocumentViewerPage() {
               </p>
             )}
 
+            {needsPlacement && (
+              <p className="text-[11.5px] text-zinc-500 bg-zinc-50 border border-zinc-100 rounded-md px-3 py-2">
+                No signature placement defined — you&rsquo;ll be asked to place it on the document before signing.
+              </p>
+            )}
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -351,7 +461,7 @@ export function SdmsDocumentViewerPage() {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Approve
+                {needsPlacement ? 'Place & Sign' : 'Approve'}
               </button>
               <button
                 type="button"
@@ -404,7 +514,7 @@ export function SdmsDocumentViewerPage() {
 
       <SignatureModal
         open={signatureModalOpen}
-        onClose={() => setSignatureModalOpen(false)}
+        onClose={onSignatureModalClose}
         onConfirm={onSignatureConfirm}
         title={`Sign ${doc.title}`}
         busy={signMutation.isPending}
@@ -415,7 +525,14 @@ export function SdmsDocumentViewerPage() {
   )
 }
 
-function PreviewArea({ doc, userMap }: { doc: AppDocument; userMap: Record<string, { name: string }> }) {
+interface PreviewAreaProps {
+  doc: AppDocument
+  userMap: Record<string, { name: string }>
+  placementMode?: boolean
+  onSlotPlaced?: (slot: Omit<SignatureSlot, 'key'>) => void
+}
+
+function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaProps) {
   const isImage = (doc.fileType === 'png' || doc.fileType === 'jpg') && !!doc.assetUrl
   if (isImage && doc.assetUrl) {
     return (
@@ -428,6 +545,9 @@ function PreviewArea({ doc, userMap }: { doc: AppDocument; userMap: Record<strin
             draggable={false}
           />
           <SignatureLayer doc={doc} userMap={userMap} />
+          {placementMode && onSlotPlaced && (
+            <PlacementOverlay active page={1} onPlaced={onSlotPlaced} />
+          )}
         </div>
       </div>
     )
@@ -435,7 +555,7 @@ function PreviewArea({ doc, userMap }: { doc: AppDocument; userMap: Record<strin
   if (doc.fileType === 'pdf' && doc.assetUrl) {
     return (
       <Suspense fallback={<div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[480px] flex items-center justify-center"><Spinner size="lg" /></div>}>
-        <PdfViewer doc={doc} url={doc.assetUrl} userMap={userMap} />
+        <PdfViewer doc={doc} url={doc.assetUrl} userMap={userMap} placementMode={placementMode} onSlotPlaced={onSlotPlaced} />
       </Suspense>
     )
   }
@@ -499,9 +619,10 @@ interface VersionsViewProps {
   userMap: Record<string, { name: string }>
   currentUserId?: string
   onRevoke: () => void
+  onReposition: (slotKey: string) => void
 }
 
-function VersionsView({ doc, userMap, currentUserId, onRevoke }: VersionsViewProps) {
+function VersionsView({ doc, userMap, currentUserId, onRevoke, onReposition }: VersionsViewProps) {
   if (doc.signatures.length === 0) {
     return (
       <div className="text-center py-12">
@@ -559,7 +680,12 @@ function VersionsView({ doc, userMap, currentUserId, onRevoke }: VersionsViewPro
                 </p>
               )}
               {canRevoke && (
-                <div className="mt-2">
+                <div className="mt-2 flex gap-2">
+                  {s.slotKey && (
+                    <Button size="sm" variant="outline" leftIcon={<Move className="w-3.5 h-3.5" />} onClick={() => onReposition(s.slotKey!)}>
+                      Reposition
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" leftIcon={<ShieldOff className="w-3.5 h-3.5" />} onClick={onRevoke}>
                     Revoke
                   </Button>

@@ -14,9 +14,18 @@ export function SignaturePad({ onCapture, onClear }: SignaturePadProps) {
   const handleEnd = useCallback(() => {
     const ref = sigRef.current
     if (!ref || ref.isEmpty()) return
-    const trim = (ref as unknown as { getTrimmedCanvas?: () => HTMLCanvasElement }).getTrimmedCanvas
-    const canvas = typeof trim === 'function' ? trim.call(ref) : ref.getCanvas()
-    onCapture(canvas.toDataURL('image/png'))
+    // getTrimmedCanvas crops to ink bounds (nicer fit in the slot), but the
+    // implementation can throw on certain canvas states. Fall back to the raw
+    // canvas so confirmation never gets blocked.
+    let dataUrl: string
+    try {
+      const trim = (ref as unknown as { getTrimmedCanvas?: () => HTMLCanvasElement }).getTrimmedCanvas
+      const canvas = typeof trim === 'function' ? trim.call(ref) : ref.getCanvas()
+      dataUrl = canvas.toDataURL('image/png')
+    } catch {
+      dataUrl = ref.getCanvas().toDataURL('image/png')
+    }
+    onCapture(dataUrl)
   }, [onCapture])
 
   const handleClear = useCallback(() => {

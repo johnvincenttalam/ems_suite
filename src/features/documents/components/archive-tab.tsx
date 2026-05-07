@@ -8,7 +8,9 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table'
 import { Archive, ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
+import { getModulePath } from '@/config/modules'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { useDocuments } from '@/features/documents'
 import { useUsers } from '@/features/users'
@@ -19,17 +21,16 @@ import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FileIcon, formatFileSize } from './file-icon'
 import { TrackingBadge } from './document-meta'
-import { DocumentDetailDrawer } from './document-detail-drawer'
 
 export function ArchiveTab() {
   const { data: documents = [], isLoading } = useDocuments()
   const { data: users = [] } = useUsers()
+  const navigate = useNavigate()
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
   const archived = useMemo(() => documents.filter((d) => d.status === 'archived'), [documents])
 
   const [globalFilter, setGlobalFilter] = useState('')
-  const [drawerDoc, setDrawerDoc] = useState<AppDocument | null>(null)
 
   const columns = useMemo<ColumnDef<AppDocument>[]>(() => [
     {
@@ -158,7 +159,7 @@ export function ArchiveTab() {
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => setDrawerDoc(row.original)}
+                  onClick={() => navigate(getModulePath('sdms', `documents/${row.original.id}`))}
                   className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -173,8 +174,6 @@ export function ArchiveTab() {
         </div>
         <DataTablePagination table={table} />
       </div>
-
-      <DocumentDetailDrawer document={drawerDoc} onClose={() => setDrawerDoc(null)} />
     </div>
   )
 }

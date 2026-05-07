@@ -395,6 +395,45 @@ export const documentsApi = {
   },
 
   /**
+   * Patch-update an existing draft. Only allowed while status === 'draft'.
+   * Unspecified fields are preserved. Used by the create-document page when
+   * launched in edit mode (?edit=DOC-XYZ).
+   */
+  updateDraft: async (
+    docId: string,
+    patch: Partial<CreateDraftInput>,
+    updaterId: string,
+  ): Promise<AppDocument> => {
+    await delay(150)
+    const doc = findOrThrow(docId)
+    if (doc.status !== 'draft') throw new Error(`Only drafts can be edited (got status: ${doc.status})`)
+
+    if (patch.title !== undefined) doc.title = patch.title
+    if (patch.description !== undefined) doc.description = patch.description
+    if (patch.fileName !== undefined) doc.fileName = patch.fileName
+    if (patch.fileType !== undefined) doc.fileType = patch.fileType
+    if (patch.fileSizeBytes !== undefined) doc.fileSizeBytes = patch.fileSizeBytes
+    if (patch.tags !== undefined) doc.tags = patch.tags
+    if (patch.category !== undefined) doc.category = patch.category
+    if (patch.priority !== undefined) doc.priority = patch.priority
+    if (patch.confidentiality !== undefined) doc.confidentiality = patch.confidentiality
+    if (patch.departmentId !== undefined) doc.departmentId = patch.departmentId
+    if (patch.signatureSlots !== undefined) {
+      doc.signatureSlots = patch.signatureSlots && patch.signatureSlots.length > 0 ? patch.signatureSlots : undefined
+    }
+    if (patch.assetUrl !== undefined) doc.assetUrl = patch.assetUrl
+
+    recordAudit({
+      userId: updaterId,
+      action: 'update',
+      module: 'Documents',
+      detail: `Edited draft "${doc.title}"`,
+    })
+
+    return doc
+  },
+
+  /**
    * Promote a classified draft into the workflow. Sets approvers, flips status
    * to 'in_review', and seeds the routing log with the first approval hop.
    */
@@ -450,7 +489,17 @@ export const documentsApi = {
     docId: string,
     signerId: string,
     comment?: string,
-    metadata?: { method?: SignatureMethod; reason?: SignatureReason; userAgent?: string; signatureImage?: string; slotKey?: string },
+    metadata?: {
+      method?: SignatureMethod
+      reason?: SignatureReason
+      userAgent?: string
+      signatureImage?: string
+      slotKey?: string
+      /** Ad-hoc slot drawn at sign time when no slot was pre-defined for this
+       * approver. The API generates a unique key, appends it to
+       * doc.signatureSlots, and uses it as the signature's slotKey. */
+      placementSlot?: Omit<SignatureSlot, 'key'>
+    },
   ): Promise<AppDocument> => {
     await delay(150)
     const doc = findOrThrow(docId)
@@ -462,6 +511,20 @@ export const documentsApi = {
       throw new Error(`${signerId} is not the next approver for ${docId}`)
     }
 
+    let resolvedSlotKey = metadata?.slotKey
+    if (!resolvedSlotKey && metadata?.placementSlot) {
+      const existingKeys = new Set((doc.signatureSlots ?? []).map((s) => s.key))
+      let i = (doc.signatureSlots?.length ?? 0) + 1
+      let candidate = `placed_${i}`
+      while (existingKeys.has(candidate)) {
+        i += 1
+        candidate = `placed_${i}`
+      }
+      const newSlot: SignatureSlot = { key: candidate, ...metadata.placementSlot }
+      doc.signatureSlots = [...(doc.signatureSlots ?? []), newSlot]
+      resolvedSlotKey = candidate
+    }
+
     const sig: DocumentSignature = {
       signerId,
       signedAt: new Date().toISOString(),
@@ -471,7 +534,7 @@ export const documentsApi = {
       ...(comment ? { comment } : {}),
       ...(metadata?.userAgent ? { userAgent: metadata.userAgent } : {}),
       ...(metadata?.signatureImage ? { signatureImage: metadata.signatureImage } : {}),
-      ...(metadata?.slotKey ? { slotKey: metadata.slotKey } : {}),
+      ...(resolvedSlotKey ? { slotKey: resolvedSlotKey } : {}),
     }
     doc.signatures = [...doc.signatures, sig]
     doc.currentApproverIndex = expectedIndex + 1
@@ -706,6 +769,41 @@ export const documentsApi = {
       action: 'update',
       module: 'Documents',
       detail: `Revoked signature on "${doc.title}" — ${reason}`,
+    })
+
+    return doc
+  },
+
+  /**
+   * Reposition an existing signature slot on a non-finalized document. Only
+   * the rectangle (x/y/width/height/page) changes; the slot key, signer
+   * binding, and any signed image stay intact. Useful when the original
+   * placement was off and the signer wants to nudge it without re-signing.
+   */
+  moveSlot: async (
+    docId: string,
+    slotKey: string,
+    coords: { page: number; x: number; y: number; width: number; height: number },
+    moverId: string,
+  ): Promise<AppDocument> => {
+    await delay(120)
+    const doc = findOrThrow(docId)
+    if (doc.finalizedAt) throw new Error('Cannot reposition a slot on a finalized document')
+    const slots = doc.signatureSlots ?? []
+    const slot = slots.find((s) => s.key === slotKey)
+    if (!slot) throw new Error(`Slot ${slotKey} not found on ${docId}`)
+    slot.page = coords.page
+    slot.x = coords.x
+    slot.y = coords.y
+    slot.width = coords.width
+    slot.height = coords.height
+    doc.signatureSlots = [...slots]
+
+    recordAudit({
+      userId: moverId,
+      action: 'update',
+      module: 'Documents',
+      detail: `Repositioned signature slot "${slotKey}" on "${doc.title}"`,
     })
 
     return doc
