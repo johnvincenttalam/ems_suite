@@ -21,6 +21,9 @@ interface AddMovementInput {
   approverId?: string
   batchNumber?: string
   referenceNumber?: string
+  /** Adjustments only. Captures the user's intended on-hand target so the
+   * applied delta can be recomputed against live stock at approve time. */
+  targetQuantity?: number
 }
 
 /**
@@ -220,6 +223,7 @@ export const inventoryApi = {
       approverId: requiresApproval ? input.approverId : undefined,
       batchNumber: input.batchNumber,
       referenceNumber: input.referenceNumber,
+      targetQuantity: input.type === 'adjustment' ? input.targetQuantity : undefined,
     }
     mockStockMovements.unshift(movement)
 
@@ -245,8 +249,13 @@ export const inventoryApi = {
 
   /**
    * Approve a pending transfer or adjustment. Posts the stock change and
-   * flips status to 'applied'. Throws if the movement isn't pending or the
-   * acting user isn't the named approver.
+   * flips status to 'applied'. Throws if the movement isn't pending, the
+   * acting user isn't the named approver, or the resulting stock would go
+   * negative without `allowNegativeStock`.
+   *
+   * For adjustments, the delta is recomputed at approve time against the
+   * live item.quantity using the originally-captured targetQuantity, so
+   * intervening movements don't displace the user's target.
    */
   approveMovement: async (movementId: string, approverName: string): Promise<StockMovement> => {
     await delay(120)
@@ -256,6 +265,23 @@ export const inventoryApi = {
     if (m.approverId && m.approverId !== approverName) {
       throw new Error(`${approverName} is not the assigned approver`)
     }
+
+    if (m.type === 'adjustment' && m.targetQuantity !== undefined) {
+      const item = mockInventoryItems.find((i) => i.id === m.itemId)
+      if (item) m.quantity = m.targetQuantity - item.quantity
+    }
+
+    if (m.type === 'adjustment') {
+      const item = mockInventoryItems.find((i) => i.id === m.itemId)
+      const settings = useInventorySettings.getState().settings
+      if (item && !settings.allowNegativeStock && item.quantity + m.quantity < 0) {
+        throw new Error(
+          `Approval would push ${item.name} below zero (${item.quantity} + ${m.quantity}). ` +
+          `Enable "Allow negative stock" in Settings to override.`,
+        )
+      }
+    }
+
     m.status = 'applied'
     m.approvedBy = approverName
     m.approvedAt = new Date().toISOString()

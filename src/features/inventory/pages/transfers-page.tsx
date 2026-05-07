@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns'
 import { ArrowLeftRight, CheckCircle2, XCircle, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useWarehouses } from '@/features/warehouses'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
@@ -21,21 +22,32 @@ import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { cn } from '@/shared/utils/cn'
 import type { StockMovement } from '@/features/inventory/types'
 
-const formSchema = z
-  .object({
-    itemId: z.string().min(1, 'Item is required'),
-    sourceLocationId: z.string().min(1, 'Source warehouse is required'),
-    destinationLocationId: z.string().min(1, 'Destination warehouse is required'),
-    quantity: z.number().int().positive('Quantity must be positive'),
-    approverId: z.string().min(1, 'Approving authority is required'),
-    reason: z.string().optional(),
-  })
-  .refine((d) => d.sourceLocationId !== d.destinationLocationId, {
-    path: ['destinationLocationId'],
-    message: 'Destination must differ from source',
-  })
+function buildSchema(requireDestination: boolean) {
+  return z
+    .object({
+      itemId: z.string().min(1, 'Item is required'),
+      sourceLocationId: z.string().min(1, 'Source warehouse is required'),
+      destinationLocationId: requireDestination
+        ? z.string().min(1, 'Destination warehouse is required (per Settings → Movement Rules)')
+        : z.string(),
+      quantity: z.number().int().positive('Quantity must be positive'),
+      approverId: z.string().min(1, 'Approving authority is required'),
+      reason: z.string().optional(),
+    })
+    .refine((d) => !d.destinationLocationId || d.sourceLocationId !== d.destinationLocationId, {
+      path: ['destinationLocationId'],
+      message: 'Destination must differ from source',
+    })
+}
 
-type FormValues = z.infer<typeof formSchema>
+type FormValues = {
+  itemId: string
+  sourceLocationId: string
+  destinationLocationId: string
+  quantity: number
+  approverId: string
+  reason?: string
+}
 
 const STATUS_PILL: Record<StockMovement['status'], string> = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -54,8 +66,10 @@ export function TransfersPage() {
   const { data: movements = [], isLoading } = useStockMovements()
   const { data: warehouses = [] } = useWarehouses()
   const { data: users = [] } = useUsers()
+  const settings = useInventorySettings((s) => s.settings)
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
+  const formSchema = buildSchema(settings.requireWarehouseOnTransfer)
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
   const warehouseMap = useMemo(() => Object.fromEntries(warehouses.map((w) => [w.id, w])), [warehouses])
@@ -166,7 +180,7 @@ export function TransfersPage() {
           />
 
           <Select
-            label="Destination Warehouse *"
+            label={settings.requireWarehouseOnTransfer ? 'Destination Warehouse *' : 'Destination Warehouse'}
             placeholder="Select destination"
             options={warehouseOptions}
             {...register('destinationLocationId')}

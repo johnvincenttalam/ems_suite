@@ -321,4 +321,62 @@ describe('inventoryApi.approveMovement / rejectMovement', () => {
     await inventoryApi.approveMovement(submitted.id, 'Jane Doe')
     await expect(inventoryApi.approveMovement(submitted.id, 'Jane Doe')).rejects.toThrow(/not pending/i)
   })
+
+  it('adjustment with targetQuantity lands the book on the target despite intervening movements', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore.find((i) => i.quantity > 5)!
+    const startingQty = target.quantity
+    const desiredTarget = startingQty - 3
+
+    // User submits "set stock to startingQty - 3"
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'adjustment',
+      quantity: desiredTarget - startingQty,
+      targetQuantity: desiredTarget,
+      sourceLocationId: target.warehouseId,
+      reason: 'target preservation test',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+    expect(submitted.status).toBe('pending')
+    expect(submitted.targetQuantity).toBe(desiredTarget)
+
+    // Meanwhile someone else stocks-out 2 units. Live qty is now startingQty - 2.
+    await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'out',
+      quantity: 2,
+      sourceLocationId: target.warehouseId,
+      reason: 'concurrent issue',
+      createdBy: 'Admin User',
+    })
+
+    // Approver runs the adjustment.
+    await inventoryApi.approveMovement(submitted.id, 'Jane Doe')
+
+    // The book MUST land on the desired target, not desiredTarget - 2.
+    const itemsAfter = await inventoryApi.listItems()
+    const after = itemsAfter.find((i) => i.id === target.id)!
+    expect(after.quantity).toBe(desiredTarget)
+  })
+
+  it('refuses to approve an adjustment that would push stock below zero (allowNegativeStock=false)', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore.find((i) => i.quantity > 0)!
+    const tooNegative = -(target.quantity + 100)
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'adjustment',
+      quantity: tooNegative,
+      targetQuantity: target.quantity + tooNegative,
+      sourceLocationId: target.warehouseId,
+      reason: 'negative stock guard test',
+      createdBy: 'John Smith',
+      approverId: 'Jane Doe',
+    })
+
+    await expect(inventoryApi.approveMovement(submitted.id, 'Jane Doe')).rejects.toThrow(/below zero|allow negative/i)
+  })
 })

@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns'
 import { Edit3, CheckCircle2, XCircle, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
@@ -20,15 +21,25 @@ import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { cn } from '@/shared/utils/cn'
 import type { StockMovement } from '@/features/inventory/types'
 
-const formSchema = z.object({
-  itemId: z.string().min(1, 'Item is required'),
-  adjustedStock: z.number().int('Whole units only').nonnegative('Cannot be negative'),
-  reason: z.string().min(2, 'Reason is required'),
-  approverId: z.string().min(1, 'Approving authority is required'),
-  remarks: z.string().optional(),
-})
+function buildSchema(requireReason: boolean) {
+  return z.object({
+    itemId: z.string().min(1, 'Item is required'),
+    adjustedStock: z.number().int('Whole units only').nonnegative('Cannot be negative'),
+    reason: requireReason
+      ? z.string().min(2, 'Reason is required (per Settings → Movement Rules)')
+      : z.string(),
+    approverId: z.string().min(1, 'Approving authority is required'),
+    remarks: z.string().optional(),
+  })
+}
 
-type FormValues = z.infer<typeof formSchema>
+type FormValues = {
+  itemId: string
+  adjustedStock: number
+  reason: string
+  approverId: string
+  remarks?: string
+}
 
 const STATUS_PILL: Record<StockMovement['status'], string> = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -55,8 +66,10 @@ export function AdjustmentsPage() {
   const { data: items = [] } = useInventoryItems()
   const { data: movements = [], isLoading } = useStockMovements()
   const { data: users = [] } = useUsers()
+  const settings = useInventorySettings((s) => s.settings)
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
+  const formSchema = buildSchema(settings.requireReasonOnAdjustment)
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
 
@@ -96,6 +109,7 @@ export function AdjustmentsPage() {
         itemId: values.itemId,
         type: 'adjustment',
         quantity: v,
+        targetQuantity: values.adjustedStock,
         sourceLocationId: item?.warehouseId,
         approverId: values.approverId,
         reason: values.remarks?.trim()
@@ -164,7 +178,7 @@ export function AdjustmentsPage() {
           />
 
           <Select
-            label="Reason *"
+            label={settings.requireReasonOnAdjustment ? 'Reason *' : 'Reason'}
             placeholder="Select reason"
             options={REASON_OPTIONS}
             {...register('reason')}

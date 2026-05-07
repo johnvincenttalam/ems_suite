@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -50,10 +50,20 @@ export function StockInOutPage() {
     [movements, mode],
   )
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { itemId: '', quantity: 0, batchNumber: '', referenceNumber: '', reason: '' },
   })
+
+  const watchedItemId = useWatch({ control, name: 'itemId' })
+  const watchedQuantity = useWatch({ control, name: 'quantity' })
+  const selectedItem = watchedItemId ? itemMap[watchedItemId] : undefined
+  const projectedAfter = selectedItem
+    ? mode === 'in'
+      ? selectedItem.quantity + (Number(watchedQuantity) || 0)
+      : selectedItem.quantity - (Number(watchedQuantity) || 0)
+    : null
+  const wouldGoNegative = mode === 'out' && projectedAfter !== null && projectedAfter < 0
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
@@ -127,6 +137,33 @@ export function StockInOutPage() {
             {...register('quantity', { valueAsNumber: true })}
             error={errors.quantity?.message}
           />
+
+          {selectedItem && (
+            <div className={cn(
+              'rounded-md border px-3 py-2 text-[12px] grid grid-cols-3 gap-2',
+              wouldGoNegative
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-700',
+            )}>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400 mb-0.5">Current</p>
+                <p className="tabular-nums font-medium">{selectedItem.quantity}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400 mb-0.5">Change</p>
+                <p className="tabular-nums font-medium">{mode === 'in' ? '+' : '−'}{Number(watchedQuantity) || 0}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400 mb-0.5">After</p>
+                <p className="tabular-nums font-semibold">{projectedAfter}</p>
+              </div>
+              {wouldGoNegative && !settings.allowNegativeStock && (
+                <p className="col-span-3 text-[11px] mt-1 pt-1 border-t border-red-200">
+                  Negative stock is disabled in Settings — submission will fail.
+                </p>
+              )}
+            </div>
+          )}
 
           <Input
             label={settings.requireBatchNumber ? 'Batch Number *' : 'Batch Number'}

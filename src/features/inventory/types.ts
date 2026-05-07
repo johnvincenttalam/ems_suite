@@ -47,6 +47,11 @@ export interface StockMovement {
   /** Optional batch/reference numbers — useful on stock in/out paperwork. */
   batchNumber?: string
   referenceNumber?: string
+  /** Adjustments only. The user's intended *target* on-hand quantity, captured
+   * at submission. At approve time the stored `quantity` (delta) is recomputed
+   * as `targetQuantity - currentItemQuantity` so the book lands on the target
+   * even if other movements happened between submission and approval. */
+  targetQuantity?: number
 }
 
 export type CycleCountStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled'

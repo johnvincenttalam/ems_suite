@@ -111,9 +111,14 @@ export function InventorySettingsPage() {
                   min={1}
                   max={100}
                   value={settings.reorderWarningPercent}
-                  onChange={(e) =>
-                    update({ reorderWarningPercent: clampPct(Number(e.target.value), 1, 100, 80) })
-                  }
+                  onChange={(e) => {
+                    const next = clampPct(Number(e.target.value), 1, 100, 80)
+                    if (next < settings.criticalPercent) {
+                      update({ reorderWarningPercent: next, criticalPercent: next })
+                    } else {
+                      update({ reorderWarningPercent: next })
+                    }
+                  }}
                   helperText="Stock at or below this percent of reorder level triggers a warning. Default 80%."
                 />
                 <Input
@@ -122,11 +127,17 @@ export function InventorySettingsPage() {
                   min={1}
                   max={100}
                   value={settings.criticalPercent}
-                  onChange={(e) =>
-                    update({ criticalPercent: clampPct(Number(e.target.value), 1, 100, 50) })
-                  }
-                  helperText="Stock at or below this percent of reorder level triggers a critical alert. Default 50%."
+                  onChange={(e) => {
+                    const next = clampPct(Number(e.target.value), 1, 100, 50)
+                    update({ criticalPercent: Math.min(next, settings.reorderWarningPercent) })
+                  }}
+                  helperText="Stock at or below this percent of reorder level triggers a critical alert. Must be ≤ Warning. Default 50%."
                 />
+                {settings.criticalPercent >= settings.reorderWarningPercent && settings.reorderWarningPercent < 100 && (
+                  <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    Critical and Warning are tied at {settings.reorderWarningPercent}% — every low-stock item will be flagged critical.
+                  </p>
+                )}
                 <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
                   Items at exactly 0 always trigger a stock-out alert regardless of these settings.
                 </p>

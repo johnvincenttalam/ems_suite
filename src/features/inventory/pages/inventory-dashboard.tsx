@@ -28,7 +28,8 @@ import {
   Line,
 } from 'recharts'
 import { format, formatDistanceToNow, parseISO, startOfMonth, subDays, subMonths, isAfter } from 'date-fns'
-import { useInventoryItems, useStockMovements } from '@/features/inventory'
+import { useInventoryItems, useStockMovements, getStockHealth } from '@/features/inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useWarehouses } from '@/features/warehouses'
 import { useCategories } from '@/features/categories'
 import { useAuditLog } from '@/features/audit-log'
@@ -82,18 +83,32 @@ export function InventoryDashboard() {
   const { data: categories = [] } = useCategories()
   const { data: auditEntries = [] } = useAuditLog()
   const { notifications } = useNotifications()
+  const settings = useInventorySettings((s) => s.settings)
   const navigate = useNavigate()
 
   const stats = useMemo(() => {
+    const thresholds = {
+      reorderWarningPercent: settings.reorderWarningPercent,
+      criticalPercent: settings.criticalPercent,
+    }
     const total = items.length
-    const lowStock = items.filter((i) => i.quantity > 0 && i.quantity <= i.reorderLevel).length
-    const stockOuts = items.filter((i) => i.quantity === 0).length
+    let lowStock = 0
+    let critical = 0
+    let stockOuts = 0
+    for (const i of items) {
+      const h = getStockHealth(i, thresholds)
+      if (h === 'out') stockOuts += 1
+      else if (h === 'critical') { critical += 1; lowStock += 1 }
+      else if (h === 'low') lowStock += 1
+    }
     const totalValue = items.reduce((s, i) => s + i.quantity * (i.unitCost ?? 0), 0)
     const today = new Date()
     const last30 = subDays(today, 30)
-    const recent30Movements = movements.filter((m) => isAfter(parseISO(m.createdAt), last30)).length
-    return { total, lowStock, stockOuts, totalValue, recent30Movements }
-  }, [items, movements])
+    const recent30Movements = movements.filter(
+      (m) => m.status === 'applied' && isAfter(parseISO(m.createdAt), last30),
+    ).length
+    return { total, lowStock, critical, stockOuts, totalValue, recent30Movements }
+  }, [items, movements, settings.reorderWarningPercent, settings.criticalPercent])
 
   const stockByWarehouse = useMemo(() => {
     const totals = new Map<string, { name: string; count: number; value: number }>()
@@ -129,15 +144,22 @@ export function InventoryDashboard() {
   }, [items, categories])
 
   const lowStockTop = useMemo(() => {
+    const thresholds = {
+      reorderWarningPercent: settings.reorderWarningPercent,
+      criticalPercent: settings.criticalPercent,
+    }
     return items
-      .filter((i) => i.quantity <= i.reorderLevel)
+      .filter((i) => {
+        const h = getStockHealth(i, thresholds)
+        return h === 'low' || h === 'critical' || h === 'out'
+      })
       .sort((a, b) => {
         const ra = a.reorderLevel === 0 ? 0 : a.quantity / a.reorderLevel
         const rb = b.reorderLevel === 0 ? 0 : b.quantity / b.reorderLevel
         return ra - rb
       })
       .slice(0, 6)
-  }, [items])
+  }, [items, settings.reorderWarningPercent, settings.criticalPercent])
 
   /**
    * Reconstruct stock value at the end of each of the last 6 months.
@@ -235,11 +257,11 @@ export function InventoryDashboard() {
                 )}
               </Link>
               <Link
-                to="movements"
+                to="stock-in-out"
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[13px] hover:bg-zinc-800 transition-colors"
               >
                 <ArrowLeftRight className="w-4 h-4" />
-                Movements
+                Stock In / Out
               </Link>
             </>
           }
@@ -459,7 +481,7 @@ export function InventoryDashboard() {
         <Card>
           <CardHeader className="flex-row items-center justify-between flex">
             <CardTitle>Recent Movements</CardTitle>
-            <Link to="movements" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
+            <Link to="stock-in-out" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
               View all
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>

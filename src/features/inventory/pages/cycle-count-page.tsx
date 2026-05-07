@@ -334,7 +334,7 @@ export function CycleCountPage() {
 
 interface SessionDetailProps {
   session: CycleCountSession
-  itemMap: Record<string, { id: string; sku: string; name: string }>
+  itemMap: Record<string, { id: string; sku: string; name: string; quantity: number }>
   warehouseName: string
   onRecord: (itemId: string, actualQty: number) => void
   isRecording: boolean
@@ -464,7 +464,7 @@ function SessionDetail({ session, itemMap, warehouseName, onRecord, isRecording,
               disabled={counted === 0}
               onClick={onFinalize}
             >
-              Finalize Settings
+              Finalize Session
             </Button>
             <Button
               fullWidth
@@ -584,13 +584,26 @@ function SummaryDonut({ total, match, variance, notCounted }: { total: number; m
   )
 }
 
-// Helper for Modal preview — shows what will be posted on finalize.
-function FinalizePreview({ session, itemMap }: { session: CycleCountSession; itemMap: Record<string, { sku: string; name: string }> }) {
-  const variances = session.lines.filter((l) => l.actualQty !== undefined && l.actualQty !== l.expectedQty)
-  if (variances.length === 0) {
+// Helper for Modal preview — shows what will actually be posted on finalize.
+// Variance is computed against the live `book` quantity (current item.quantity),
+// matching the API's reconciliation logic. expectedQty is shown alongside for
+// context but is no longer the basis for the adjustment math.
+function FinalizePreview({ session, itemMap }: { session: CycleCountSession; itemMap: Record<string, { sku: string; name: string; quantity: number }> }) {
+  type Line = CycleCountSession['lines'][number]
+  type PreviewRow = { line: Line; book: number; variance: number }
+
+  const counted = session.lines.filter((l) => l.actualQty !== undefined)
+  const previews: PreviewRow[] = counted.map((l) => {
+    const item = itemMap[l.itemId]
+    const book = item?.quantity ?? l.expectedQty
+    return { line: l, book, variance: (l.actualQty ?? 0) - book }
+  })
+  const willPost = previews.filter((p) => p.variance !== 0)
+
+  if (willPost.length === 0) {
     return (
       <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-[12px] text-emerald-800">
-        All counted lines match — no adjustments will be posted. Session simply closes.
+        All counted lines match current stock — no adjustments will be posted. Session simply closes.
       </div>
     )
   }
@@ -600,20 +613,23 @@ function FinalizePreview({ session, itemMap }: { session: CycleCountSession; ite
         <thead>
           <tr className="text-zinc-400">
             <th className="px-3 py-1.5 text-left font-medium uppercase tracking-wider text-[10px]">Item</th>
-            <th className="px-3 py-1.5 text-right font-medium uppercase tracking-wider text-[10px]">Variance</th>
+            <th className="px-3 py-1.5 text-right font-medium uppercase tracking-wider text-[10px]">Book</th>
+            <th className="px-3 py-1.5 text-right font-medium uppercase tracking-wider text-[10px]">Counted</th>
+            <th className="px-3 py-1.5 text-right font-medium uppercase tracking-wider text-[10px]">Adjustment</th>
           </tr>
         </thead>
         <tbody>
-          {variances.map((l) => {
-            const item = itemMap[l.itemId]
-            const v = (l.actualQty ?? 0) - l.expectedQty
+          {willPost.map(({ line, book, variance }) => {
+            const item = itemMap[line.itemId]
             return (
-              <tr key={l.itemId} className="border-t border-zinc-100">
+              <tr key={line.itemId} className="border-t border-zinc-100">
                 <td className="px-3 py-1.5 text-zinc-700">
-                  <span className="font-mono text-[11px] text-zinc-400">{item?.sku ?? l.itemId}</span> {item?.name ?? ''}
+                  <span className="font-mono text-[11px] text-zinc-400">{item?.sku ?? line.itemId}</span> {item?.name ?? ''}
                 </td>
-                <td className={cn('px-3 py-1.5 text-right tabular-nums font-medium', v < 0 ? 'text-red-700' : 'text-blue-700')}>
-                  {v > 0 ? '+' : ''}{v}
+                <td className="px-3 py-1.5 text-right tabular-nums text-zinc-500">{book}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-zinc-700">{line.actualQty}</td>
+                <td className={cn('px-3 py-1.5 text-right tabular-nums font-medium', variance < 0 ? 'text-red-700' : 'text-blue-700')}>
+                  {variance > 0 ? '+' : ''}{variance}
                 </td>
               </tr>
             )

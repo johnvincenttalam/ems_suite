@@ -14,4 +14,6 @@ export { useInventoryItems, useStockMovements, useCycleCountSessions } from './h
 export { inventoryApi } from './api/inventory-api'
 export { cycleCountApi } from './api/cycle-count-api'
 export { mockInventoryItems, mockStockMovements, mockCycleCountSessions } from './data/mock-inventory'
+export { getStockHealth } from './lib/stock-health'
+export type { StockHealth } from './lib/stock-health'
 export type { InventoryItem, StockMovement, StockMovementType, StockMovementStatus, CycleCountSession, CycleCountLine, CycleCountStatus } from './types'

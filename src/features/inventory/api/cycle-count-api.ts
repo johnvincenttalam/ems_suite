@@ -118,19 +118,23 @@ export const cycleCountApi = {
     const finalizedAt = new Date().toISOString()
     let appliedCount = 0
     for (const line of counted) {
-      const variance = (line.actualQty ?? 0) - line.expectedQty
-      if (variance === 0) continue
-      // Generate an auto-applied adjustment movement. The cycle count itself
-      // is the authorization, so we bypass the pending → approve loop.
       const item = mockInventoryItems.find((i) => i.id === line.itemId)
       if (!item) continue
+      // Variance is computed against LIVE stock at finalize time, not the
+      // schedule-time snapshot. expectedQty is preserved on the line for the
+      // audit narrative ("expected 100, found 95"), but the adjustment that
+      // posts must reconcile the book to the physical count — otherwise any
+      // movement during the count window double-counts.
+      const actual = line.actualQty ?? 0
+      const variance = actual - item.quantity
+      if (variance === 0) continue
       const movement: StockMovement = {
         id: `MV-CC-${s.id}-${line.itemId}`,
         itemId: line.itemId,
         type: 'adjustment',
         quantity: variance,
         sourceLocationId: item.warehouseId,
-        reason: `Cycle count ${s.id} — ${variance > 0 ? 'found' : 'shrinkage'}`,
+        reason: `Cycle count ${s.id} — ${variance > 0 ? 'found' : 'shrinkage'} (book ${item.quantity} → counted ${actual})`,
         createdAt: finalizedAt,
         createdBy: finalizerName,
         status: 'applied',
@@ -139,7 +143,7 @@ export const cycleCountApi = {
         approvedAt: finalizedAt,
       }
       mockStockMovements.unshift(movement)
-      item.quantity += variance
+      item.quantity = actual
       appliedCount += 1
     }
 
