@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SignatureSlot } from '@/features/documents/types'
 
 interface PlacementOverlayProps {
@@ -16,8 +16,22 @@ function clamp(n: number, lo: number, hi: number): number {
 
 export function PlacementOverlay({ active, page, onPlaced }: PlacementOverlayProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const capturedPointerRef = useRef<number | null>(null)
   const [from, setFrom] = useState<{ x: number; y: number } | null>(null)
   const [to, setTo] = useState<{ x: number; y: number } | null>(null)
+
+  // If the parent flips active to false mid-drag (e.g., user clicks Cancel
+  // outside the overlay), release any held pointer capture and reset state.
+  useEffect(() => {
+    if (active) return
+    const captured = capturedPointerRef.current
+    if (captured !== null) {
+      ref.current?.releasePointerCapture?.(captured)
+      capturedPointerRef.current = null
+    }
+    setFrom(null)
+    setTo(null)
+  }, [active])
 
   const norm = (e: React.PointerEvent): { x: number; y: number } => {
     const el = ref.current
@@ -35,6 +49,7 @@ export function PlacementOverlay({ active, page, onPlaced }: PlacementOverlayPro
     setFrom(p)
     setTo(p)
     ref.current?.setPointerCapture?.(e.pointerId)
+    capturedPointerRef.current = e.pointerId
   }
   const handleMove = (e: React.PointerEvent) => {
     if (!from) return
@@ -53,6 +68,7 @@ export function PlacementOverlay({ active, page, onPlaced }: PlacementOverlayPro
     setFrom(null)
     setTo(null)
     ref.current?.releasePointerCapture?.(e.pointerId)
+    capturedPointerRef.current = null
   }
 
   if (!active) return null

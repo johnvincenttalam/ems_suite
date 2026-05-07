@@ -87,7 +87,7 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
           loading={<div className="flex justify-center py-16"><Spinner size="lg" /></div>}
         >
           {showToolbar && (
-            <div className="sticky top-[72px] z-10 flex justify-center mb-3">
+            <div className="sticky top-[calc(var(--topbar-h)+1rem)] z-10 flex justify-center mb-3">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur">
                 <button
                   type="button"
@@ -108,8 +108,11 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
                     onChange={(e) => setPageInputValue(e.target.value)}
                     onBlur={() => {
                       const n = Number(pageInputValue)
-                      if (Number.isFinite(n) && n >= 1) scrollToPage(n)
-                      else setPageInputValue(String(currentPage))
+                      const target = Number.isFinite(n) && n >= 1
+                        ? Math.min(Math.max(Math.floor(n), 1), numPages)
+                        : currentPage
+                      scrollToPage(target)
+                      setPageInputValue(String(target))
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {

@@ -45,6 +45,7 @@ import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/button'
 import { PlacementOverlay, SignatureLayer, SignatureModal } from '@/features/documents/components/signature'
 import { RevokeSignatureModal } from '@/features/documents/components/revoke-signature-modal'
+import { safeAssetUrl } from '@/features/documents/lib/safe-asset-url'
 
 const PdfViewer = lazy(() => import('@/features/documents/components/pdf-viewer'))
 
@@ -405,7 +406,7 @@ export function SdmsDocumentViewerPage() {
           </div>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-[72px] lg:self-start">
+        <aside className="space-y-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start">
           <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} />
 
           <div className="bg-white rounded-xl border border-zinc-200/60 p-4 space-y-3">
@@ -533,13 +534,14 @@ interface PreviewAreaProps {
 }
 
 function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaProps) {
-  const isImage = (doc.fileType === 'png' || doc.fileType === 'jpg') && !!doc.assetUrl
-  if (isImage && doc.assetUrl) {
+  const safeUrl = safeAssetUrl(doc.assetUrl)
+  const isImage = (doc.fileType === 'png' || doc.fileType === 'jpg') && !!safeUrl
+  if (isImage && safeUrl) {
     return (
       <div className="rounded-lg border border-zinc-200/60 bg-zinc-100/50 p-4">
         <div className="relative mx-auto bg-white shadow-sm" style={{ maxWidth: 800 }}>
           <img
-            src={doc.assetUrl}
+            src={safeUrl}
             alt={doc.title}
             className="block w-full h-auto select-none"
             draggable={false}
@@ -552,10 +554,10 @@ function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaP
       </div>
     )
   }
-  if (doc.fileType === 'pdf' && doc.assetUrl) {
+  if (doc.fileType === 'pdf' && safeUrl) {
     return (
       <Suspense fallback={<div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[480px] flex items-center justify-center"><Spinner size="lg" /></div>}>
-        <PdfViewer doc={doc} url={doc.assetUrl} userMap={userMap} placementMode={placementMode} onSlotPlaced={onSlotPlaced} />
+        <PdfViewer doc={doc} url={safeUrl} userMap={userMap} placementMode={placementMode} onSlotPlaced={onSlotPlaced} />
       </Suspense>
     )
   }

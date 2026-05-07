@@ -24,6 +24,10 @@
   --color-surface-card: #ffffff;
   --color-surface-hover: #f4f4f5;
 
+  /* Topbar height. Keep in sync with module-layout's <main className="pt-14">.
+   * Used by sticky offsets so when the topbar resizes, the offsets follow. */
+  --topbar-h: 56px;
+
   --color-success-50: #f7fdf9;
   --color-success-500: #16a34a;
   --color-success-600: #15803d;

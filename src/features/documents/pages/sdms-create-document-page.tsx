@@ -126,6 +126,12 @@ export function SdmsCreateDocumentPage() {
 
   const fileName = watch('fileName')
 
+  // Reset prefill flag whenever the target draft changes — prevents the form
+  // from sticking to a previous draft's values when navigating ?edit=A → ?edit=B.
+  useEffect(() => {
+    editPrefilledRef.current = false
+  }, [editId])
+
   // Prefill the form once from the editing doc when it arrives.
   useEffect(() => {
     if (!isEditMode || !editingDoc || editPrefilledRef.current) return
@@ -139,7 +145,13 @@ export function SdmsCreateDocumentPage() {
     if (editingDoc.departmentId) setValue('departmentId', editingDoc.departmentId)
     setTags(editingDoc.tags ?? [])
     setSignatureSlots(editingDoc.signatureSlots ?? [])
-    setExistingAssetUrl(editingDoc.assetUrl)
+    // Blob URLs from a prior session don't survive page reload — treat them
+    // as missing and force the user to re-pick the file.
+    const url = editingDoc.assetUrl
+    setExistingAssetUrl(url && !url.startsWith('blob:') ? url : undefined)
+    if (url?.startsWith('blob:')) {
+      toast.info('Original file is no longer available — pick the file again to preview it.')
+    }
   }, [isEditMode, editingDoc, setValue])
 
   const invalidate = () => {

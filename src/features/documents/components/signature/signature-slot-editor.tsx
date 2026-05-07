@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import type { SignatureSlot } from '@/features/documents/types'
 import { Spinner } from '@/shared/ui/spinner'
 import { cn } from '@/shared/utils/cn'
+import { safeAssetUrl } from '@/features/documents/lib/safe-asset-url'
 
 const PdfPageWithSize = lazy(() => import('./pdf-page'))
 
@@ -38,7 +39,8 @@ type Op =
   | { kind: 'resize'; key: string; mouseStart: { x: number; y: number }; slotStart: SignatureSlot }
 
 export function SignatureSlotEditor({ referenceUrl, slots, onChange, approverNames }: SignatureSlotEditorProps) {
-  const assetType = detectAssetType(referenceUrl)
+  const safeUrl = safeAssetUrl(referenceUrl)
+  const assetType = safeUrl ? detectAssetType(safeUrl) : 'image'
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -179,11 +181,15 @@ export function SignatureSlotEditor({ referenceUrl, slots, onChange, approverNam
         className="relative mx-auto bg-white border border-zinc-200/60 shadow-sm select-none touch-none"
         style={{ maxWidth: 720, cursor: op?.kind === 'draw' ? 'crosshair' : 'default' }}
       >
-        {assetType === 'image' ? (
-          <img src={referenceUrl} alt="Reference document" className="block w-full h-auto pointer-events-none" draggable={false} />
+        {!safeUrl ? (
+          <div className="py-16 text-center text-[12px] text-red-700">
+            Unsupported reference URL — must be a relative path, http(s), or blob.
+          </div>
+        ) : assetType === 'image' ? (
+          <img src={safeUrl} alt="Reference document" className="block w-full h-auto pointer-events-none" draggable={false} />
         ) : (
           <Suspense fallback={<div className="flex justify-center py-16"><Spinner size="lg" /></div>}>
-            <PdfPageWithSize url={referenceUrl} page={page} onLoadSuccess={(n) => setNumPages(n)} />
+            <PdfPageWithSize url={safeUrl} page={page} onLoadSuccess={(n) => setNumPages(n)} />
           </Suspense>
         )}
 

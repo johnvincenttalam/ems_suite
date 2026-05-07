@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -102,10 +102,14 @@ export function DocumentsTab() {
   }
 
   const deepLinkDocId = searchParams.get('doc')
+  const handledDeepLinkRef = useRef<string | null>(null)
   useEffect(() => {
     if (!deepLinkDocId || documents.length === 0) return
+    if (handledDeepLinkRef.current === deepLinkDocId) return
     const target = documents.find((d) => d.id === deepLinkDocId)
-    if (target) navigate(getModulePath('sdms', `documents/${target.id}`))
+    if (!target) return
+    handledDeepLinkRef.current = deepLinkDocId
+    navigate(getModulePath('sdms', `documents/${target.id}`))
   }, [deepLinkDocId, documents, navigate])
 
   const archiveMutation = useMutation({

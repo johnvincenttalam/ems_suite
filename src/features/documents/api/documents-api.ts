@@ -24,6 +24,11 @@ import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 400 + 250))
 
+/** Prefix for keys auto-generated when a signer ad-hoc-places their slot at
+ * sign time. Used to distinguish ephemeral placements from admin/template
+ * slots so we can clean them up on revoke. */
+const AD_HOC_SLOT_PREFIX = 'placed_'
+
 interface RegisterReceiptInput {
   title: string
   description?: string
@@ -513,13 +518,16 @@ export const documentsApi = {
 
     let resolvedSlotKey = metadata?.slotKey
     if (!resolvedSlotKey && metadata?.placementSlot) {
-      const existingKeys = new Set((doc.signatureSlots ?? []).map((s) => s.key))
-      let i = (doc.signatureSlots?.length ?? 0) + 1
-      let candidate = `placed_${i}`
-      while (existingKeys.has(candidate)) {
-        i += 1
-        candidate = `placed_${i}`
-      }
+      // Pick the next free suffix by scanning existing ad-hoc keys, not
+      // length-based — survives slot deletions without reusing keys.
+      const maxSuffix = (doc.signatureSlots ?? [])
+        .map((s) => {
+          if (!s.key.startsWith(AD_HOC_SLOT_PREFIX)) return 0
+          const n = Number(s.key.slice(AD_HOC_SLOT_PREFIX.length))
+          return Number.isFinite(n) ? n : 0
+        })
+        .reduce((max, n) => Math.max(max, n), 0)
+      const candidate = `${AD_HOC_SLOT_PREFIX}${maxSuffix + 1}`
       const newSlot: SignatureSlot = { key: candidate, ...metadata.placementSlot }
       doc.signatureSlots = [...(doc.signatureSlots ?? []), newSlot]
       resolvedSlotKey = candidate
@@ -760,6 +768,13 @@ export const documentsApi = {
     sig.revokedAt = revokedAt
     sig.revokedBy = revokerId
     sig.revocationReason = reason
+
+    // Drop ad-hoc placement slots so re-signing doesn't leave a phantom
+    // rectangle. Template/admin-defined slots are preserved.
+    if (sig.slotKey?.startsWith(AD_HOC_SLOT_PREFIX) && doc.signatureSlots) {
+      const remaining = doc.signatureSlots.filter((s) => s.key !== sig.slotKey)
+      doc.signatureSlots = remaining.length > 0 ? remaining : undefined
+    }
 
     doc.currentApproverIndex = idx
     if (doc.status === 'approved') doc.status = 'in_review'
