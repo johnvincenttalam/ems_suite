@@ -1,6 +1,7 @@
 import type { InventoryItem, StockMovement, StockMovementType } from '@/features/inventory/types'
 import { mockInventoryItems, mockStockMovements } from '@/features/inventory/data/mock-inventory'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 // import { http } from '@/shared/lib/http'
 
 const delay = (ms?: number) =>
@@ -190,6 +191,20 @@ export const inventoryApi = {
     const requiresApproval = input.type === 'transfer' || input.type === 'adjustment'
     if (requiresApproval && !input.approverId) {
       throw new Error(`${input.type === 'transfer' ? 'Transfer' : 'Adjustment'} requires an approver`)
+    }
+    // Block stock-out movements that would push the item below zero unless
+    // the operator has explicitly opted in via Settings → System Preferences.
+    if (input.type === 'out') {
+      const settings = useInventorySettings.getState().settings
+      if (!settings.allowNegativeStock) {
+        const item = mockInventoryItems.find((i) => i.id === input.itemId)
+        if (item && input.quantity > item.quantity) {
+          throw new Error(
+            `Cannot stock-out ${input.quantity} of ${item.name} — only ${item.quantity} on hand. ` +
+            `Enable "Allow negative stock" in Settings to override.`,
+          )
+        }
+      }
     }
     const movement: StockMovement = {
       id: `MV-${String(movementCounter).padStart(4, '0')}`,

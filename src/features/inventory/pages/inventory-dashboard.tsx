@@ -24,8 +24,10 @@ import {
   Pie,
   Cell,
   Legend,
+  LineChart,
+  Line,
 } from 'recharts'
-import { formatDistanceToNow, parseISO, subDays, isAfter } from 'date-fns'
+import { format, formatDistanceToNow, parseISO, startOfMonth, subDays, subMonths, isAfter } from 'date-fns'
 import { useInventoryItems, useStockMovements } from '@/features/inventory'
 import { useWarehouses } from '@/features/warehouses'
 import { useCategories } from '@/features/categories'
@@ -62,6 +64,8 @@ const MOVEMENT_LABEL: Record<StockMovementType, string> = {
   transfer: 'Transfer',
   adjustment: 'Adjustment',
 }
+
+const CATEGORY_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7']
 
 const tooltipStyle = {
   borderRadius: '8px',
@@ -134,6 +138,46 @@ export function InventoryDashboard() {
       })
       .slice(0, 6)
   }, [items])
+
+  /**
+   * Reconstruct stock value at the end of each of the last 6 months.
+   *
+   * Strategy: today's totalValue is the anchor. For each prior month-end,
+   * subtract net stock changes (priced at unit cost) that happened after
+   * that point. This is approximate — assumes unit costs are stable, which
+   * the current data model doesn't track historically.
+   */
+  const stockTrend = useMemo(() => {
+    const today = new Date()
+    const currentValue = items.reduce((s, i) => s + i.quantity * (i.unitCost ?? 0), 0)
+    const itemMap = new Map(items.map((i) => [i.id, i]))
+
+    const buckets: { month: string; value: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = startOfMonth(subMonths(today, i))
+      const monthEnd = i === 0 ? today : startOfMonth(subMonths(today, i - 1))
+
+      // Net stock-value change of all movements AFTER monthEnd. If we walk
+      // back from today's value by subtracting future net changes, we get
+      // the historical end-of-month value.
+      let netChangeSinceMonthEnd = 0
+      for (const m of movements) {
+        if (m.status !== 'applied') continue
+        const t = parseISO(m.createdAt)
+        if (!isAfter(t, monthEnd)) continue
+        const item = itemMap.get(m.itemId)
+        const cost = item?.unitCost ?? 0
+        if (m.type === 'in') netChangeSinceMonthEnd += m.quantity * cost
+        else if (m.type === 'out') netChangeSinceMonthEnd -= m.quantity * cost
+        else if (m.type === 'adjustment') netChangeSinceMonthEnd += m.quantity * cost
+      }
+      buckets.push({
+        month: format(monthStart, 'MMM'),
+        value: Math.max(0, currentValue - netChangeSinceMonthEnd),
+      })
+    }
+    return buckets
+  }, [items, movements])
 
   const movementBreakdown = useMemo(() => {
     const counts = new Map<StockMovementType, number>()
@@ -239,6 +283,64 @@ export function InventoryDashboard() {
           iconColor="text-violet-600"
           index={3}
         />
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex-row items-center justify-between flex">
+            <CardTitle>Stock Trend (Last 6 Months)</CardTitle>
+            <span className="text-[11px] text-zinc-400">Total stock value</span>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div style={{ width: '100%', height: 240 }}>
+              {stockTrend.every((b) => b.value === 0) ? (
+                <div className="h-full flex items-center justify-center text-[13px] text-zinc-400">No movement history</div>
+              ) : (
+                <ResponsiveContainer>
+                  <LineChart data={stockTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatCompactCurrency(Number(v)), 'Value']} />
+                    <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock by Category</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div style={{ width: '100%', height: 240 }}>
+              {stockByCategory.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-[13px] text-zinc-400">No stock yet</div>
+              ) : (
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={stockByCategory}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={2}
+                    >
+                      {stockByCategory.map((entry, i) => (
+                        <Cell key={entry.name} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatCompactCurrency(Number(v)), 'Value']} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">

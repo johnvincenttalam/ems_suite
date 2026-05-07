@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { ArrowDownToLine, ArrowUpFromLine, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -19,24 +20,28 @@ import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { cn } from '@/shared/utils/cn'
 import type { StockMovementType } from '@/features/inventory/types'
 
-const formSchema = z.object({
-  itemId: z.string().min(1, 'Item is required'),
-  quantity: z.number().int().positive('Quantity must be positive'),
-  batchNumber: z.string().optional(),
-  referenceNumber: z.string().optional(),
-  reason: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof formSchema>
-
 type Mode = 'in' | 'out'
 
 export function StockInOutPage() {
   const [mode, setMode] = useState<Mode>('in')
   const { data: items = [] } = useInventoryItems()
   const { data: movements = [], isLoading } = useStockMovements()
+  const settings = useInventorySettings((s) => s.settings)
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
+
+  // Schema is built per-render so requireBatchNumber reflects the live setting.
+  const formSchema = z.object({
+    itemId: z.string().min(1, 'Item is required'),
+    quantity: z.number().int().positive('Quantity must be positive'),
+    batchNumber: settings.requireBatchNumber
+      ? z.string().min(1, 'Batch number is required (per Settings → System Preferences)')
+      : z.string().optional(),
+    referenceNumber: z.string().optional(),
+    reason: z.string().optional(),
+  })
+
+  type FormValues = z.infer<typeof formSchema>
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
 
@@ -54,6 +59,10 @@ export function StockInOutPage() {
     mutationFn: (values: FormValues) => {
       if (!currentUser) throw new Error('Not signed in')
       const item = itemMap[values.itemId]
+      const explicitRef = values.referenceNumber?.trim()
+      const generatedRef = settings.autoGenerateReferenceNumber && !explicitRef
+        ? `${mode === 'in' ? 'RCPT' : 'ISSUE'}-${Date.now().toString().slice(-6)}`
+        : undefined
       return inventoryApi.addMovement({
         itemId: values.itemId,
         type: mode,
@@ -61,7 +70,7 @@ export function StockInOutPage() {
         ...(mode === 'in' ? { destinationLocationId: item?.warehouseId } : { sourceLocationId: item?.warehouseId }),
         reason: values.reason?.trim() || undefined,
         batchNumber: values.batchNumber?.trim() || undefined,
-        referenceNumber: values.referenceNumber?.trim() || undefined,
+        referenceNumber: explicitRef || generatedRef,
         createdBy: currentUser.name,
       })
     },
@@ -120,14 +129,15 @@ export function StockInOutPage() {
           />
 
           <Input
-            label="Batch Number"
+            label={settings.requireBatchNumber ? 'Batch Number *' : 'Batch Number'}
             placeholder="e.g. BTC-2026-001"
             {...register('batchNumber')}
+            error={errors.batchNumber?.message as string | undefined}
           />
 
           <Input
             label="Reference Number"
-            placeholder={mode === 'in' ? 'e.g. RCPT-00123' : 'e.g. ISSUE-00123'}
+            placeholder={settings.autoGenerateReferenceNumber ? 'Auto-generated if blank' : (mode === 'in' ? 'e.g. RCPT-00123' : 'e.g. ISSUE-00123')}
             {...register('referenceNumber')}
           />
 

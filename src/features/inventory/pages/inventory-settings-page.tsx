@@ -1,32 +1,56 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Bell, ArrowLeftRight, AlertTriangle, RotateCcw } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, ArrowLeftRight, AlertTriangle, RotateCcw, ScanLine, Sliders } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Toggle } from '@/shared/ui/toggle'
 import { Input } from '@/shared/ui/input'
+import { Select } from '@/shared/ui/select'
 import { Button } from '@/shared/ui/button'
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
+import { useWarehouses } from '@/features/warehouses'
+import { useUom } from '@/features/uom'
 
 const tabs = [
   { label: 'General', value: 'general', icon: SettingsIcon },
-  { label: 'Stock Levels', value: 'stock', icon: AlertTriangle },
-  { label: 'Movements', value: 'movements', icon: ArrowLeftRight },
+  { label: 'Stock Thresholds', value: 'thresholds', icon: AlertTriangle },
+  { label: 'System Preferences', value: 'preferences', icon: Sliders },
+  { label: 'Movement Rules', value: 'movements', icon: ArrowLeftRight },
+  { label: 'Defaults', value: 'defaults', icon: ScanLine },
   { label: 'Notifications', value: 'notifications', icon: Bell },
 ] as const
 
 type TabKey = (typeof tabs)[number]['value']
 
+const CURRENCIES = [
+  { value: 'PHP', label: 'PHP — Philippine Peso' },
+  { value: 'USD', label: 'USD — US Dollar' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'JPY', label: 'JPY — Japanese Yen' },
+  { value: 'SGD', label: 'SGD — Singapore Dollar' },
+]
+
 export function InventorySettingsPage() {
   const { settings, update, updateNotify, reset } = useInventorySettings()
+  const { data: warehouses = [] } = useWarehouses()
+  const { data: uoms = [] } = useUom()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
+
+  const warehouseOptions = [
+    { value: '', label: 'No default — pick at submit' },
+    ...warehouses.map((w) => ({ value: w.id, label: w.name })),
+  ]
+  const uomOptions = [
+    { value: '', label: 'No default' },
+    ...uoms.map((u) => ({ value: u.id, label: u.name })),
+  ]
 
   return (
     <div>
       <PageHeader
         title="Inventory Settings"
-        subtitle="Configure stock thresholds, movement rules, and alert behavior"
+        subtitle="Configure thresholds, system preferences, movement rules, and alert behavior."
         actions={
           <Button
             variant="outline"
@@ -62,7 +86,7 @@ export function InventorySettingsPage() {
           {activeTab === 'general' && (
             <Card>
               <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Defaults</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Item Defaults</h3>
                 <Input
                   label="Default reorder level"
                   type="number"
@@ -77,80 +101,139 @@ export function InventorySettingsPage() {
             </Card>
           )}
 
-          {activeTab === 'stock' && (
+          {activeTab === 'thresholds' && (
             <Card>
               <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Low-stock Threshold</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Stock Thresholds</h3>
                 <Input
-                  label="Critical ratio"
+                  label="Reorder Level Warning (%)"
                   type="number"
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  value={settings.lowStockRatio}
+                  min={1}
+                  max={100}
+                  value={settings.reorderWarningPercent}
                   onChange={(e) =>
-                    update({
-                      lowStockRatio: Math.max(0.1, Math.min(1, Number(e.target.value) || 0.5)),
-                    })
+                    update({ reorderWarningPercent: clampPct(Number(e.target.value), 1, 100, 80) })
                   }
-                  helperText="Items at or below this fraction of reorder level escalate to a critical alert (e.g. 0.5 = half of reorder level)"
+                  helperText="Stock at or below this percent of reorder level triggers a warning. Default 80%."
+                />
+                <Input
+                  label="Critical Level (%)"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={settings.criticalPercent}
+                  onChange={(e) =>
+                    update({ criticalPercent: clampPct(Number(e.target.value), 1, 100, 50) })
+                  }
+                  helperText="Stock at or below this percent of reorder level triggers a critical alert. Default 50%."
                 />
                 <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
-                  Items at exactly 0 always trigger a stock-out alert regardless of this setting.
+                  Items at exactly 0 always trigger a stock-out alert regardless of these settings.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'preferences' && (
+            <Card>
+              <CardContent className="space-y-1 p-6">
+                <h3 className="text-sm font-semibold text-zinc-900 mb-2">System Preferences</h3>
+
+                <SettingRow
+                  title="Enable barcode scanning"
+                  desc="Show a barcode-scan input on the items page (placeholder — scanner integration pending)."
+                  checked={settings.enableBarcodeScanning}
+                  onChange={(v) => update({ enableBarcodeScanning: v })}
+                />
+                <SettingRow
+                  title="Auto-generate reference number"
+                  desc="Stock In/Out forms fill in a reference number automatically when left blank."
+                  checked={settings.autoGenerateReferenceNumber}
+                  onChange={(v) => update({ autoGenerateReferenceNumber: v })}
+                />
+                <SettingRow
+                  title="Require batch number"
+                  desc="Stock In/Out submissions must include a batch number — useful for traceability."
+                  checked={settings.requireBatchNumber}
+                  onChange={(v) => update({ requireBatchNumber: v })}
+                />
+                <SettingRow
+                  title="Allow negative stock"
+                  desc="Stock-out movements can push item quantity below zero. Off by default for accuracy."
+                  checked={settings.allowNegativeStock}
+                  onChange={(v) => update({ allowNegativeStock: v })}
+                  last
+                />
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'movements' && (
             <Card>
+              <CardContent className="space-y-1 p-6">
+                <h3 className="text-sm font-semibold text-zinc-900 mb-2">Movement Rules</h3>
+                <SettingRow
+                  title="Require reason on adjustment"
+                  desc="Adjustments must include a written reason for the audit trail."
+                  checked={settings.requireReasonOnAdjustment}
+                  onChange={(v) => update({ requireReasonOnAdjustment: v })}
+                />
+                <SettingRow
+                  title="Require destination on transfer"
+                  desc="Transfers must specify a destination warehouse."
+                  checked={settings.requireWarehouseOnTransfer}
+                  onChange={(v) => update({ requireWarehouseOnTransfer: v })}
+                  last
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'defaults' && (
+            <Card>
               <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Movement Rules</h3>
-                <div className="flex items-center justify-between py-3 border-b border-zinc-100/60">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700">Require reason on adjustment</p>
-                    <p className="text-xs text-zinc-400">Adjustments must include a written reason for the audit trail</p>
-                  </div>
-                  <Toggle
-                    checked={settings.requireReasonOnAdjustment}
-                    onChange={(v) => update({ requireReasonOnAdjustment: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700">Require destination on transfer</p>
-                    <p className="text-xs text-zinc-400">Transfers must specify a destination warehouse</p>
-                  </div>
-                  <Toggle
-                    checked={settings.requireWarehouseOnTransfer}
-                    onChange={(v) => update({ requireWarehouseOnTransfer: v })}
-                  />
-                </div>
+                <h3 className="text-sm font-semibold text-zinc-900">Operational Defaults</h3>
+                <Select
+                  label="Default Warehouse"
+                  options={warehouseOptions}
+                  value={settings.defaultWarehouseId}
+                  onChange={(e) => update({ defaultWarehouseId: e.target.value })}
+                />
+                <Select
+                  label="Default Unit"
+                  options={uomOptions}
+                  value={settings.defaultUomId}
+                  onChange={(e) => update({ defaultUomId: e.target.value })}
+                />
+                <Select
+                  label="Default Currency"
+                  options={CURRENCIES}
+                  value={settings.defaultCurrency}
+                  onChange={(e) => update({ defaultCurrency: e.target.value })}
+                />
+                <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
+                  Pre-fills these fields on new forms. Users can still override per-record.
+                </p>
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'notifications' && (
             <Card>
-              <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Inventory Alerts</h3>
+              <CardContent className="space-y-1 p-6">
+                <h3 className="text-sm font-semibold text-zinc-900 mb-2">Inventory Alerts</h3>
                 {[
                   { key: 'lowStock' as const, label: 'Low stock', desc: 'When an item drops to or below its reorder level' },
                   { key: 'stockOut' as const, label: 'Stock out', desc: 'When an item reaches zero on hand' },
-                ].map((item) => (
-                  <div
+                ].map((item, i, arr) => (
+                  <SettingRow
                     key={item.key}
-                    className="flex items-center justify-between py-3 border-b border-zinc-100/60 last:border-0"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-zinc-700">{item.label}</p>
-                      <p className="text-xs text-zinc-400">{item.desc}</p>
-                    </div>
-                    <Toggle
-                      checked={settings.notify[item.key]}
-                      onChange={(v) => updateNotify({ [item.key]: v })}
-                    />
-                  </div>
+                    title={item.label}
+                    desc={item.desc}
+                    checked={settings.notify[item.key]}
+                    onChange={(v) => updateNotify({ [item.key]: v })}
+                    last={i === arr.length - 1}
+                  />
                 ))}
                 <p className="text-[12px] text-zinc-400 pt-2">
                   These preferences control whether the bell icon and Alerts page surface each kind of event.
@@ -160,6 +243,31 @@ export function InventorySettingsPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function clampPct(v: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(v)) return fallback
+  return Math.max(lo, Math.min(hi, v))
+}
+
+interface SettingRowProps {
+  title: string
+  desc: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  last?: boolean
+}
+
+function SettingRow({ title, desc, checked, onChange, last }: SettingRowProps) {
+  return (
+    <div className={cn('flex items-center justify-between py-3 gap-4', !last && 'border-b border-zinc-100/60')}>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-zinc-700">{title}</p>
+        <p className="text-xs text-zinc-400 mt-0.5">{desc}</p>
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
     </div>
   )
 }

@@ -2,9 +2,23 @@ import { create } from 'zustand'
 
 export interface InventorySettings {
   defaultReorderLevel: number
-  lowStockRatio: number
+  /** Stock at or below this percent of reorder level is "low" (warning). */
+  reorderWarningPercent: number
+  /** Stock at or below this percent of reorder level is "critical". */
+  criticalPercent: number
   requireReasonOnAdjustment: boolean
   requireWarehouseOnTransfer: boolean
+  /** Stock In/Out forms refuse to submit without a batch number. */
+  requireBatchNumber: boolean
+  /** Allow stock-out movements to push item.quantity below zero. */
+  allowNegativeStock: boolean
+  /** Auto-fill a reference number on stock in/out if the user leaves it empty. */
+  autoGenerateReferenceNumber: boolean
+  /** UI placeholder — toggles a (future) barcode-scan input on the items page. */
+  enableBarcodeScanning: boolean
+  defaultWarehouseId: string
+  defaultUomId: string
+  defaultCurrency: string
   notify: {
     lowStock: boolean
     stockOut: boolean
@@ -15,9 +29,17 @@ const STORAGE_KEY = 'inventory-settings'
 
 const defaults: InventorySettings = {
   defaultReorderLevel: 10,
-  lowStockRatio: 0.5,
+  reorderWarningPercent: 80,
+  criticalPercent: 50,
   requireReasonOnAdjustment: true,
   requireWarehouseOnTransfer: true,
+  requireBatchNumber: false,
+  allowNegativeStock: false,
+  autoGenerateReferenceNumber: true,
+  enableBarcodeScanning: false,
+  defaultWarehouseId: '',
+  defaultUomId: '',
+  defaultCurrency: 'PHP',
   notify: {
     lowStock: true,
     stockOut: true,
