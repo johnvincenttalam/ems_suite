@@ -1,4 +1,4 @@
-import type { InventoryItem, StockMovement } from '@/features/inventory/types'
+import type { CycleCountSession, InventoryItem, StockMovement } from '@/features/inventory/types'
 
 export const mockInventoryItems: InventoryItem[] = [
   { id: 'INV-1001', sku: 'OS-PAPR-A4',  name: 'A4 Copy Paper, 80gsm',         description: 'Ream of 500 sheets', categoryId: 'C005', uomId: 'U002', warehouseId: 'W001', quantity: 240, reorderLevel: 100, unitCost: 4.20,  createdAt: '2024-09-01' },
@@ -30,4 +30,53 @@ export const mockStockMovements: StockMovement[] = [
   { id: 'MV-2010', itemId: 'INV-1010', type: 'transfer',   quantity: 12,  sourceLocationId: 'W001', destinationLocationId: 'W002',     reason: 'Site team request — vests',      createdAt: '2026-05-06T08:30:00Z', createdBy: 'John Smith', status: 'pending', approverId: 'Jane Doe' },
   { id: 'MV-2011', itemId: 'INV-1008', type: 'adjustment', quantity: -2,  sourceLocationId: 'W002',                                    reason: 'Filter found defective during PM', createdAt: '2026-05-06T09:15:00Z', createdBy: 'John Smith', status: 'pending', approverId: 'Jane Doe' },
   { id: 'MV-2012', itemId: 'INV-1012', type: 'transfer',   quantity: 5,   sourceLocationId: 'W002', destinationLocationId: 'W001',     reason: 'Restock for Site Alpha',         createdAt: '2026-05-06T10:00:00Z', createdBy: 'John Smith', status: 'pending', approverId: 'Admin User' },
+]
+
+export const mockCycleCountSessions: CycleCountSession[] = [
+  // Completed last week — full count of W001 office supplies.
+  {
+    id: 'CC-0001',
+    warehouseId: 'W001',
+    categoryId: 'C005',
+    scheduledDate: '2026-04-28',
+    startedAt: '2026-04-28T08:00:00Z',
+    completedAt: '2026-04-28T11:30:00Z',
+    status: 'completed',
+    createdBy: 'Jane Doe',
+    finalizedBy: 'Jane Doe',
+    lines: [
+      { itemId: 'INV-1001', expectedQty: 240, actualQty: 240, countedAt: '2026-04-28T08:30:00Z', countedBy: 'John Smith' },
+      { itemId: 'INV-1002', expectedQty: 56, actualQty: 54, countedAt: '2026-04-28T08:45:00Z', countedBy: 'John Smith' },
+      { itemId: 'INV-1003', expectedQty: 12, actualQty: 12, countedAt: '2026-04-28T09:10:00Z', countedBy: 'John Smith' },
+    ],
+  },
+  // In-progress — counter has done 2 of 4 lines.
+  {
+    id: 'CC-0002',
+    warehouseId: 'W002',
+    categoryId: 'C007',
+    scheduledDate: '2026-05-06',
+    startedAt: '2026-05-06T08:15:00Z',
+    status: 'in_progress',
+    createdBy: 'Jane Doe',
+    lines: [
+      { itemId: 'INV-1006', expectedQty: 124, actualQty: 124, countedAt: '2026-05-06T08:40:00Z', countedBy: 'John Smith' },
+      { itemId: 'INV-1007', expectedQty: 72, actualQty: 70, countedAt: '2026-05-06T09:05:00Z', countedBy: 'John Smith' },
+      { itemId: 'INV-1008', expectedQty: 18 },
+      { itemId: 'INV-1012', expectedQty: 45 },
+    ],
+  },
+  // Scheduled for next week — not yet started.
+  {
+    id: 'CC-0003',
+    warehouseId: 'W001',
+    categoryId: 'C008',
+    scheduledDate: '2026-05-13',
+    status: 'scheduled',
+    createdBy: 'Jane Doe',
+    lines: [
+      { itemId: 'INV-1009', expectedQty: 64 },
+      { itemId: 'INV-1010', expectedQty: 27 },
+    ],
+  },
 ]

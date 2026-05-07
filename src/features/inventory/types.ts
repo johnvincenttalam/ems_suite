@@ -48,3 +48,32 @@ export interface StockMovement {
   batchNumber?: string
   referenceNumber?: string
 }
+
+export type CycleCountStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface CycleCountLine {
+  itemId: string
+  /** Snapshot of item.quantity at the time the session was scheduled.
+   * Treated as the "book" value; variance = actualQty - expectedQty. */
+  expectedQty: number
+  /** Set by the counter while the session is in_progress. Undefined means
+   * the line hasn't been counted yet. */
+  actualQty?: number
+  countedAt?: string
+  countedBy?: string
+}
+
+export interface CycleCountSession {
+  id: string
+  warehouseId: string
+  /** Optional category filter — if set, lines are restricted to items in
+   * that category. Lets you spot-check a slice rather than the whole site. */
+  categoryId?: string
+  scheduledDate: string
+  startedAt?: string
+  completedAt?: string
+  status: CycleCountStatus
+  createdBy: string
+  finalizedBy?: string
+  lines: CycleCountLine[]
+}
