@@ -6,6 +6,7 @@ import { Breadcrumb } from '@/shared/ui/breadcrumb'
 import { cn } from '@/shared/utils/cn'
 import type { EmsModule } from '@/config/modules'
 import { useAuthStore } from '@/features/auth/store/auth-store'
+import { useNotificationToasts } from '@/shared/notifications'
 
 const SearchPalette = lazy(() =>
   import('@/shared/search').then((m) => ({ default: m.SearchPalette })),
@@ -24,6 +25,9 @@ export function ModuleLayout({ module }: ModuleLayoutProps) {
   useEffect(() => {
     setSelectedModule(module.key)
   }, [module, setSelectedModule])
+
+  // Toast for every newly-arrived notification scoped to this module workspace.
+  useNotificationToasts(module.key)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

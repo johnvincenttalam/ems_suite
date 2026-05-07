@@ -3,7 +3,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 import type { AppDocument } from '@/features/documents'
 import type { AppNotification } from '@/shared/notifications/types'
 
-const SDMS_DOC_LINK = (id: string) => `/module/sdms/documents?doc=${id}`
+const SDMS_DOC_LINK = (id: string) => `/module/sdms/documents/${id}`
 
 /**
  * Derive notifications for `userId` from the current `documents` array.

@@ -28,7 +28,7 @@ export function scoreDocuments(documents: AppDocument[], query: string): GlobalS
       icon: FileText,
       iconBg: 'bg-violet-50',
       iconColor: 'text-violet-600',
-      link: `/module/sdms/documents?doc=${doc.id}`,
+      link: `/module/sdms/documents/${doc.id}`,
     })
   }
 
