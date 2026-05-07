@@ -13,7 +13,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
 interface PdfViewerProps {
   doc: AppDocument
   url: string
-  userMap: Record<string, { name: string }>
+  userMap: Record<string, { name: string } | undefined>
   placementMode?: boolean
   onSlotPlaced?: (slot: Omit<SignatureSlot, 'key'>) => void
 }

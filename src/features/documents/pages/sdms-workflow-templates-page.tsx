@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapPin, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUsers } from '@/features/users'
+import { useUsers, UserInfoPopover } from '@/features/users'
 import { useWorkflowTemplates } from '@/features/documents/hooks/use-workflow-templates'
 import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { workflowTemplatesApi } from '@/features/documents/api/workflow-templates-api'
@@ -141,13 +141,16 @@ export function SdmsWorkflowTemplatesPage() {
                       <div className="flex items-center gap-1 flex-wrap">
                         {t.approverIds.map((id, i) => {
                           const u = userMap[id]
+                          const pill = (
+                            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200/60 text-[11.5px] hover:border-zinc-300 transition-colors">
+                              <Avatar name={u?.name ?? id} size="sm" className="w-4 h-4 text-[8px]" />
+                              <span className="text-zinc-700">{u?.name ?? id}</span>
+                            </span>
+                          )
                           return (
                             <span key={`${id}-${i}`} className="inline-flex items-center gap-1.5">
                               {i > 0 && <span className="text-zinc-300">→</span>}
-                              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200/60 text-[11.5px]">
-                                <Avatar name={u?.name ?? id} size="sm" className="w-4 h-4 text-[8px]" />
-                                <span className="text-zinc-700">{u?.name ?? id}</span>
-                              </span>
+                              {u ? <UserInfoPopover user={u}>{pill}</UserInfoPopover> : pill}
                             </span>
                           )
                         })}

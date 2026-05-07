@@ -8,10 +8,12 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { getModulePath } from '@/config/modules'
 import { format } from 'date-fns'
 import { Users, ShieldCheck, ListChecks, UserPlus, UserX, Crown, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUsers, CreateEditUserModal } from '@/features/users'
+import { useUsers, CreateEditUserModal, ModuleAccessPills } from '@/features/users'
 import { usersApi } from '@/features/users/api/users-api'
 import type { User } from '@/features/users/types'
 import { useRequests } from '@/features/procurement'
@@ -28,6 +30,7 @@ import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { StatCard } from '@/shared/ui/stat-card'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { formatCompactCurrency } from '@/shared/utils/format'
 
 type UserActivity = User & {
@@ -41,11 +44,13 @@ export function ProcurementUsersPage() {
   const { data: allUsers = [], isLoading } = useUsers()
   const { data: requests = [] } = useRequests()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<User | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<User | null>(null)
+  const [adminTarget, setAdminTarget] = useState<{ user: User; makeAdmin: boolean } | null>(null)
 
   const canManage = isModuleAdmin(currentUser, 'procurement')
 
@@ -66,6 +71,27 @@ export function ProcurementUsersPage() {
     },
     onError: (err) => {
       toast.error('Revoke failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    },
+  })
+
+  const adminMutation = useMutation({
+    mutationFn: ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return usersApi.setModuleAdmin({
+        userId,
+        moduleKey: 'procurement',
+        auditModule: 'Procurement',
+        makeAdmin,
+        byId: currentUser.id,
+      })
+    },
+    onSuccess: (user, vars) => {
+      toast.success(vars.makeAdmin ? `${user.name} is now a Procurement admin` : `${user.name} is no longer a Procurement admin`)
+      invalidate()
+      setAdminTarget(null)
+    },
+    onError: (err) => {
+      toast.error('Update failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     },
   })
 
@@ -111,7 +137,8 @@ export function ProcurementUsersPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-400 truncate">{row.original.email}</p>
+              <p className="text-xs text-zinc-400 truncate">{row.original.position ?? row.original.email}</p>
+              <ModuleAccessPills modules={row.original.modules} excludeModule="procurement" className="mt-1" />
             </div>
           </div>
         ),
@@ -169,27 +196,38 @@ export function ProcurementUsersPage() {
           const u = row.original
           const isSelf = u.id === currentUser?.id
           const isAdmin = u.moduleAdmins?.includes('procurement')
-          if (isSelf || isAdmin) {
-            return <span className="text-[11px] text-zinc-300">—</span>
+          const items: ActionMenuItem[] = [
+            { key: 'edit', label: 'Edit user', icon: Pencil, onClick: () => setEditTarget(u) },
+          ]
+          if (!isSelf) {
+            if (isAdmin) {
+              items.push({
+                key: 'demote',
+                label: 'Remove as Admin',
+                icon: Crown,
+                description: 'Becomes a regular member',
+                onClick: () => setAdminTarget({ user: u, makeAdmin: false }),
+              })
+            } else {
+              items.push({
+                key: 'promote',
+                label: 'Make Admin',
+                icon: Crown,
+                description: 'Can invite users and manage access',
+                onClick: () => setAdminTarget({ user: u, makeAdmin: true }),
+              })
+              items.push({
+                key: 'revoke',
+                label: 'Revoke access',
+                icon: UserX,
+                danger: true,
+                onClick: () => setRevokeTarget(u),
+              })
+            }
           }
           return (
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<Pencil className="w-3.5 h-3.5" />}
-                onClick={() => setEditTarget(u)}
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<UserX className="w-3.5 h-3.5" />}
-                onClick={() => setRevokeTarget(u)}
-              >
-                Revoke
-              </Button>
+            <div className="flex justify-end">
+              <ActionMenu items={items} />
             </div>
           )
         },
@@ -301,7 +339,11 @@ export function ProcurementUsersPage() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">
+                <tr
+                  key={row.id}
+                  onClick={() => navigate(getModulePath('procurement', `users/${row.original.id}`))}
+                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -348,6 +390,29 @@ export function ProcurementUsersPage() {
         confirmLabel="Revoke access"
         tone="danger"
         busy={revokeMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!adminTarget}
+        onCancel={() => setAdminTarget(null)}
+        onConfirm={() =>
+          adminTarget && adminMutation.mutate({ userId: adminTarget.user.id, makeAdmin: adminTarget.makeAdmin })
+        }
+        title={
+          adminTarget?.makeAdmin
+            ? `Make ${adminTarget?.user.name ?? ''} a Procurement admin?`
+            : `Remove ${adminTarget?.user.name ?? ''} as Procurement admin?`
+        }
+        message={
+          adminTarget?.makeAdmin ? (
+            <>They will be able to invite users, manage access, and promote others. They keep their existing Procurement access.</>
+          ) : (
+            <>They will lose admin privileges (invite, revoke, promote) but keep their Procurement access. At least one admin must remain.</>
+          )
+        }
+        confirmLabel={adminTarget?.makeAdmin ? 'Make admin' : 'Remove admin'}
+        tone={adminTarget?.makeAdmin ? 'default' : 'warning'}
+        busy={adminMutation.isPending}
       />
     </div>
   )

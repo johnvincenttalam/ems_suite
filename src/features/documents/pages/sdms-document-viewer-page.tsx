@@ -30,7 +30,8 @@ import {
   type AppDocument,
   type SignatureSlot,
 } from '@/features/documents/types'
-import { useUsers } from '@/features/users'
+import { useUsers, UserInfoPopover } from '@/features/users'
+import type { User } from '@/features/users/types'
 import { useDepartments } from '@/features/departments'
 import { useAuditLog } from '@/features/audit-log'
 import { useAuthStore } from '@/features/auth/store/auth-store'
@@ -528,7 +529,7 @@ export function SdmsDocumentViewerPage() {
 
 interface PreviewAreaProps {
   doc: AppDocument
-  userMap: Record<string, { name: string }>
+  userMap: Record<string, User | undefined>
   placementMode?: boolean
   onSlotPlaced?: (slot: Omit<SignatureSlot, 'key'>) => void
 }
@@ -618,7 +619,7 @@ function MetadataView({ doc, authorName, departmentName }: { doc: AppDocument; a
 
 interface VersionsViewProps {
   doc: AppDocument
-  userMap: Record<string, { name: string }>
+  userMap: Record<string, User | undefined>
   currentUserId?: string
   onRevoke: () => void
   onReposition: (slotKey: string) => void
@@ -758,7 +759,7 @@ function AuditTrailView({ doc, entries }: { doc: AppDocument; entries: { id: str
 
 interface WorkflowProgressProps {
   doc: AppDocument
-  userMap: Record<string, { name: string }>
+  userMap: Record<string, User | undefined>
   currentUserId?: string
 }
 
@@ -771,6 +772,8 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
   type Step = {
     label: string
     actor?: string
+    actorUser?: User
+    actorIsYou?: boolean
     statusText: string
     state: 'done' | 'current' | 'pending' | 'rejected'
     isYou?: boolean
@@ -780,6 +783,7 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
     {
       label: 'Requested',
       actor: userMap[doc.createdBy]?.name ?? doc.createdBy,
+      actorUser: userMap[doc.createdBy],
       statusText: format(parseISO(doc.createdAt), 'MMM d, HH:mm'),
       state: 'done',
     },
@@ -787,7 +791,8 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
       const sig = signatureMap[approverId]
       const isCurrent = i === idx && doc.status === 'in_review'
       const isRejected = doc.status === 'rejected' && doc.rejectedBy === approverId
-      const actor = userMap[approverId]?.name ?? approverId
+      const approverUser = userMap[approverId]
+      const actor = approverUser?.name ?? approverId
       const isYou = approverId === currentUserId
       let statusText = 'Pending'
       let state: Step['state'] = 'pending'
@@ -803,7 +808,9 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
       }
       return {
         label: `Step ${i + 2}`,
-        actor: isYou && isCurrent ? `${actor} (You)` : actor,
+        actor,
+        actorUser: approverUser,
+        actorIsYou: isYou && isCurrent,
         statusText,
         state,
         isYou: isYou && isCurrent,
@@ -843,9 +850,20 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
               </span>
               <p className="text-[13px] font-medium text-zinc-900">{step.label}</p>
               {step.actor && (
-                <p className={cn('text-[12px]', step.isYou ? 'text-amber-700 font-medium' : 'text-zinc-600')}>
-                  {step.actor}
-                </p>
+                <div className={cn('text-[12px]', step.isYou ? 'text-amber-700 font-medium' : 'text-zinc-600')}>
+                  {step.actorUser ? (
+                    <UserInfoPopover user={step.actorUser}>
+                      <span className="hover:text-zinc-900 hover:underline underline-offset-2">
+                        {step.actor}{step.actorIsYou ? ' (You)' : ''}
+                      </span>
+                    </UserInfoPopover>
+                  ) : (
+                    <span>{step.actor}{step.actorIsYou ? ' (You)' : ''}</span>
+                  )}
+                  {step.actorUser?.position && (
+                    <p className="text-[11px] text-zinc-400 leading-tight mt-0.5">{step.actorUser.position}</p>
+                  )}
+                </div>
               )}
               <p className={cn(
                 'text-[11px] mt-0.5',
@@ -865,7 +883,7 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
 
 interface CommentsPanelProps {
   doc: AppDocument
-  userMap: Record<string, { name: string }>
+  userMap: Record<string, User | undefined>
   comment: string
   setComment: (s: string) => void
   error: string | null
@@ -875,11 +893,12 @@ interface CommentsPanelProps {
 
 function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onSubmit }: CommentsPanelProps) {
   const thread = useMemo(() => {
-    const items: { who: string; text: string; when: string; tone: 'sig' | 'rejection' }[] = []
+    const items: { who: string; whoUser?: User; text: string; when: string; tone: 'sig' | 'rejection' }[] = []
     for (const s of doc.signatures) {
       if (s.comment) {
         items.push({
           who: userMap[s.signerId]?.name ?? s.signerId,
+          whoUser: userMap[s.signerId],
           text: s.comment,
           when: s.signedAt,
           tone: 'sig',
@@ -889,6 +908,7 @@ function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onS
     if (doc.rejectedReason && doc.rejectedBy) {
       items.push({
         who: userMap[doc.rejectedBy]?.name ?? doc.rejectedBy,
+        whoUser: userMap[doc.rejectedBy],
         text: doc.rejectedReason,
         when: doc.rejectedAt ?? doc.createdAt,
         tone: 'rejection',
@@ -907,7 +927,13 @@ function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onS
               'rounded-md px-3 py-2 text-[12px]',
               c.tone === 'rejection' ? 'bg-red-50 border border-red-200' : 'bg-zinc-50 border border-zinc-100',
             )}>
-              <p className={cn('font-medium', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-900')}>{c.who}</p>
+              <div className={cn('font-medium', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-900')}>
+                {c.whoUser ? (
+                  <UserInfoPopover user={c.whoUser}>
+                    <span className="hover:underline underline-offset-2">{c.who}</span>
+                  </UserInfoPopover>
+                ) : c.who}
+              </div>
               <p className={cn('mt-0.5', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-700')}>{c.text}</p>
               <p className="text-[10.5px] text-zinc-400 mt-1">{formatDistanceToNow(parseISO(c.when), { addSuffix: true })}</p>
             </li>

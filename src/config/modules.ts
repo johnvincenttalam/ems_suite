@@ -104,6 +104,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Create Document', path: 'create-document', icon: FolderOpen, feature: 'sdmsCreateDocument', hidden: true },
           { label: 'Document Viewer', path: 'documents/:id', icon: FolderOpen, feature: 'sdmsDocumentViewer', hidden: true },
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
         ],
       },
     ],
@@ -161,6 +162,11 @@ export const modules: EmsModule[] = [
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'inventorySettings' },
         ],
       },
+      {
+        items: [
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
+        ],
+      },
     ],
   },
   {
@@ -198,6 +204,11 @@ export const modules: EmsModule[] = [
           { label: 'Users', path: 'users', icon: Users, feature: 'assetsUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'assetsLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'assetsSettings' },
+        ],
+      },
+      {
+        items: [
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
         ],
       },
     ],
@@ -239,6 +250,11 @@ export const modules: EmsModule[] = [
           { label: 'Users', path: 'users', icon: Users, feature: 'fleetUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'fleetLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'fleetSettings' },
+        ],
+      },
+      {
+        items: [
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
         ],
       },
     ],
@@ -284,6 +300,11 @@ export const modules: EmsModule[] = [
           { label: 'Users', path: 'users', icon: Users, feature: 'procurementUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'procurementLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'procurementSettings' },
+        ],
+      },
+      {
+        items: [
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
         ],
       },
     ],
@@ -341,6 +362,11 @@ export const modules: EmsModule[] = [
           { label: 'Users', path: 'users', icon: UserCheck, feature: 'maintenanceUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings' },
+        ],
+      },
+      {
+        items: [
+          { label: 'User Profile', path: 'users/:id', icon: Users, feature: 'userProfile', hidden: true },
         ],
       },
     ],

@@ -5,7 +5,7 @@ import { SignatureOverlay } from './signature-overlay'
 interface SignatureLayerProps {
   doc: AppDocument
   page?: number
-  userMap?: Record<string, { name: string }>
+  userMap?: Record<string, { name: string } | undefined>
   /** Whether to outline still-empty slots (so reviewers know where signatures will land). */
   showEmptySlots?: boolean
 }

@@ -79,6 +79,7 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   suppliers:           lazy(() => featureImports.suppliers().then((m: any) => ({ default: m.SuppliersPage }))),
   activity:            lazy(() => featureImports.activity().then((m: any) => ({ default: m.ActivityPage }))),
   profile:             lazy(() => featureImports.profile().then((m: any) => ({ default: m.ProfilePage }))),
+  userProfile:         lazy(() => featureImports.userProfile().then((m: any) => ({ default: m.UserProfilePage }))),
   uiKit:               lazy(() => featureImports.uiKit().then((m: any) => ({ default: m.UIKitPage }))),
 }
 

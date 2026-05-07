@@ -71,6 +71,7 @@ export const features = {
 
   // Account
   profile: true,
+  userProfile: true,
 
   // Template demo pages — disabled for EMS, code retained for reference
   charts: false,

@@ -78,6 +78,7 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   suppliers:   () => import('@/features/suppliers'),
   activity:    () => import('@/features/activity'),
   profile:     () => import('@/features/profile'),
+  userProfile: () => import('@/features/users'),
   uiKit:       () => import('@/features/ui-kit'),
 }
 

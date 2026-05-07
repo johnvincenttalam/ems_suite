@@ -177,6 +177,57 @@ export const usersApi = {
   },
 
   /**
+   * Promote or demote a user as administrator of a specific module. Promotion
+   * requires the user to already have access; demotion is forbidden if they
+   * are the last admin (every module must have at least one admin so admin
+   * power isn't orphaned). The audit entry is tagged with the calling
+   * module's display name.
+   */
+  setModuleAdmin: async (input: {
+    userId: string
+    moduleKey: ModuleKey
+    auditModule: string
+    makeAdmin: boolean
+    byId: string
+  }): Promise<User> => {
+    await delay(120)
+    const idx = mockUsers.findIndex((u) => u.id === input.userId)
+    if (idx === -1) throw new Error(`User ${input.userId} not found`)
+    const u = mockUsers[idx]
+    const isAdmin = u.moduleAdmins.includes(input.moduleKey)
+
+    if (input.makeAdmin) {
+      if (isAdmin) throw new Error(`${u.name} is already a ${input.auditModule} admin`)
+      if (!u.modules.includes(input.moduleKey)) {
+        throw new Error(`${u.name} doesn't have ${input.auditModule} access — grant access first`)
+      }
+      u.moduleAdmins = [...u.moduleAdmins, input.moduleKey]
+      recordAudit({
+        userId: input.byId,
+        action: 'update',
+        module: input.auditModule,
+        detail: `Promoted ${u.name} to ${input.auditModule} admin`,
+      })
+    } else {
+      if (!isAdmin) throw new Error(`${u.name} is not a ${input.auditModule} admin`)
+      const otherAdmins = mockUsers.filter(
+        (other) => other.id !== u.id && other.moduleAdmins.includes(input.moduleKey),
+      )
+      if (otherAdmins.length === 0) {
+        throw new Error(`${u.name} is the last ${input.auditModule} admin — promote another user first`)
+      }
+      u.moduleAdmins = u.moduleAdmins.filter((m) => m !== input.moduleKey)
+      recordAudit({
+        userId: input.byId,
+        action: 'update',
+        module: input.auditModule,
+        detail: `Removed ${u.name} as ${input.auditModule} admin`,
+      })
+    }
+    return u
+  },
+
+  /**
    * Revoke a user's access to a specific module. Their global record stays —
    * other modules they belong to are unaffected. Throws if the user doesn't
    * have access in the first place. Module admins themselves cannot be revoked
