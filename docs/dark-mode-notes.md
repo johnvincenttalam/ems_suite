@@ -203,6 +203,86 @@ The accent tokens give you free brand-color customization (indigo / emerald / ro
 
 ---
 
+## Bug 7 — Recharts grid lines and labels stay light
+
+**Symptoms (in dark mode):**
+- Chart axis lines and grid render as **near-white** strokes — washed out and overpowering against the dark surface.
+- Axis tick labels stay light gray on a dark background but with low contrast.
+- The default tooltip is white-on-white when you hover a series.
+
+**Cause:** Recharts renders SVG with **inline presentation attributes** (e.g. `stroke="#e4e4e7"`, `fill="#71717a"`). These come through as `style="stroke: …"` on the DOM — Tailwind classes can't reach them, and a CSS rule without `!important` loses to the inline style.
+
+**Fix — target Recharts' stable class names with `!important`:**
+
+```css
+/* Recharts uses inline SVG presentation attributes (stroke, fill) on grid
+   lines and tick labels which CSS without !important won't reach for
+   style="" attribute values. !important on a class selector wins, and
+   these recharts class names are stable across versions. */
+.dark .recharts-cartesian-grid line       { stroke: #27272a !important; }
+.dark .recharts-cartesian-axis-tick-value { fill:   #71717a !important; }
+.dark .recharts-text                      { fill:   #a1a1aa !important; }
+.dark .recharts-default-tooltip {
+  background-color: #18181b !important;
+  border-color:     #3f3f46 !important;
+  color:            #e4e4e7 !important;
+}
+```
+
+These four selectors fix every chart in the codebase at once — you don't have to touch individual `<LineChart>` / `<BarChart>` / `<PieChart>` instances.
+
+**Bigger principle:** any SVG-based component that renders inline color attributes (Recharts, react-leaflet markers, hand-rolled SVGs) needs CSS overrides via stable class names, not Tailwind classes on the wrappers. Same trick applies to your own SVG pies / donuts — render them with `stroke="currentColor"` / `fill="currentColor"` and apply `text-zinc-…` on the parent so the color flows through `currentColor` and inherits the dark override naturally:
+
+```tsx
+{/* ❌ Inline color — won't dark-mode */}
+<circle stroke="#e4e4e7" />
+
+{/* ✅ currentColor — inherits text-* class which has a dark override */}
+<circle stroke="currentColor" className="text-zinc-200" />
+```
+
+---
+
+## Bug 8 — Surfaces that should stay white in BOTH modes
+
+**Symptom:** A signature canvas, rendered document page, or any "ink on paper" surface goes dark in dark mode. Dark-ink content (signature strokes, PDF glyphs) becomes invisible against the dark background.
+
+**Why this isn't just a regular surface:** these are **substrates**, not UI chrome. The content is authored in dark ink against a white assumption — a signature drawn at `#18181b` ink on a `#ffffff` paper canvas is unreadable when the paper goes to `#18181b`. Auto-flipping every white surface for "dark mode parity" breaks this.
+
+**The trap:** if you write the surface as `bg-white`, your dark override (`.dark .bg-white { background: #18181b !important }`) catches it and inverts it — but you don't want that here.
+
+**Fix — semantic class + remove `bg-white`:**
+
+```css
+/* index.css — define a semantic class for "always-paper" surfaces */
+.surface-paper { background-color: #ffffff !important; }
+```
+
+```tsx
+{/* ❌ Before — dark mode override catches this and inverts */}
+<div className="bg-white border border-zinc-200 …">
+  <SignatureCanvas penColor="#18181b" … />
+</div>
+
+{/* ✅ After — surface-paper is unique to your CSS, not in any dark override */}
+<div className="surface-paper border border-zinc-200 …">
+  <SignatureCanvas penColor="#18181b" … />
+</div>
+```
+
+**When to use `.surface-paper`:**
+- Signature canvases (drawing surface for `react-signature-canvas` etc.)
+- Rendered PDF / document pages (`react-pdf` page wrappers)
+- Signed-document image previews (the user expects to see the dark signature)
+- Print-preview surfaces
+
+**Don't use it for:**
+- Cards, modals, panels — those are UI chrome and should flip with theme
+
+The trick is that `.surface-paper` is your own custom class — no dark override touches it, so it stays white regardless of mode. `!important` defends against any future broad rule that might accidentally hit it.
+
+---
+
 ## Audit checklist for a new template
 
 Run this over any admin template using class-targeted dark mode:
@@ -211,8 +291,11 @@ Run this over any admin template using class-targeted dark mode:
 - [ ] `grep -rE 'border-(zinc|emerald|amber|red|blue)-(100|200)\\?\/(40|60|80)' src/` — same for border alphas.
 - [ ] `grep -r 'divide-y\|divide-' src/` — replace any `divide-{color}` usages with per-child `border-t border-{color} first:border-t-0`.
 - [ ] `grep -rE '(span|div).*bg-zinc-900' src/` — verify any non-button `bg-zinc-900` uses accent tokens or has a span/div override.
-- [ ] Toggle dark mode on **every page** after building. Anything that looks washed-out gray (instead of tinted) is missing an alpha override.
-- [ ] Specifically check expandable rows, metric tiles, KPI cards, filter chips, tab badges, avatar circles, modal backgrounds.
+- [ ] `grep -rl 'recharts\|<LineChart\|<BarChart\|<PieChart' src/` — if you find Recharts, drop in the `.recharts-*` overrides from the CSS block.
+- [ ] `grep -rE 'fill="#|stroke="#' src/` — any custom SVG with hex literals breaks dark mode. Switch to `fill="currentColor"` / `stroke="currentColor"` and apply `text-zinc-*` on the wrapper.
+- [ ] `grep -r 'SignatureCanvas\|<Page \|react-pdf\|paper.*bg-white' src/` — find any "ink on paper" surfaces and migrate them to `.surface-paper`.
+- [ ] Toggle dark mode on **every page** after building. Anything that looks washed-out gray (instead of tinted) is missing an alpha override. Anything dark-on-dark (like a signature you can't see) is a paper-surface issue.
+- [ ] Specifically check expandable rows, metric tiles, KPI cards, filter chips, tab badges, avatar circles, modal backgrounds, **chart axes/grids/tooltips**, **signature canvases**, **rendered document pages**.
 - [ ] Verify `border-t border-zinc-100/60` (or your chosen unified weight) is the convention across all tables.
 
 ---
@@ -254,6 +337,30 @@ Copy this block into your `index.css` (or wherever your dark-mode rules live), u
   background-color: #fafafa !important;
   color: #09090b !important;
 }
+
+/* === divide-* utilities — the .border-* overrides above don't reach the
+   sibling-selector rule that divide-y emits. Mirror them. === */
+.dark .divide-zinc-100 > :not([hidden]) ~ :not([hidden])      { border-color: #27272a !important; }
+.dark .divide-zinc-200 > :not([hidden]) ~ :not([hidden])      { border-color: #3f3f46 !important; }
+.dark .divide-zinc-100\/60 > :not([hidden]) ~ :not([hidden])  { border-color: rgba(39, 39, 42, 0.6) !important; }
+.dark .divide-zinc-200\/60 > :not([hidden]) ~ :not([hidden])  { border-color: rgba(63, 63, 70, 0.6) !important; }
+
+/* === Recharts — inline SVG presentation attributes that Tailwind classes
+   can't reach. !important on stable Recharts class names wins. === */
+.dark .recharts-cartesian-grid line       { stroke: #27272a !important; }
+.dark .recharts-cartesian-axis-tick-value { fill:   #71717a !important; }
+.dark .recharts-text                      { fill:   #a1a1aa !important; }
+.dark .recharts-default-tooltip {
+  background-color: #18181b !important;
+  border-color:     #3f3f46 !important;
+  color:            #e4e4e7 !important;
+}
+
+/* === "Always-paper" surfaces — signature canvases, rendered document
+   pages, anything where dark ink needs a white substrate. Stays white in
+   both light and dark mode. Apply via className="surface-paper" instead
+   of bg-white (which gets dark-flipped). === */
+.surface-paper { background-color: #ffffff !important; }
 ```
 
 ---
@@ -263,7 +370,9 @@ Copy this block into your `index.css` (or wherever your dark-mode rules live), u
 1. **Alpha modifiers and `divide-*` are second-class citizens of class-targeted dark mode.** If you can choose, prefer overriding via CSS variables (`var(--surface-tint)`) instead of literal class overrides — variables flow through alpha modifiers automatically.
 2. **Hand-rolled brand elements (avatars, badges) should always use accent tokens**, never `bg-zinc-900` directly. Accent tokens flip with theme; literal classes don't.
 3. **Maps and charts are data surfaces, not chrome.** Don't auto-dark them just for visual cohesion — readability comes first.
-4. **Build an audit checklist and run it after every theming change.** Every new tinted variant you introduce is another class that needs a matching dark override unless you use variables.
+4. **SVG inline color attributes need `!important` on a stable class selector.** Tailwind `dark:` variants can't reach `style=""`-attribute values. Recharts is the canonical example, but the same rule applies to your own custom SVGs — render them with `currentColor` whenever possible so `text-*` classes (which DO have dark overrides) flow through naturally.
+5. **Identify "always-paper" surfaces upfront.** Signature canvases, rendered document pages, and anything else where dark ink needs a white substrate — these aren't UI chrome. Use a semantic class (`.surface-paper`) instead of `bg-white`, so dark-mode overrides skip them.
+6. **Build an audit checklist and run it after every theming change.** Every new tinted variant you introduce is another class that needs a matching dark override unless you use variables.
 
 ---
 
