@@ -152,17 +152,55 @@ export function AssetDisposalPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Pending Approval" value={stats.pendingCount} icon={Clock} iconBg="bg-amber-50" iconColor="text-amber-600" index={0} />
-        <StatCard title="Disposed Total" value={stats.disposedCount} icon={Trash2} iconBg="bg-zinc-100" iconColor="text-zinc-600" index={1} />
-        <StatCard title="Recovered Value" value={formatCurrency(stats.recoveredValue)} subtitle="Sale / scrap proceeds" icon={ArrowDownToLine} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={2} />
-        <StatCard title="In Your Queue" value={stats.myQueue} subtitle={currentUser ? `Awaiting ${currentUser.name}` : 'Sign in to see'} icon={CheckCircle2} iconBg="bg-blue-50" iconColor="text-blue-600" index={3} />
+        <StatCard
+          title="Pending Approval"
+          value={stats.pendingCount}
+          subtitle={stats.pendingCount === 0 ? 'Queue is clear' : 'Awaiting decision'}
+          icon={Clock}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-600"
+          index={0}
+        />
+        <StatCard
+          title="Disposed Total"
+          value={stats.disposedCount}
+          subtitle="All-time disposed assets"
+          icon={Trash2}
+          iconBg="bg-zinc-100"
+          iconColor="text-zinc-600"
+          index={1}
+        />
+        <StatCard
+          title="Recovered Value"
+          value={formatCurrency(stats.recoveredValue)}
+          subtitle={stats.recoveredValue > 0 ? 'Sale / scrap proceeds' : 'No proceeds yet'}
+          icon={ArrowDownToLine}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+          index={2}
+        />
+        <StatCard
+          title="In Your Queue"
+          value={stats.myQueue}
+          subtitle={
+            !currentUser
+              ? 'Sign in to see'
+              : stats.myQueue === 0
+                ? 'Caught up'
+                : 'Pending your decision'
+          }
+          icon={CheckCircle2}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
+          index={3}
+        />
       </div>
 
       <div className="mb-4">
         <Tabs
           items={[
-            { value: 'pending', label: `Pending Approval${pending.length ? ` (${pending.length})` : ''}` },
-            { value: 'archive', label: `Disposed Archive${archive.length ? ` (${archive.length})` : ''}` },
+            { value: 'pending', label: `Pending Approval (${pending.length})` },
+            { value: 'archive', label: `Disposed Archive (${archive.length})` },
           ]}
           value={tab}
           onChange={(v) => setTab(v as DisposalTab)}
