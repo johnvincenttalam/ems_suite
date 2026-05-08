@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Boxes, Plus, AlertTriangle, Trash2, MapPin } from 'lucide-react'
+import { Boxes, Plus, AlertTriangle, Trash2, MapPin, Pencil } from 'lucide-react'
 import { TrackingPanel } from '@/shared/tracking'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
@@ -22,7 +22,7 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
-import { RowActions } from '@/shared/ui/row-actions'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
@@ -165,20 +165,19 @@ export function ItemsTab() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1 justify-end">
-          <button
-            onClick={() => setLocationItem(row.original)}
-            title="View location"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-          ><MapPin className="w-4 h-4" /></button>
-          <RowActions
-            onView={() => toast.info('View details coming soon')}
-            onEdit={() => openEdit(row.original)}
-            onDelete={() => setDeleteCandidate(row.original)}
-          />
-        </div>
-      ),
+      cell: ({ row }) => {
+        const item = row.original
+        const items: ActionMenuItem[] = [
+          { key: 'edit', label: 'Edit item', icon: Pencil, onClick: () => openEdit(item) },
+          { key: 'location', label: 'View location', icon: MapPin, onClick: () => setLocationItem(item) },
+          { key: 'delete', label: 'Delete item', icon: Trash2, danger: true, onClick: () => setDeleteCandidate(item) },
+        ]
+        return (
+          <div className="flex items-center justify-end">
+            <ActionMenu items={items} />
+          </div>
+        )
+      },
     },
   ], [categoryMap, uomMap, warehouseMap, openEdit])
 

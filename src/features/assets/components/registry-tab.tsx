@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2 } from 'lucide-react'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { TrackingPanel } from '@/shared/tracking'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
@@ -325,53 +326,55 @@ export function RegistryTab() {
       const canReturn = asset.status !== 'disposed' && !!asset.assignedTo
       const canTransfer = asset.status !== 'disposed' && asset.status !== 'retiring'
       const canDispose = asset.status === 'active' || asset.status === 'maintenance'
+
+      const menuItems: ActionMenuItem[] = [
+        ...(asset.checklistId ? [{
+          key: 'inspection',
+          label: 'Inspection checklist',
+          icon: ClipboardList,
+          onClick: () => { setActiveAsset(asset); setActiveAction('inspection') },
+        }] : []),
+        {
+          key: 'location',
+          label: 'View location',
+          icon: MapPin,
+          onClick: () => { setActiveAsset(asset); setActiveAction('location') },
+        },
+        ...(canAssign ? [{
+          key: 'assign',
+          label: 'Assign',
+          icon: UserCheck,
+          onClick: () => { setActiveAsset(asset); setActiveAction('assign') },
+        }] : []),
+        ...(canReturn ? [{
+          key: 'return',
+          label: 'Return from assignment',
+          icon: Undo2,
+          onClick: () => { setActiveAsset(asset); setActiveAction('return') },
+        }] : []),
+        ...(canTransfer ? [{
+          key: 'transfer',
+          label: 'Transfer',
+          icon: ArrowLeftRight,
+          onClick: () => { setActiveAsset(asset); setActiveAction('transfer') },
+        }] : []),
+        ...(canDispose ? [{
+          key: 'dispose',
+          label: 'Dispose / retire',
+          icon: Trash2,
+          danger: true,
+          onClick: () => { setActiveAsset(asset); setActiveAction('dispose') },
+        }] : []),
+      ]
+
       return (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => { setActiveAsset(asset); setActiveAction('view') }}
             title="View details"
             className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
           ><Eye className="w-4 h-4" /></button>
-          {asset.checklistId && (
-            <button
-              onClick={() => { setActiveAsset(asset); setActiveAction('inspection') }}
-              title="Inspection checklist"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-            ><ClipboardList className="w-4 h-4" /></button>
-          )}
-          <button
-            onClick={() => { setActiveAsset(asset); setActiveAction('location') }}
-            title="View location"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          ><MapPin className="w-4 h-4" /></button>
-          {canAssign && (
-            <button
-              onClick={() => { setActiveAsset(asset); setActiveAction('assign') }}
-              title="Assign"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-            ><UserCheck className="w-4 h-4" /></button>
-          )}
-          {canReturn && (
-            <button
-              onClick={() => { setActiveAsset(asset); setActiveAction('return') }}
-              title="Return from assignment"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-            ><Undo2 className="w-4 h-4" /></button>
-          )}
-          {canTransfer && (
-            <button
-              onClick={() => { setActiveAsset(asset); setActiveAction('transfer') }}
-              title="Transfer"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-            ><ArrowLeftRight className="w-4 h-4" /></button>
-          )}
-          {canDispose && (
-            <button
-              onClick={() => { setActiveAsset(asset); setActiveAction('dispose') }}
-              title="Dispose / retire"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-            ><Trash2 className="w-4 h-4" /></button>
-          )}
+          <ActionMenu items={menuItems} />
         </div>
       )
     }},

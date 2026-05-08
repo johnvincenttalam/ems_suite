@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle } from 'lucide-react'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { ChecklistPanel } from '@/shared/checklists'
 import { useSearchParams } from 'react-router-dom'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
@@ -187,43 +188,37 @@ export function WorkOrdersTab() {
     { id: 'actions', header: '', cell: ({ row }) => {
       const wo = row.original
       const canCancel = wo.status === 'pending' || wo.status === 'ongoing'
+      const items: ActionMenuItem[] = [
+        ...(wo.checklistId ? [{
+          key: 'inspection',
+          label: 'Open inspection checklist',
+          icon: ClipboardList,
+          onClick: () => setInspectionWO(wo),
+        }] : []),
+        ...(wo.status === 'pending' ? [{
+          key: 'start',
+          label: 'Start work',
+          icon: Play,
+          disabled: startMutation.isPending,
+          onClick: () => startMutation.mutate(wo),
+        }] : []),
+        ...(wo.status === 'ongoing' ? [{
+          key: 'complete',
+          label: 'Mark complete',
+          icon: CheckCircle2,
+          onClick: () => { setCompletingWO(wo); setCompletionNotes('') },
+        }] : []),
+        ...(canCancel ? [{
+          key: 'cancel',
+          label: 'Cancel work order',
+          icon: XCircle,
+          danger: true,
+          onClick: () => { setCancellingWO(wo); setCancelReason('') },
+        }] : []),
+      ]
       return (
-        <div className="flex items-center gap-1">
-          {wo.checklistId && (
-            <button
-              onClick={() => setInspectionWO(wo)}
-              title="Open inspection checklist"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-            ><ClipboardList className="w-4 h-4" /></button>
-          )}
-          {wo.status === 'pending' && (
-            <button
-              onClick={() => startMutation.mutate(wo)}
-              disabled={startMutation.isPending}
-              title="Start"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
-            >
-              <Play className="w-4 h-4" />
-            </button>
-          )}
-          {wo.status === 'ongoing' && (
-            <button
-              onClick={() => { setCompletingWO(wo); setCompletionNotes('') }}
-              title="Mark complete"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-            </button>
-          )}
-          {canCancel && (
-            <button
-              onClick={() => { setCancellingWO(wo); setCancelReason('') }}
-              title="Cancel"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
-          )}
+        <div className="flex items-center justify-end">
+          <ActionMenu items={items} />
         </div>
       )
     }},
