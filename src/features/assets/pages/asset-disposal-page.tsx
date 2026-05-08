@@ -27,7 +27,7 @@ import { Textarea } from '@/shared/ui/textarea'
 import { Tabs } from '@/shared/ui/tabs'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
-import { EmptyState } from '@/shared/ui/empty-state'
+import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { StatCard } from '@/shared/ui/stat-card'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
 import { formatCurrency } from '@/shared/utils/format'
@@ -303,15 +303,6 @@ function PendingTable({
   isApproving: boolean
   approvingId?: string
 }) {
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        icon={CheckCircle2}
-        title="Queue is clear"
-        description="No pending disposals are waiting on a decision."
-      />
-    )
-  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -327,6 +318,9 @@ function PendingTable({
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 && (
+            <DataTableEmpty colSpan={7} icon={CheckCircle2} message="No pending disposals — your queue is clear" />
+          )}
           {rows.map((a) => {
             const d = a.disposal!
             const canActOnThis = !!currentUserName && (!d.pendingApproverName || d.pendingApproverName === currentUserName)
@@ -400,15 +394,6 @@ function PendingTable({
 }
 
 function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: Asset) => void }) {
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        icon={Trash2}
-        title="No disposed assets yet"
-        description="Approved disposals will land here for the audit archive."
-      />
-    )
-  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -423,6 +408,9 @@ function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: A
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 && (
+            <DataTableEmpty colSpan={6} icon={Trash2} message="No disposed assets in the archive yet" />
+          )}
           {rows.map((a) => {
             const d = a.disposal!
             return (
