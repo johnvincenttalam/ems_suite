@@ -196,6 +196,86 @@ describe('assetsApi.transfer', () => {
       assetsApi.transfer({ assetId: created.id, toLocationId: 'W001', actorName: 'Admin User' }),
     ).rejects.toThrow(/already at the target/i)
   })
+
+  it('refuses to transfer an asset with a pending disposal', async () => {
+    const created = await assetsApi.create({
+      name: 'Retiring Transfer',
+      serialNumber: `SN-RTX-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'pending',
+      disposedDate: '2026-05-08',
+      approverName: 'Admin User',
+      submittedBy: 'Jane Doe',
+    })
+    await expect(
+      assetsApi.transfer({ assetId: created.id, toLocationId: 'W002', actorName: 'Admin User' }),
+    ).rejects.toThrow(/pending disposal/i)
+  })
+})
+
+describe('assetsApi.markMaintenanceStarted', () => {
+  it('refuses to start maintenance on a retiring asset', async () => {
+    const created = await assetsApi.create({
+      name: 'Retiring Maintenance',
+      serialNumber: `SN-RMX-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'pending',
+      disposedDate: '2026-05-08',
+      approverName: 'Admin User',
+      submittedBy: 'Jane Doe',
+    })
+    expect(() => assetsApi.markMaintenanceStarted(created.id, 'Admin User')).toThrow(/pending disposal/i)
+  })
+})
+
+describe('assetsApi event narration', () => {
+  it('renders user names in assigned/returned events instead of IDs', async () => {
+    const created = await assetsApi.create({
+      name: 'Event Narrator',
+      serialNumber: `SN-EVN-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.assign({ assetId: created.id, userId: 'U002', actorName: 'Admin User' })
+    await assetsApi.return({ assetId: created.id, actorName: 'U002' })
+    const events = await assetsApi.listEvents(created.id)
+    const assigned = events.find((e) => e.type === 'assigned')!
+    const returned = events.find((e) => e.type === 'returned')!
+    expect(assigned.detail).toContain('Jane Doe')
+    expect(assigned.detail).not.toContain('U002')
+    expect(returned.detail).toContain('Jane Doe')
+  })
+
+  it('renders warehouse names in transfer events instead of IDs', async () => {
+    const created = await assetsApi.create({
+      name: 'Transfer Narrator',
+      serialNumber: `SN-TRN-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.transfer({ assetId: created.id, toLocationId: 'W002', actorName: 'Admin User' })
+    const events = await assetsApi.listEvents(created.id)
+    const transferred = events.find((e) => e.type === 'transferred')!
+    expect(transferred.detail).not.toMatch(/W001|W002/)
+  })
 })
 
 describe('assetsApi.submitDisposal / approveDisposal / rejectDisposal', () => {
@@ -263,6 +343,68 @@ describe('assetsApi.submitDisposal / approveDisposal / rejectDisposal', () => {
       createdBy: 'Admin User',
     })
     await expect(assetsApi.approveDisposal(created.id, 'Admin User')).rejects.toThrow(/no pending disposal/i)
+  })
+
+  it('persists pendingApproverName on the disposal record', async () => {
+    const created = await assetsApi.create({
+      name: 'Approver Tracker',
+      serialNumber: `SN-APV-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'pending approver gate test',
+      disposedDate: '2026-05-08',
+      approverName: 'Admin User',
+      submittedBy: 'Jane Doe',
+    })
+    const list = await assetsApi.list()
+    const target = list.find((a) => a.id === created.id)!
+    expect(target.disposal?.pendingApproverName).toBe('Admin User')
+  })
+
+  it('blocks approvers other than the named one from approving', async () => {
+    const created = await assetsApi.create({
+      name: 'Wrong Approver',
+      serialNumber: `SN-WAP-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'test',
+      disposedDate: '2026-05-08',
+      approverName: 'Admin User',
+      submittedBy: 'Jane Doe',
+    })
+    await expect(assetsApi.approveDisposal(created.id, 'Jane Doe')).rejects.toThrow(/not the assigned approver/i)
+  })
+
+  it('blocks rejectors other than the named approver', async () => {
+    const created = await assetsApi.create({
+      name: 'Wrong Rejecter',
+      serialNumber: `SN-WRJ-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'test',
+      disposedDate: '2026-05-08',
+      approverName: 'Admin User',
+      submittedBy: 'Jane Doe',
+    })
+    await expect(assetsApi.rejectDisposal(created.id, 'Jane Doe', 'pretending')).rejects.toThrow(/not the assigned approver/i)
   })
 })
 

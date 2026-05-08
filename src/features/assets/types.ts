@@ -43,7 +43,9 @@ export interface Asset {
   notes?: string
   /** Optional checklist template — used for inspection / intake / disposal. */
   checklistId?: string
-  /** Disposal metadata, populated when status flips to 'disposed'. */
+  /** Disposal metadata, populated when status flips to 'retiring' on submit
+   * and finalized when an approver runs `approveDisposal`. Stays on the asset
+   * after disposal completes for audit. */
   disposal?: {
     type: DisposalType
     amount?: number
@@ -51,6 +53,9 @@ export interface Asset {
     disposedDate: string
     disposedBy: string
     reason: string
+    /** Display name of the approver assigned at submission. Only this user
+     * (or an inventory admin in real-world setups) can act on the request. */
+    pendingApproverName?: string
     /** Approver who authorized the disposal (when approval was required). */
     approvedBy?: string
     approvedAt?: string

@@ -15,8 +15,22 @@ import {
   mockAssetEvents,
   mockInspections,
 } from '@/features/assets/data/mock-assets'
+import { mockUsers } from '@/features/users/data/mock-users'
+import { mockWarehouses } from '@/features/warehouses/data/mock-warehouses'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
+
+/** Resolve a user ID to a display name for event narration. Falls back to
+ * the ID when the user is missing so events stay valid even if a user is
+ * deleted. */
+function userName(userId: string): string {
+  return mockUsers.find((u) => u.id === userId)?.name ?? userId
+}
+
+/** Resolve a warehouse ID to its display name for event narration. */
+function locationName(locationId: string): string {
+  return mockWarehouses.find((w) => w.id === locationId)?.name ?? locationId
+}
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 400 + 250))
@@ -268,10 +282,11 @@ export const assetsApi = {
     }
     mockAssetAssignments.push(assignment)
 
+    const toName = userName(input.userId)
     emitEvent({
       assetId: asset.id,
       type: 'assigned',
-      detail: `Assigned to ${input.userId}${input.notes ? ` — ${input.notes}` : ''}`,
+      detail: `Assigned to ${toName}${input.notes ? ` — ${input.notes}` : ''}`,
       actorName: input.actorName,
       payload: { toUserId: input.userId },
     })
@@ -279,7 +294,7 @@ export const assetsApi = {
       userId: input.actorName,
       action: 'update',
       module: 'Assets',
-      detail: `Assigned ${asset.assetCode} (${asset.name}) to user ${input.userId}`,
+      detail: `Assigned ${asset.assetCode} (${asset.name}) to ${toName}`,
     })
     return { asset, assignment }
   },
@@ -300,10 +315,11 @@ export const assetsApi = {
     }
     asset.assignedTo = undefined
 
+    const fromName = userName(previousAssignee)
     emitEvent({
       assetId: asset.id,
       type: 'returned',
-      detail: `Returned by ${previousAssignee}${input.notes ? ` — ${input.notes}` : ''}`,
+      detail: `Returned by ${fromName}${input.notes ? ` — ${input.notes}` : ''}`,
       actorName: input.actorName,
       payload: { fromUserId: previousAssignee },
     })
@@ -311,7 +327,7 @@ export const assetsApi = {
       userId: input.actorName,
       action: 'update',
       module: 'Assets',
-      detail: `Returned ${asset.assetCode} (${asset.name}) from ${previousAssignee}`,
+      detail: `Returned ${asset.assetCode} (${asset.name}) from ${fromName}`,
     })
     return asset
   },
@@ -320,14 +336,19 @@ export const assetsApi = {
     await delay(120)
     const asset = findAsset(input.assetId)
     if (asset.status === 'disposed') throw new Error('Cannot transfer a disposed asset')
+    if (asset.status === 'retiring') {
+      throw new Error('Cannot transfer an asset with a pending disposal')
+    }
     if (asset.locationId === input.toLocationId) throw new Error('Asset is already at the target location')
     const fromLocationId = asset.locationId
     asset.locationId = input.toLocationId
 
+    const fromName = locationName(fromLocationId)
+    const toName = locationName(input.toLocationId)
     emitEvent({
       assetId: asset.id,
       type: 'transferred',
-      detail: `Transferred ${fromLocationId} → ${input.toLocationId}${input.notes ? ` — ${input.notes}` : ''}`,
+      detail: `Transferred ${fromName} → ${toName}${input.notes ? ` — ${input.notes}` : ''}`,
       actorName: input.actorName,
       payload: { fromLocationId, toLocationId: input.toLocationId },
     })
@@ -335,7 +356,7 @@ export const assetsApi = {
       userId: input.actorName,
       action: 'update',
       module: 'Assets',
-      detail: `Transferred ${asset.assetCode} from ${fromLocationId} to ${input.toLocationId}`,
+      detail: `Transferred ${asset.assetCode} from ${fromName} to ${toName}`,
     })
     return asset
   },
@@ -360,6 +381,7 @@ export const assetsApi = {
       disposedDate: input.disposedDate,
       disposedBy: input.submittedBy,
       reason: input.reason,
+      pendingApproverName: input.approverName,
     }
 
     emitEvent({
@@ -384,6 +406,9 @@ export const assetsApi = {
     const asset = findAsset(assetId)
     if (asset.status !== 'retiring' || !asset.disposal) {
       throw new Error('No pending disposal to approve')
+    }
+    if (asset.disposal.pendingApproverName && asset.disposal.pendingApproverName !== approverName) {
+      throw new Error(`${approverName} is not the assigned approver for this disposal`)
     }
     const now = new Date().toISOString()
     asset.status = 'disposed'
@@ -414,6 +439,9 @@ export const assetsApi = {
     await delay(120)
     const asset = findAsset(assetId)
     if (asset.status !== 'retiring') throw new Error('No pending disposal to reject')
+    if (asset.disposal?.pendingApproverName && asset.disposal.pendingApproverName !== rejecterName) {
+      throw new Error(`${rejecterName} is not the assigned approver for this disposal`)
+    }
     asset.status = 'active'
     const submittedReason = asset.disposal?.reason
     asset.disposal = undefined
@@ -489,6 +517,11 @@ export const assetsApi = {
     const asset = findAsset(assetId)
     if (asset.status === 'disposed') {
       throw new Error(`Cannot start maintenance on a disposed asset`)
+    }
+    if (asset.status === 'retiring') {
+      throw new Error(
+        `Cannot start maintenance on an asset with a pending disposal — resolve the disposal first.`,
+      )
     }
     if (asset.status === 'maintenance') return asset
     asset.status = 'maintenance'

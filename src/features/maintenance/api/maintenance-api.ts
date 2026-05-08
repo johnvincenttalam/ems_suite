@@ -2,6 +2,7 @@ import type { WorkOrder, WorkOrderPriority } from '@/features/maintenance/types'
 import { mockWorkOrders } from '@/features/maintenance/data/mock-maintenance'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 import { mockUsers } from '@/features/users/data/mock-users'
+import { mockAssets } from '@/features/assets/data/mock-assets'
 import { assetsApi } from '@/features/assets/api/assets-api'
 // import { http } from '@/shared/lib/http'
 
@@ -26,6 +27,12 @@ function nextWorkOrderId(): string {
 /** Resolve a user ID to a display name for cross-module event narration. */
 function userName(userId: string): string {
   return mockUsers.find((u) => u.id === userId)?.name ?? userId
+}
+
+/** Resolve an asset ID to a "Name (CODE)" string for audit-log narration. */
+function assetLabel(assetId: string): string {
+  const a = mockAssets.find((x) => x.id === assetId)
+  return a ? `${a.name} (${a.assetCode})` : assetId
 }
 
 /** Returns true if the given asset has any other open (pending/ongoing) WOs
@@ -89,7 +96,7 @@ export const maintenanceApi = {
       userId: userName(input.createdBy),
       action: 'create',
       module: 'Maintenance',
-      detail: `Created ${workOrder.id} — ${workOrder.title} (asset ${workOrder.assetId})`,
+      detail: `Created ${workOrder.id} — ${workOrder.title} on ${assetLabel(workOrder.assetId)}`,
     })
     return workOrder
   },

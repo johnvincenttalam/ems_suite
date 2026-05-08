@@ -4,21 +4,22 @@ export interface AssetsSettings {
   /** Default depreciation life in months — used when registering an asset
    * with no explicit `usefulLifeMonths`. */
   defaultDepreciationMonths: number
-  /** Salvage value as a percentage of purchase cost — used as a placeholder
-   * default when registering an asset with no explicit salvage value. */
+  /** Salvage value as a percentage of purchase cost — auto-fills the salvage
+   * field on the Add Asset form when a cost is entered and salvage is empty. */
   defaultSalvagePercent: number
   /** Default location pre-selected on the Add Asset modal. Empty = no default. */
   defaultLocationId: string
-  /** Days an open assignment can run before showing as long-overdue. */
+  /** Days an open assignment can run before being flagged as long-overdue
+   * on the dashboard checkouts widget. */
   longCheckoutDays: number
-  /** Warranty alert threshold — assets within this many days of expiry are flagged. */
+  /** Warranty alert threshold — assets within this many days of expiry are
+   * flagged on the alerts page. */
   warrantyExpiringDays: number
-  /** When true, the Stock In/Out style "negative stock" check applies — for
-   * Assets this means transfers and disposals must go through approval. */
-  requireApprovalForDisposal: boolean
-  requireApprovalForTransfer: boolean
-  /** Operational input controls. */
+  /** When true, the Add Asset form requires a serial number; otherwise it's
+   * optional (useful for batch consumables). */
   requireSerialOnCreate: boolean
+  /** When true, the Return modal requires the operator to enter handover
+   * notes (condition, location, observations). */
   requireReturnNotes: boolean
   notify: {
     inMaintenance: boolean
@@ -36,8 +37,6 @@ const defaults: AssetsSettings = {
   defaultLocationId: '',
   longCheckoutDays: 30,
   warrantyExpiringDays: 60,
-  requireApprovalForDisposal: true,
-  requireApprovalForTransfer: false,
   requireSerialOnCreate: true,
   requireReturnNotes: false,
   notify: {

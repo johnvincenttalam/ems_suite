@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck, Inbox } from 'lucide-react'
+import { Bell, CheckCheck, Inbox, ShieldAlert } from 'lucide-react'
+import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { useNotifications } from '@/shared/notifications'
+import { useAssets } from '@/features/assets'
+import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import type { NotificationKind, NotificationSeverity } from '@/shared/notifications/types'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
@@ -43,15 +46,37 @@ const dotByType: Record<NotificationSeverity, string> = {
 
 export function AssetsAlertsPage() {
   const { notifications, markRead, markAllRead } = useNotifications()
+  const { data: assets = [] } = useAssets()
+  const settings = useAssetsSettings((s) => s.settings)
   const navigate = useNavigate()
+
+  const warrantyExpiring = useMemo(() => {
+    if (!settings.notify.warrantyExpiring) return []
+    const today = new Date()
+    return assets
+      .filter((a) => a.status !== 'disposed' && a.warrantyExpiry)
+      .map((a) => ({
+        asset: a,
+        days: differenceInCalendarDays(parseISO(a.warrantyExpiry!), today),
+      }))
+      .filter((row) => row.days >= 0 && row.days <= settings.warrantyExpiringDays)
+      .sort((a, b) => a.days - b.days)
+  }, [assets, settings.notify.warrantyExpiring, settings.warrantyExpiringDays])
 
   const [severity, setSeverity] = useState<SeverityFilter>('all')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [search, setSearch] = useState('')
 
   const assetAlerts = useMemo(
-    () => notifications.filter((n) => ASSET_KINDS.includes(n.kind)),
-    [notifications],
+    () =>
+      notifications.filter((n) => {
+        if (!ASSET_KINDS.includes(n.kind)) return false
+        // Honor the per-kind notify toggles in Settings.
+        if (n.kind === 'asset_in_maintenance' && !settings.notify.inMaintenance) return false
+        if (n.kind === 'asset_assignment_open' && !settings.notify.longCheckout) return false
+        return true
+      }),
+    [notifications, settings.notify.inMaintenance, settings.notify.longCheckout],
   )
 
   const filtered = useMemo(() => {
@@ -152,6 +177,46 @@ export function AssetsAlertsPage() {
           </ul>
         )}
       </div>
+
+      {warrantyExpiring.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-[14px] font-semibold text-zinc-900">Warranty expiring</h2>
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                Assets within {settings.warrantyExpiringDays} days of warranty expiry
+              </p>
+            </div>
+            <span className="text-[11px] text-zinc-400">{warrantyExpiring.length} flagged</span>
+          </div>
+          <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+            <ul>
+              {warrantyExpiring.map(({ asset, days }, i) => (
+                <li
+                  key={asset.id}
+                  className={cn(
+                    'flex items-start gap-3 px-6 py-3.5 hover:bg-zinc-50/50 cursor-pointer',
+                    i !== warrantyExpiring.length - 1 && 'border-b border-zinc-100/60',
+                  )}
+                  onClick={() => navigate(`registry?asset=${asset.id}`)}
+                >
+                  <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', days <= 14 ? 'bg-red-50' : 'bg-amber-50')}>
+                    <ShieldAlert className={cn('w-4 h-4', days <= 14 ? 'text-red-600' : 'text-amber-500')} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13.5px] font-medium text-zinc-900 truncate">{asset.name}</p>
+                    <p className="text-[12px] text-zinc-500 mt-0.5">
+                      <span className="font-mono">{asset.assetCode}</span>
+                      {' · '}
+                      Expires in {days} day{days === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

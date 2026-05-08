@@ -25,6 +25,7 @@ import {
 } from 'recharts'
 import { format, formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
 import { useAssets, useAssetAssignments, totalBookValue } from '@/features/assets'
+import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import { useWorkOrders } from '@/features/maintenance'
 import { useCategories } from '@/features/categories'
 import { useAuditLog } from '@/features/audit-log'
@@ -79,6 +80,7 @@ export function AssetsDashboard() {
   const { data: auditEntries = [] } = useAuditLog()
   const { data: workOrders = [] } = useWorkOrders()
   const { notifications, unreadCount } = useNotifications()
+  const settings = useAssetsSettings((s) => s.settings)
   const navigate = useNavigate()
 
   const stats = useMemo(() => {
@@ -134,13 +136,13 @@ export function AssetsDashboard() {
   const maintenanceDue = useMemo(() => {
     const today = new Date()
     return workOrders
-      .filter((wo) => wo.status !== 'completed')
+      .filter((wo) => wo.status === 'pending' || wo.status === 'ongoing')
       .map((wo) => ({
         wo,
         asset: assets.find((a) => a.id === wo.assetId),
         days: differenceInCalendarDays(parseISO(wo.scheduledDate), today),
       }))
-      .filter((row) => !!row.asset)
+      .filter((row) => !!row.asset && row.asset.status !== 'disposed')
       .sort((a, b) => a.days - b.days)
       .slice(0, 5)
   }, [workOrders, assets])
@@ -451,7 +453,7 @@ export function AssetsDashboard() {
             ) : (
               <ul>
                 {openCheckouts.map(({ ass, days, asset, user: assignee }, i) => {
-                  const overdue = days >= 60
+                  const overdue = days >= settings.longCheckoutDays
                   return (
                     <li
                       key={ass.id}

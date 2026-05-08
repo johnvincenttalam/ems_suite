@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2 } from 'lucide-react'
 import { TrackingPanel } from '@/shared/tracking'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -46,24 +46,43 @@ const DISPOSAL_TYPES: { value: DisposalType; label: string }[] = [
   { value: 'traded_in', label: 'Traded In' },
 ]
 
-const assetSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  serialNumber: z.string().min(2, 'Serial number is required'),
-  assetCode: z.string().optional(),
-  model: z.string().optional(),
-  vendor: z.string().optional(),
-  categoryId: z.string().min(1, 'Category is required'),
-  locationId: z.string().min(1, 'Location is required'),
-  condition: z.enum(['excellent', 'good', 'fair', 'poor', 'out_of_service'] as const),
-  purchaseDate: z.string().min(1, 'Purchase date is required'),
-  purchaseCost: z.number().min(0).optional(),
-  warrantyExpiry: z.string().optional(),
-  usefulLifeMonths: z.number().int().positive().optional(),
-  salvageValue: z.number().min(0).optional(),
-  description: z.string().optional(),
-})
+function buildAssetSchema(requireSerial: boolean) {
+  return z.object({
+    name: z.string().min(2, 'Name is required'),
+    serialNumber: requireSerial
+      ? z.string().min(2, 'Serial number is required (per Settings → General)')
+      : z.string(),
+    assetCode: z.string().optional(),
+    model: z.string().optional(),
+    vendor: z.string().optional(),
+    categoryId: z.string().min(1, 'Category is required'),
+    locationId: z.string().min(1, 'Location is required'),
+    condition: z.enum(['excellent', 'good', 'fair', 'poor', 'out_of_service'] as const),
+    purchaseDate: z.string().min(1, 'Purchase date is required'),
+    purchaseCost: z.number().min(0).optional(),
+    warrantyExpiry: z.string().optional(),
+    usefulLifeMonths: z.number().int().positive().optional(),
+    salvageValue: z.number().min(0).optional(),
+    description: z.string().optional(),
+  })
+}
 
-type AssetForm = z.infer<typeof assetSchema>
+type AssetForm = {
+  name: string
+  serialNumber: string
+  assetCode?: string
+  model?: string
+  vendor?: string
+  categoryId: string
+  locationId: string
+  condition: 'excellent' | 'good' | 'fair' | 'poor' | 'out_of_service'
+  purchaseDate: string
+  purchaseCost?: number
+  warrantyExpiry?: string
+  usefulLifeMonths?: number
+  salvageValue?: number
+  description?: string
+}
 
 const assignSchema = z.object({
   assignedTo: z.string().min(1, 'User is required'),
@@ -129,6 +148,7 @@ export function RegistryTab() {
     queryClient.invalidateQueries({ queryKey: ['audit-log'] })
   }
 
+  const assetSchema = buildAssetSchema(settings.requireSerialOnCreate)
   const addForm = useForm<AssetForm>({
     resolver: zodResolver(assetSchema),
     defaultValues: {
@@ -137,6 +157,28 @@ export function RegistryTab() {
       usefulLifeMonths: settings.defaultDepreciationMonths,
     },
   })
+
+  // Re-sync form defaults when the user changes Settings while the page is
+  // mounted. Only resets fields the user hasn't dirtied so in-progress data
+  // isn't blown away.
+  useEffect(() => {
+    if (!showAdd) return
+    const dirty = addForm.formState.dirtyFields
+    if (!dirty.locationId) addForm.setValue('locationId', settings.defaultLocationId || '', { shouldDirty: false })
+    if (!dirty.usefulLifeMonths) addForm.setValue('usefulLifeMonths', settings.defaultDepreciationMonths, { shouldDirty: false })
+  }, [settings.defaultLocationId, settings.defaultDepreciationMonths, showAdd, addForm])
+
+  // Auto-suggest salvage value from purchase cost × default salvage percent
+  // until the user explicitly enters a salvage figure.
+  const watchedCost = useWatch({ control: addForm.control, name: 'purchaseCost' })
+  useEffect(() => {
+    if (!showAdd) return
+    if (settings.defaultSalvagePercent <= 0) return
+    if (addForm.formState.dirtyFields.salvageValue) return
+    if (typeof watchedCost !== 'number' || !Number.isFinite(watchedCost)) return
+    const suggested = Math.round((watchedCost * settings.defaultSalvagePercent) / 100)
+    addForm.setValue('salvageValue', suggested, { shouldDirty: false })
+  }, [watchedCost, settings.defaultSalvagePercent, showAdd, addForm])
   const assignForm = useForm<AssignForm>({ resolver: zodResolver(assignSchema) })
   const transferForm = useForm<TransferForm>({ resolver: zodResolver(transferSchema) })
   const disposeForm = useForm<DisposeForm>({
@@ -189,13 +231,22 @@ export function RegistryTab() {
     onError: (err) => toast.error('Assignment failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
   })
 
+  const [returnNotes, setReturnNotes] = useState('')
   const returnMutation = useMutation({
     mutationFn: () => {
       if (!activeAsset || !currentUser) throw new Error('Asset or user missing')
-      return assetsApi.return({ assetId: activeAsset.id, actorName: currentUser.name })
+      if (settings.requireReturnNotes && returnNotes.trim().length < 2) {
+        throw new Error('Return notes are required (per Settings → Assignments)')
+      }
+      return assetsApi.return({
+        assetId: activeAsset.id,
+        actorName: currentUser.name,
+        notes: returnNotes.trim() || undefined,
+      })
     },
     onSuccess: (asset) => {
       toast.success(`${asset.name} returned`)
+      setReturnNotes('')
       closeAction()
       invalidate()
     },
@@ -272,7 +323,7 @@ export function RegistryTab() {
       const asset = row.original
       const canAssign = asset.status === 'active' && !asset.assignedTo
       const canReturn = asset.status !== 'disposed' && !!asset.assignedTo
-      const canTransfer = asset.status !== 'disposed'
+      const canTransfer = asset.status !== 'disposed' && asset.status !== 'retiring'
       const canDispose = asset.status === 'active' || asset.status === 'maintenance'
       return (
         <div className="flex items-center gap-1">
@@ -388,7 +439,11 @@ export function RegistryTab() {
         <form onSubmit={addForm.handleSubmit((d) => addMutation.mutate(d))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Name *" {...addForm.register('name')} error={addForm.formState.errors.name?.message} />
-            <Input label="Serial Number *" {...addForm.register('serialNumber')} error={addForm.formState.errors.serialNumber?.message} />
+            <Input
+              label={settings.requireSerialOnCreate ? 'Serial Number *' : 'Serial Number'}
+              {...addForm.register('serialNumber')}
+              error={addForm.formState.errors.serialNumber?.message}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Asset Code (optional)" {...addForm.register('assetCode')} placeholder="Auto-generated if blank" />
@@ -430,7 +485,7 @@ export function RegistryTab() {
         </form>
       </Modal>
 
-      <Modal open={activeAction === 'return'} onClose={closeAction} title={`Return ${activeAsset?.name ?? 'Asset'}`} size="md">
+      <Modal open={activeAction === 'return'} onClose={() => { setReturnNotes(''); closeAction() }} title={`Return ${activeAsset?.name ?? 'Asset'}`} size="md">
         <div className="space-y-4">
           {activeAsset?.assignedTo && (
             <p className="text-[13px] text-zinc-500">
@@ -438,9 +493,24 @@ export function RegistryTab() {
               Returning closes the open assignment record and frees the asset for reassignment.
             </p>
           )}
+          <Textarea
+            label={settings.requireReturnNotes ? 'Handover Notes *' : 'Handover Notes'}
+            rows={3}
+            value={returnNotes}
+            onChange={(e) => setReturnNotes(e.target.value)}
+            placeholder="Condition, location, any observations…"
+          />
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={closeAction} disabled={returnMutation.isPending}>Cancel</Button>
-            <Button type="button" fullWidth loading={returnMutation.isPending} onClick={() => returnMutation.mutate()}>Confirm Return</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setReturnNotes(''); closeAction() }} disabled={returnMutation.isPending}>Cancel</Button>
+            <Button
+              type="button"
+              fullWidth
+              loading={returnMutation.isPending}
+              disabled={settings.requireReturnNotes && returnNotes.trim().length < 2}
+              onClick={() => returnMutation.mutate()}
+            >
+              Confirm Return
+            </Button>
           </div>
         </div>
       </Modal>

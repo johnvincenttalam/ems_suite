@@ -208,6 +208,9 @@ function OverviewTab({ asset }: { asset: Asset }) {
             )}
             {asset.disposal.disposedTo && <Field label="Disposed To">{asset.disposal.disposedTo}</Field>}
             <Field label="Submitted By">{asset.disposal.disposedBy}</Field>
+            {asset.disposal.pendingApproverName && !asset.disposal.approvedBy && (
+              <Field label="Awaits">{asset.disposal.pendingApproverName}</Field>
+            )}
             {asset.disposal.approvedBy && <Field label="Approved By">{asset.disposal.approvedBy}</Field>}
           </Grid>
           <p className="text-[12px] text-zinc-600 italic mt-2">{asset.disposal.reason}</p>

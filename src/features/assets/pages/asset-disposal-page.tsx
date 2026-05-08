@@ -86,6 +86,8 @@ export function AssetDisposalPage() {
   const archive = useMemo(() => {
     return assets
       .filter((a) => a.status === 'disposed' && !!a.disposal)
+      // satisfies the audit fix #14 — never display a disposed row without payload
+      .filter((a) => !!a.disposal)
       .filter((a) => !search.trim() || matches(a, search))
       .sort((a, b) => (b.disposal?.approvedAt ?? '').localeCompare(a.disposal?.approvedAt ?? ''))
   }, [assets, search])
@@ -95,7 +97,7 @@ export function AssetDisposalPage() {
     const disposed = assets.filter((a) => a.status === 'disposed')
     const recoveredValue = disposed.reduce((s, a) => s + (a.disposal?.amount ?? 0), 0)
     const myQueue = currentUser
-      ? allRetiring.length // approvers see them all in this mock; per-user routing isn't modeled at submit time
+      ? allRetiring.filter((a) => a.disposal?.pendingApproverName === currentUser.name).length
       : 0
     return {
       pendingCount: allRetiring.length,
@@ -161,7 +163,7 @@ export function AssetDisposalPage() {
         <StatCard title="Pending Approval" value={stats.pendingCount} icon={Clock} iconBg="bg-amber-50" iconColor="text-amber-600" index={0} />
         <StatCard title="Disposed Total" value={stats.disposedCount} icon={Trash2} iconBg="bg-zinc-100" iconColor="text-zinc-600" index={1} />
         <StatCard title="Recovered Value" value={formatCurrency(stats.recoveredValue)} subtitle="Sale / scrap proceeds" icon={ArrowDownToLine} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={2} />
-        <StatCard title="In Your Queue" value={stats.myQueue} subtitle={currentUser ? 'Pending decisions' : 'Sign in to see'} icon={CheckCircle2} iconBg="bg-blue-50" iconColor="text-blue-600" index={3} />
+        <StatCard title="In Your Queue" value={stats.myQueue} subtitle={currentUser ? `Awaiting ${currentUser.name}` : 'Sign in to see'} icon={CheckCircle2} iconBg="bg-blue-50" iconColor="text-blue-600" index={3} />
       </div>
 
       <div className="mb-4">
@@ -272,7 +274,7 @@ function PendingTable({
   approvingId?: string
 }) {
   if (rows.length === 0) {
-    return <DataTableEmpty colSpan={6} icon={CheckCircle2} message="No pending disposals — your queue is clear." />
+    return <DataTableEmpty colSpan={7} icon={CheckCircle2} message="No pending disposals — your queue is clear." />
   }
   return (
     <div className="overflow-x-auto">
@@ -283,6 +285,7 @@ function PendingTable({
             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Type</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider">Amount</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Submitted</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Awaits</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Reason</th>
             <th className="px-4 py-3"></th>
           </tr>
@@ -290,7 +293,7 @@ function PendingTable({
         <tbody>
           {rows.map((a) => {
             const d = a.disposal!
-            const canActOnThis = !!currentUserName // every admin can clear the queue in this mock
+            const canActOnThis = !!currentUserName && (!d.pendingApproverName || d.pendingApproverName === currentUserName)
             return (
               <tr key={a.id} className="border-b border-zinc-100/60 align-top">
                 <td className="px-4 py-3 text-[13px] text-zinc-700">
@@ -309,6 +312,9 @@ function PendingTable({
                 <td className="px-4 py-3 text-[12px] text-zinc-500 whitespace-nowrap">
                   {format(parseISO(d.disposedDate), 'MMM d, yyyy')}
                   <span className="block text-[10.5px] text-zinc-400">{d.disposedBy}</span>
+                </td>
+                <td className="px-4 py-3 text-[12px] text-zinc-700 whitespace-nowrap">
+                  {d.pendingApproverName ?? <span className="text-zinc-400">—</span>}
                 </td>
                 <td className="px-4 py-3 text-[12px] text-zinc-600 max-w-[260px]">
                   {d.reason}

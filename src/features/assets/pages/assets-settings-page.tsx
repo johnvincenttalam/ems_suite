@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Bell, Tag, UserCheck, RotateCcw, Sliders } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Tag, UserCheck, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -14,7 +14,6 @@ import { useWarehouses } from '@/features/warehouses'
 const tabs = [
   { label: 'General', value: 'general', icon: SettingsIcon },
   { label: 'Depreciation', value: 'depreciation', icon: Tag },
-  { label: 'Approval Rules', value: 'approvals', icon: Sliders },
   { label: 'Assignments', value: 'assignments', icon: UserCheck },
   { label: 'Notifications', value: 'notifications', icon: Bell },
 ] as const
@@ -126,31 +125,6 @@ export function AssetsSettingsPage() {
                 />
                 <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
                   Straight-line depreciation only. Per-category overrides will arrive in a future release.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === 'approvals' && (
-            <Card>
-              <CardContent className="space-y-1 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900 mb-2">Approval Rules</h3>
-                <SettingRow
-                  title="Require approval for disposal"
-                  desc="Disposals submit a pending request the named approver finalizes. Strongly recommended for audit trails."
-                  checked={settings.requireApprovalForDisposal}
-                  onChange={(v) => update({ requireApprovalForDisposal: v })}
-                />
-                <SettingRow
-                  title="Require approval for transfer"
-                  desc="Inter-location transfers go through the same pending → approve flow as disposals."
-                  checked={settings.requireApprovalForTransfer}
-                  onChange={(v) => update({ requireApprovalForTransfer: v })}
-                  last
-                />
-                <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">
-                  Disposals always require an approver to be named on submission, regardless of this toggle —
-                  off means the approver is just the operator themselves.
                 </p>
               </CardContent>
             </Card>
