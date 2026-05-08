@@ -27,7 +27,7 @@ import { Textarea } from '@/shared/ui/textarea'
 import { Tabs } from '@/shared/ui/tabs'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { EmptyState } from '@/shared/ui/empty-state'
 import { StatCard } from '@/shared/ui/stat-card'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
 import { formatCurrency } from '@/shared/utils/format'
@@ -304,7 +304,13 @@ function PendingTable({
   approvingId?: string
 }) {
   if (rows.length === 0) {
-    return <DataTableEmpty colSpan={7} icon={CheckCircle2} message="No pending disposals — your queue is clear." />
+    return (
+      <EmptyState
+        icon={CheckCircle2}
+        title="Queue is clear"
+        description="No pending disposals are waiting on a decision."
+      />
+    )
   }
   return (
     <div className="overflow-x-auto">
@@ -395,7 +401,13 @@ function PendingTable({
 
 function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: Asset) => void }) {
   if (rows.length === 0) {
-    return <DataTableEmpty colSpan={6} icon={Trash2} message="No disposed assets in the archive yet." />
+    return (
+      <EmptyState
+        icon={Trash2}
+        title="No disposed assets yet"
+        description="Approved disposals will land here for the audit archive."
+      />
+    )
   }
   return (
     <div className="overflow-x-auto">
