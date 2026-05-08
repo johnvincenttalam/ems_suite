@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Ruler, Download, Plus, Trash2 } from 'lucide-react'
+import { Ruler, Download, Plus, Trash2, Pencil } from 'lucide-react'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useForm } from 'react-hook-form'
@@ -19,7 +19,7 @@ import { Input } from '@/shared/ui/input'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { PageHeader } from '@/shared/ui/page-header'
-import { RowActions } from '@/shared/ui/row-actions'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 
@@ -108,12 +108,13 @@ export function UomPage() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
-        <RowActions
-          onEdit={() => openEdit(row.original)}
-          onDelete={() => setDeleteCandidate(row.original)}
-        />
-      ),
+      cell: ({ row }) => {
+        const items: ActionMenuItem[] = [
+          { key: 'edit', label: 'Edit', icon: Pencil, onClick: () => openEdit(row.original) },
+          { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteCandidate(row.original) },
+        ]
+        return <div className="flex justify-end"><ActionMenu items={items} /></div>
+      },
     },
   ], [openEdit])
 

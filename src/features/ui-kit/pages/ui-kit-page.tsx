@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Mail, Search, Inbox, Download, Users, TrendingUp, Activity, ArrowRight } from 'lucide-react'
+import { Mail, Search, Inbox, Download, Users, TrendingUp, Activity, ArrowRight, Eye, Pencil, Trash2 } from 'lucide-react'
 import {
   PageHeader,
   Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter,
@@ -22,7 +22,7 @@ import {
   Checkbox,
   SearchInput,
   FilterChips,
-  RowActions,
+  ActionMenu,
 } from '@/shared/ui'
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -202,16 +202,16 @@ export function UIKitPage() {
         />
       </Section>
 
-      {/* Row Actions */}
-      <Section title="Row Actions" description="Three-dot menu for table rows">
+      {/* Action Menu */}
+      <Section title="Action Menu" description="Three-dot kebab dropdown for table rows. Pass items as a flat array — `danger: true` makes an item red, conditional inclusion is just a `.filter()` away.">
         <div className="flex items-center gap-4 p-3 rounded-lg bg-zinc-50 border border-zinc-100 max-w-md">
           <Avatar name="Example Row" size="sm" />
           <span className="text-[13px] text-zinc-700 flex-1">Example row</span>
-          <RowActions
-            onView={() => toast.info('View action')}
-            onEdit={() => toast.info('Edit action')}
-            onDelete={() => toast.success('Delete action')}
-          />
+          <ActionMenu items={[
+            { key: 'view', label: 'View', icon: Eye, onClick: () => toast.info('View action') },
+            { key: 'edit', label: 'Edit', icon: Pencil, onClick: () => toast.info('Edit action') },
+            { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => toast.success('Delete action') },
+          ]} />
         </div>
       </Section>
 
