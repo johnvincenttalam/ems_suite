@@ -59,12 +59,14 @@ const STATUS_COLORS: Record<WorkOrderStatus, string> = {
   pending: '#f59e0b',
   ongoing: '#3b82f6',
   completed: '#10b981',
+  cancelled: '#ef4444',
 }
 
 const STATUS_LABEL: Record<WorkOrderStatus, string> = {
   pending: 'Pending',
   ongoing: 'Ongoing',
   completed: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {

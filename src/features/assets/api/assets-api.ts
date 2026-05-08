@@ -475,4 +475,50 @@ export const assetsApi = {
     }
     return inspection
   },
+
+  /**
+   * Cross-module hook: maintenanceApi calls this when a work order on this
+   * asset starts. Flips the asset to status='maintenance' (only if it isn't
+   * already, to avoid emitting duplicate events when multiple WOs run in
+   * parallel) and records a `maintenance_started` lifecycle event.
+   *
+   * Returns the asset (mutated in place). Throws if the asset is disposed —
+   * disposed assets shouldn't be picking up new work.
+   */
+  markMaintenanceStarted: (assetId: string, actorName: string): Asset => {
+    const asset = findAsset(assetId)
+    if (asset.status === 'disposed') {
+      throw new Error(`Cannot start maintenance on a disposed asset`)
+    }
+    if (asset.status === 'maintenance') return asset
+    asset.status = 'maintenance'
+    emitEvent({
+      assetId: asset.id,
+      type: 'maintenance_started',
+      detail: `Entered maintenance — work order in progress`,
+      actorName,
+    })
+    return asset
+  },
+
+  /**
+   * Cross-module hook: maintenanceApi calls this when the LAST open work
+   * order on this asset closes (completed or cancelled). Flips status back
+   * to 'active' and records a `maintenance_ended` lifecycle event.
+   *
+   * Caller is responsible for checking that no other open WOs exist — this
+   * helper performs the unconditional flip.
+   */
+  markMaintenanceEnded: (assetId: string, actorName: string): Asset => {
+    const asset = findAsset(assetId)
+    if (asset.status !== 'maintenance') return asset
+    asset.status = 'active'
+    emitEvent({
+      assetId: asset.id,
+      type: 'maintenance_ended',
+      detail: `Returned to service — all work orders closed`,
+      actorName,
+    })
+    return asset
+  },
 }

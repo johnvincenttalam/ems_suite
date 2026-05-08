@@ -39,6 +39,7 @@ const STATUS_LABEL: Record<WorkOrderStatus, string> = {
   pending: 'Pending',
   ongoing: 'Ongoing',
   completed: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {

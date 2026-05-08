@@ -24,7 +24,7 @@ import { useUsers } from '@/features/users'
 import { useCategories } from '@/features/categories'
 import { useWarehouses } from '@/features/warehouses'
 import { useAuthStore } from '@/features/auth'
-import { useWorkOrders } from '@/features/maintenance'
+import { useWorkOrders, maintenanceApi } from '@/features/maintenance'
 import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance'
 import {
   assetsApi,
@@ -311,6 +311,7 @@ function MaintenanceTab({ asset }: { asset: Asset }) {
   const { data: workOrders = [] } = useWorkOrders()
   const { data: users = [] } = useUsers()
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const [showSchedule, setShowSchedule] = useState(false)
 
   const orders = useMemo(
     () =>
@@ -320,40 +321,154 @@ function MaintenanceTab({ asset }: { asset: Asset }) {
     [workOrders, asset.id],
   )
 
-  const upcoming = orders.filter((wo) => wo.status !== 'completed')
-  const completed = orders.filter((wo) => wo.status === 'completed')
-
-  if (orders.length === 0) {
-    return <EmptyState icon={Wrench} message="No work orders for this asset yet" />
-  }
+  const upcoming = orders.filter((wo) => wo.status === 'pending' || wo.status === 'ongoing')
+  const closed = orders.filter((wo) => wo.status === 'completed' || wo.status === 'cancelled')
 
   return (
     <div className="space-y-5">
-      {upcoming.length > 0 && (
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
-            Upcoming · {upcoming.length}
-          </p>
-          <ul className="space-y-2">
-            {upcoming.map((wo) => (
-              <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
-            ))}
-          </ul>
-        </div>
+      <div className="flex items-center justify-between">
+        <p className="text-[12px] text-zinc-500">
+          {orders.length} work order{orders.length === 1 ? '' : 's'} on file
+        </p>
+        <Button
+          size="sm"
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+          onClick={() => setShowSchedule(true)}
+          disabled={asset.status === 'disposed'}
+        >
+          Schedule Maintenance
+        </Button>
+      </div>
+
+      {showSchedule && (
+        <ScheduleMaintenanceForm asset={asset} users={users} onDone={() => setShowSchedule(false)} />
       )}
-      {completed.length > 0 && (
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
-            Completed · {completed.length}
-          </p>
-          <ul className="space-y-2">
-            {completed.map((wo) => (
-              <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
-            ))}
-          </ul>
-        </div>
+
+      {orders.length === 0 && !showSchedule ? (
+        <EmptyState icon={Wrench} message="No work orders for this asset yet" />
+      ) : (
+        <>
+          {upcoming.length > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+                Upcoming · {upcoming.length}
+              </p>
+              <ul className="space-y-2">
+                {upcoming.map((wo) => (
+                  <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {closed.length > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+                History · {closed.length}
+              </p>
+              <ul className="space-y-2">
+                {closed.map((wo) => (
+                  <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
+  )
+}
+
+const scheduleMaintenanceSchema = z.object({
+  title: z.string().min(2, 'Title is required'),
+  description: z.string().optional(),
+  assignedTo: z.string().min(1, 'Technician is required'),
+  priority: z.enum(['low', 'medium', 'high', 'critical'] as const),
+  scheduledDate: z.string().min(1, 'Schedule date is required'),
+})
+
+type ScheduleMaintenanceFormValues = z.infer<typeof scheduleMaintenanceSchema>
+
+function ScheduleMaintenanceForm({
+  asset,
+  users,
+  onDone,
+}: {
+  asset: Asset
+  users: { id: string; name: string; status: string }[]
+  onDone: () => void
+}) {
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const { register, handleSubmit, formState: { errors } } = useForm<ScheduleMaintenanceFormValues>({
+    resolver: zodResolver(scheduleMaintenanceSchema),
+    defaultValues: {
+      priority: 'medium',
+      scheduledDate: format(new Date(), 'yyyy-MM-dd'),
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: ScheduleMaintenanceFormValues) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.create({
+        title: data.title,
+        description: data.description,
+        assetId: asset.id,
+        assignedTo: data.assignedTo,
+        priority: data.priority,
+        scheduledDate: data.scheduledDate,
+        createdBy: currentUser.id,
+      })
+    },
+    onSuccess: (wo) => {
+      toast.success(`Created ${wo.id}`, { description: `Pending — assign Start in the Maintenance module to begin work.` })
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] })
+      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      onDone()
+    },
+    onError: (err) => toast.error('Schedule failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const techOptions = users
+    .filter((u) => u.status === 'active')
+    .map((u) => ({ value: u.id, label: u.name }))
+
+  return (
+    <form
+      onSubmit={handleSubmit((d) => createMutation.mutate(d))}
+      className="rounded-lg border border-zinc-200 bg-zinc-50/30 p-4 space-y-3"
+    >
+      <Input label="Title *" placeholder="e.g. Quarterly inspection" {...register('title')} error={errors.title?.message} />
+      <Textarea label="Description" rows={2} {...register('description')} />
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          {...register('assignedTo')}
+          className="w-full rounded-md border border-zinc-200 bg-white px-2 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+        >
+          <option value="">Select technician</option>
+          {techOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <Input type="date" {...register('scheduledDate')} error={errors.scheduledDate?.message} />
+      </div>
+      <select
+        {...register('priority')}
+        className="w-full rounded-md border border-zinc-200 bg-white px-2 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+      >
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+      {errors.assignedTo && <p className="text-[11px] text-red-600">{errors.assignedTo.message}</p>}
+      <p className="text-[11px] text-zinc-500">
+        The work order is created in the Maintenance module as <span className="font-medium">Pending</span>.
+        It moves to <span className="font-medium">In Progress</span> when started; the asset flips to maintenance status then.
+      </p>
+      <div className="flex gap-2 pt-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={createMutation.isPending}>Cancel</Button>
+        <Button type="submit" size="sm" loading={createMutation.isPending}>Create Work Order</Button>
+      </div>
+    </form>
   )
 }
 
@@ -416,12 +531,14 @@ const WORK_ORDER_STATUS_STYLES: Record<WorkOrderStatus, string> = {
   pending: 'bg-zinc-100 text-zinc-600 border-zinc-200',
   ongoing: 'bg-blue-50 text-blue-700 border-blue-200',
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  cancelled: 'bg-red-50 text-red-700 border-red-200',
 }
 
 const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   pending: 'Pending',
   ongoing: 'In Progress',
   completed: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 function WorkOrderStatusPill({ status }: { status: WorkOrderStatus }) {

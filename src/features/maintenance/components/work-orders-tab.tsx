@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { Wrench, Plus, Play, CheckCircle2, ClipboardList } from 'lucide-react'
+import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle } from 'lucide-react'
 import { ChecklistPanel } from '@/shared/checklists'
 import { useSearchParams } from 'react-router-dom'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
@@ -8,11 +8,13 @@ import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { useWorkOrders } from '@/features/maintenance'
+import { useWorkOrders, maintenanceApi } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
 import { useUsers } from '@/features/users'
+import { useAuthStore } from '@/features/auth'
 import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
@@ -56,6 +58,8 @@ export function WorkOrdersTab() {
   const { data: workOrders = [], isLoading } = useWorkOrders()
   const { data: assets = [] } = useAssets()
   const { data: users = [] } = useUsers()
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
@@ -65,6 +69,10 @@ export function WorkOrdersTab() {
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | 'all'>('all')
   const [showNew, setShowNew] = useState(false)
   const [inspectionWO, setInspectionWO] = useState<WorkOrder | null>(null)
+  const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null)
+  const [completionNotes, setCompletionNotes] = useState('')
+  const [cancellingWO, setCancellingWO] = useState<WorkOrder | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   useEffect(() => {
     const woId = searchParams.get('wo')
@@ -76,8 +84,73 @@ export function WorkOrdersTab() {
     [workOrders, statusFilter],
   )
 
-  const handleStart = (wo: WorkOrder) => toast.success(`Started ${wo.id}`)
-  const handleComplete = (wo: WorkOrder) => toast.success(`Completed ${wo.id}`)
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['maintenance'] })
+    queryClient.invalidateQueries({ queryKey: ['assets'] })
+    queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+  }
+
+  const startMutation = useMutation({
+    mutationFn: (wo: WorkOrder) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.start(wo.id, currentUser.id)
+    },
+    onSuccess: (wo) => {
+      toast.success(`Started ${wo.id}`)
+      invalidate()
+    },
+    onError: (err) => toast.error('Start failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const completeMutation = useMutation({
+    mutationFn: ({ wo, notes }: { wo: WorkOrder; notes?: string }) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.complete(wo.id, currentUser.id, notes)
+    },
+    onSuccess: (wo) => {
+      toast.success(`Completed ${wo.id}`)
+      setCompletingWO(null)
+      setCompletionNotes('')
+      invalidate()
+    },
+    onError: (err) => toast.error('Complete failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ wo, reason }: { wo: WorkOrder; reason: string }) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.cancel(wo.id, currentUser.id, reason)
+    },
+    onSuccess: (wo) => {
+      toast.success(`Cancelled ${wo.id}`)
+      setCancellingWO(null)
+      setCancelReason('')
+      invalidate()
+    },
+    onError: (err) => toast.error('Cancel failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: WorkOrderForm) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.create({
+        title: data.title,
+        description: data.description,
+        assetId: data.assetId,
+        assignedTo: data.assignedTo,
+        priority: data.priority,
+        scheduledDate: data.scheduledDate,
+        createdBy: currentUser.id,
+      })
+    },
+    onSuccess: (wo) => {
+      toast.success(`Created ${wo.id}`)
+      setShowNew(false)
+      reset({ priority: 'medium' })
+      invalidate()
+    },
+    onError: (err) => toast.error('Create failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
 
   const columns = useMemo<ColumnDef<WorkOrder>[]>(() => [
     { accessorKey: 'id', header: 'Order', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-700">{getValue() as string}</span> },
@@ -113,6 +186,7 @@ export function WorkOrdersTab() {
     { accessorKey: 'scheduledDate', header: 'Scheduled', cell: ({ getValue }) => format(new Date(getValue() as string), 'MMM dd, yyyy') },
     { id: 'actions', header: '', cell: ({ row }) => {
       const wo = row.original
+      const canCancel = wo.status === 'pending' || wo.status === 'ongoing'
       return (
         <div className="flex items-center gap-1">
           {wo.checklistId && (
@@ -123,19 +197,37 @@ export function WorkOrdersTab() {
             ><ClipboardList className="w-4 h-4" /></button>
           )}
           {wo.status === 'pending' && (
-            <button onClick={() => handleStart(wo)} title="Start" className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+            <button
+              onClick={() => startMutation.mutate(wo)}
+              disabled={startMutation.isPending}
+              title="Start"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
+            >
               <Play className="w-4 h-4" />
             </button>
           )}
           {wo.status === 'ongoing' && (
-            <button onClick={() => handleComplete(wo)} title="Mark complete" className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+            <button
+              onClick={() => { setCompletingWO(wo); setCompletionNotes('') }}
+              title="Mark complete"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+            >
               <CheckCircle2 className="w-4 h-4" />
+            </button>
+          )}
+          {canCancel && (
+            <button
+              onClick={() => { setCancellingWO(wo); setCancelReason('') }}
+              title="Cancel"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <XCircle className="w-4 h-4" />
             </button>
           )}
         </div>
       )
     }},
-  ], [assetMap, userMap])
+  ], [assetMap, userMap, startMutation])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
@@ -147,11 +239,7 @@ export function WorkOrdersTab() {
     defaultValues: { priority: 'medium' },
   })
 
-  const onSubmit = (_data: WorkOrderForm) => {
-    setShowNew(false)
-    reset({ priority: 'medium' })
-    toast.success('Work order created')
-  }
+  const onSubmit = (data: WorkOrderForm) => createMutation.mutate(data)
 
   if (isLoading) return <TableSkeleton columns={8} rows={6} />
 
@@ -247,10 +335,67 @@ export function WorkOrdersTab() {
             <Input label="Scheduled Date *" type="date" {...register('scheduledDate')} error={errors.scheduledDate?.message} />
           </div>
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowNew(false); reset({ priority: 'medium' }) }}>Cancel</Button>
-            <Button type="submit" fullWidth>Create Work Order</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowNew(false); reset({ priority: 'medium' }) }} disabled={createMutation.isPending}>Cancel</Button>
+            <Button type="submit" fullWidth loading={createMutation.isPending}>Create Work Order</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={!!completingWO} onClose={() => { setCompletingWO(null); setCompletionNotes('') }} title={`Complete ${completingWO?.id ?? ''}`} size="md">
+        <div className="space-y-4">
+          <p className="text-[13px] text-zinc-500">
+            Mark this work order as completed. If this is the only open work order for{' '}
+            <span className="font-medium text-zinc-700">{completingWO ? assetMap[completingWO.assetId]?.name ?? completingWO.assetId : ''}</span>,
+            the asset will return to active status.
+          </p>
+          <Textarea
+            label="Completion Notes"
+            rows={3}
+            value={completionNotes}
+            onChange={(e) => setCompletionNotes(e.target.value)}
+            placeholder="e.g. Replaced air filter, topped off coolant — operating within spec"
+          />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setCompletingWO(null); setCompletionNotes('') }} disabled={completeMutation.isPending}>Cancel</Button>
+            <Button
+              type="button"
+              variant="success"
+              fullWidth
+              loading={completeMutation.isPending}
+              onClick={() => completingWO && completeMutation.mutate({ wo: completingWO, notes: completionNotes.trim() || undefined })}
+            >
+              Confirm Completion
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!cancellingWO} onClose={() => { setCancellingWO(null); setCancelReason('') }} title={`Cancel ${cancellingWO?.id ?? ''}`} size="md">
+        <div className="space-y-4">
+          <p className="text-[13px] text-zinc-500">
+            Drop this work order before it's done. The asset returns to active status if no other open WOs remain.
+          </p>
+          <Textarea
+            label="Reason *"
+            rows={3}
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="e.g. Superseded by WO-2026-0099, technician unavailable"
+          />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setCancellingWO(null); setCancelReason('') }} disabled={cancelMutation.isPending}>Back</Button>
+            <Button
+              type="button"
+              variant="danger"
+              fullWidth
+              loading={cancelMutation.isPending}
+              disabled={cancelReason.trim().length < 2}
+              onClick={() => cancellingWO && cancelMutation.mutate({ wo: cancellingWO, reason: cancelReason.trim() })}
+            >
+              Confirm Cancellation
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
