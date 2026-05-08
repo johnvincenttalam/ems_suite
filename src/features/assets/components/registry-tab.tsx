@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2 } from 'lucide-react'
+import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2, Upload, X, Pencil } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { TrackingPanel } from '@/shared/tracking'
 import { useForm, useWatch } from 'react-hook-form'
@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { useAssets, assetsApi } from '@/features/assets'
+import { useAssets, assetsApi, AssetThumbnail } from '@/features/assets'
 import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import type { Asset, AssetStatus, AssetCondition, DisposalType } from '@/features/assets/types'
 import { useCategories } from '@/features/categories'
@@ -64,6 +64,7 @@ function buildAssetSchema(requireSerial: boolean) {
     warrantyExpiry: z.string().optional(),
     usefulLifeMonths: z.number().int().positive().optional(),
     salvageValue: z.number().min(0).optional(),
+    imageUrl: z.string().optional(),
     description: z.string().optional(),
   })
 }
@@ -82,6 +83,7 @@ type AssetForm = {
   warrantyExpiry?: string
   usefulLifeMonths?: number
   salvageValue?: number
+  imageUrl?: string
   description?: string
 }
 
@@ -134,6 +136,11 @@ export function RegistryTab() {
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
+  /** When set, the registration form opens in edit mode pre-filled with this
+   * asset's values; submit calls assetsApi.update instead of create. */
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
+  const isEditing = !!editingAsset
+  const formOpen = showAdd || isEditing
   const [activeAsset, setActiveAsset] = useState<Asset | null>(null)
   const [activeAction, setActiveAction] = useState<'assign' | 'return' | 'transfer' | 'dispose' | 'location' | 'inspection' | 'view' | null>(null)
 
@@ -159,27 +166,60 @@ export function RegistryTab() {
     },
   })
 
-  // Re-sync form defaults when the user changes Settings while the page is
-  // mounted. Only resets fields the user hasn't dirtied so in-progress data
-  // isn't blown away.
+  // Re-sync form defaults when the user changes Settings while the Add form
+  // is mounted. Skipped during edit mode — pre-filled values from the asset
+  // already represent ground truth.
   useEffect(() => {
-    if (!showAdd) return
+    if (!showAdd || isEditing) return
     const dirty = addForm.formState.dirtyFields
     if (!dirty.locationId) addForm.setValue('locationId', settings.defaultLocationId || '', { shouldDirty: false })
     if (!dirty.usefulLifeMonths) addForm.setValue('usefulLifeMonths', settings.defaultDepreciationMonths, { shouldDirty: false })
-  }, [settings.defaultLocationId, settings.defaultDepreciationMonths, showAdd, addForm])
+  }, [settings.defaultLocationId, settings.defaultDepreciationMonths, showAdd, isEditing, addForm])
 
   // Auto-suggest salvage value from purchase cost × default salvage percent
-  // until the user explicitly enters a salvage figure.
+  // until the user explicitly enters a salvage figure. Only on Add — edit
+  // preserves whatever the asset already has.
   const watchedCost = useWatch({ control: addForm.control, name: 'purchaseCost' })
   useEffect(() => {
-    if (!showAdd) return
+    if (!showAdd || isEditing) return
     if (settings.defaultSalvagePercent <= 0) return
     if (addForm.formState.dirtyFields.salvageValue) return
     if (typeof watchedCost !== 'number' || !Number.isFinite(watchedCost)) return
     const suggested = Math.round((watchedCost * settings.defaultSalvagePercent) / 100)
     addForm.setValue('salvageValue', suggested, { shouldDirty: false })
-  }, [watchedCost, settings.defaultSalvagePercent, showAdd, addForm])
+  }, [watchedCost, settings.defaultSalvagePercent, showAdd, isEditing, addForm])
+
+  // Pre-fill the form when entering edit mode.
+  useEffect(() => {
+    if (!editingAsset) return
+    addForm.reset({
+      name: editingAsset.name,
+      serialNumber: editingAsset.serialNumber,
+      assetCode: editingAsset.assetCode,
+      model: editingAsset.model,
+      vendor: editingAsset.vendor,
+      categoryId: editingAsset.categoryId,
+      locationId: editingAsset.locationId,
+      condition: editingAsset.condition,
+      purchaseDate: editingAsset.purchaseDate,
+      purchaseCost: editingAsset.purchaseCost,
+      warrantyExpiry: editingAsset.warrantyExpiry,
+      usefulLifeMonths: editingAsset.usefulLifeMonths,
+      salvageValue: editingAsset.salvageValue,
+      imageUrl: editingAsset.imageUrl,
+      description: editingAsset.description,
+    })
+  }, [editingAsset, addForm])
+
+  const closeRegistrationForm = () => {
+    setShowAdd(false)
+    setEditingAsset(null)
+    addForm.reset({
+      condition: 'good',
+      locationId: settings.defaultLocationId || undefined,
+      usefulLifeMonths: settings.defaultDepreciationMonths,
+    })
+  }
   const assignForm = useForm<AssignForm>({ resolver: zodResolver(assignSchema) })
   const transferForm = useForm<TransferForm>({ resolver: zodResolver(transferSchema) })
   const disposeForm = useForm<DisposeForm>({
@@ -198,19 +238,20 @@ export function RegistryTab() {
   const addMutation = useMutation({
     mutationFn: (data: AssetForm) => {
       if (!currentUser) throw new Error('Not signed in')
+      if (editingAsset) {
+        return assetsApi.update(editingAsset.id, { ...data, updatedBy: currentUser.name })
+      }
       return assetsApi.create({ ...data, createdBy: currentUser.name })
     },
     onSuccess: (asset) => {
-      toast.success(`Registered ${asset.name}`)
-      setShowAdd(false)
-      addForm.reset({
-        condition: 'good',
-        locationId: settings.defaultLocationId || undefined,
-        usefulLifeMonths: settings.defaultDepreciationMonths,
-      })
+      toast.success(editingAsset ? `Updated ${asset.name}` : `Registered ${asset.name}`)
+      closeRegistrationForm()
       invalidate()
     },
-    onError: (err) => toast.error('Register failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+    onError: (err) => toast.error(
+      editingAsset ? 'Update failed' : 'Register failed',
+      { description: err instanceof Error ? err.message : 'Unknown error' },
+    ),
   })
 
   const assignMutation = useMutation({
@@ -305,9 +346,12 @@ export function RegistryTab() {
       </button>
     )},
     { accessorKey: 'name', header: 'Asset', cell: ({ row }) => (
-      <div>
-        <p className="font-medium text-zinc-900">{row.original.name}</p>
-        <p className="text-xs text-zinc-400">{categoryMap[row.original.categoryId]?.name ?? '—'}</p>
+      <div className="flex items-center gap-2.5">
+        <AssetThumbnail imageUrl={row.original.imageUrl} alt={row.original.name} size="sm" />
+        <div className="min-w-0">
+          <p className="font-medium text-zinc-900 truncate">{row.original.name}</p>
+          <p className="text-xs text-zinc-400 truncate">{categoryMap[row.original.categoryId]?.name ?? '—'}</p>
+        </div>
       </div>
     )},
     { accessorKey: 'serialNumber', header: 'Serial', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-500">{getValue() as string}</span> },
@@ -327,7 +371,15 @@ export function RegistryTab() {
       const canTransfer = asset.status !== 'disposed' && asset.status !== 'retiring'
       const canDispose = asset.status === 'active' || asset.status === 'maintenance'
 
+      const canEdit = asset.status !== 'disposed'
+
       const menuItems: ActionMenuItem[] = [
+        ...(canEdit ? [{
+          key: 'edit',
+          label: 'Edit asset',
+          icon: Pencil,
+          onClick: () => setEditingAsset(asset),
+        }] : []),
         ...(asset.checklistId ? [{
           key: 'inspection',
           label: 'Inspection checklist',
@@ -438,8 +490,21 @@ export function RegistryTab() {
         <DataTablePagination table={table} />
       </div>
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); addForm.reset({ condition: 'good', locationId: settings.defaultLocationId || undefined, usefulLifeMonths: settings.defaultDepreciationMonths }) }} title="Register Asset" size="lg">
-        <form onSubmit={addForm.handleSubmit((d) => addMutation.mutate(d))} className="space-y-4">
+      <Modal
+        open={formOpen}
+        onClose={closeRegistrationForm}
+        title={isEditing ? `Edit ${editingAsset!.name}` : 'Register Asset'}
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={closeRegistrationForm} disabled={addMutation.isPending}>Cancel</Button>
+            <Button type="submit" form="asset-registration-form" loading={addMutation.isPending}>
+              {isEditing ? 'Save Changes' : 'Register Asset'}
+            </Button>
+          </>
+        }
+      >
+        <form id="asset-registration-form" onSubmit={addForm.handleSubmit((d) => addMutation.mutate(d))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Name *" {...addForm.register('name')} error={addForm.formState.errors.name?.message} />
             <Input
@@ -470,10 +535,8 @@ export function RegistryTab() {
             <Input label="Salvage Value" type="number" step="0.01" {...addForm.register('salvageValue', { setValueAs: (v) => v === '' || v == null || Number.isNaN(Number(v)) ? undefined : Number(v) })} />
           </div>
           <Textarea label="Description" {...addForm.register('description')} rows={2} />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); addForm.reset({ condition: 'good', locationId: settings.defaultLocationId || undefined, usefulLifeMonths: settings.defaultDepreciationMonths }) }} disabled={addMutation.isPending}>Cancel</Button>
-            <Button type="submit" fullWidth loading={addMutation.isPending}>Register Asset</Button>
-          </div>
+
+          <AssetImageField form={addForm} />
         </form>
       </Modal>
 
@@ -606,6 +669,81 @@ export function RegistryTab() {
         asset={activeAsset}
         onClose={closeAction}
       />
+    </div>
+  )
+}
+
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+
+/**
+ * Asset image input — accepts either a pasted URL or a small file upload
+ * (PNG / JPG, ≤ 2 MB, FileReader-based) and previews the result inline.
+ * Stores the resulting URL or data URL on the form's `imageUrl` field.
+ */
+function AssetImageField({ form }: { form: ReturnType<typeof useForm<AssetForm>> }) {
+  const imageUrl = useWatch({ control: form.control, name: 'imageUrl' })
+
+  const handleFile = (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Only PNG, JPG, or WEBP files are accepted')
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error('Image must be under 2 MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        form.setValue('imageUrl', reader.result, { shouldDirty: true })
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">Photo (optional)</p>
+      <div className="flex items-start gap-3">
+        <AssetThumbnail imageUrl={imageUrl} size="lg" className="!w-16 !h-16" />
+        <div className="flex-1 space-y-2">
+          <Input
+            placeholder="Paste an image URL — https://…"
+            {...form.register('imageUrl')}
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFile(file)
+                e.target.value = ''
+              }}
+              className="hidden"
+              id="asset-image-upload"
+            />
+            <label
+              htmlFor="asset-image-upload"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-200 bg-white text-[12px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 cursor-pointer transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload file
+            </label>
+            {imageUrl && (
+              <button
+                type="button"
+                onClick={() => form.setValue('imageUrl', '', { shouldDirty: true })}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-zinc-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-zinc-400">PNG, JPG, or WEBP · max 2 MB</p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -106,6 +106,52 @@ describe('assetsApi.create / update', () => {
     const events = await assetsApi.listEvents(created.id)
     expect(events.some((e) => e.type === 'condition_changed')).toBe(true)
   })
+
+  it('update patches editable fields (model, vendor, imageUrl, useful life)', async () => {
+    const created = await assetsApi.create({
+      name: 'Edit Target',
+      serialNumber: `SN-EDIT-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.update(created.id, {
+      model: 'New Model',
+      vendor: 'New Vendor',
+      imageUrl: 'data:image/png;base64,iVBOR…',
+      usefulLifeMonths: 72,
+      salvageValue: 500,
+      updatedBy: 'Admin User',
+    })
+    const list = await assetsApi.list()
+    const after = list.find((a) => a.id === created.id)!
+    expect(after.model).toBe('New Model')
+    expect(after.vendor).toBe('New Vendor')
+    expect(after.imageUrl).toBe('data:image/png;base64,iVBOR…')
+    expect(after.usefulLifeMonths).toBe(72)
+    expect(after.salvageValue).toBe(500)
+  })
+
+  it('update leaves unspecified fields untouched', async () => {
+    const created = await assetsApi.create({
+      name: 'Partial Patch',
+      serialNumber: `SN-PRT-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      purchaseCost: 1000,
+      vendor: 'Original',
+      model: 'M-100',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.update(created.id, { vendor: 'Updated', updatedBy: 'Admin User' })
+    const list = await assetsApi.list()
+    const after = list.find((a) => a.id === created.id)!
+    expect(after.vendor).toBe('Updated')
+    expect(after.model).toBe('M-100')
+    expect(after.purchaseCost).toBe(1000)
+  })
 })
 
 describe('assetsApi.assign / return', () => {
