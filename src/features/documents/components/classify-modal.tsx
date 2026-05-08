@@ -100,8 +100,19 @@ export function ClassifyModal({ document, onClose }: ClassifyModalProps) {
   }
 
   return (
-    <Modal open={!!document} onClose={onClose} title={`Classify ${document?.title ?? ''}`} size="lg">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={!!document}
+      onClose={onClose}
+      title={`Classify ${document?.title ?? ''}`}
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" form="classify-document-form" loading={mutation.isPending}>Save Classification</Button>
+        </>
+      }
+    >
+      <form id="classify-document-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Select
             label="Category *"
@@ -132,11 +143,6 @@ export function ClassifyModal({ document, onClose }: ClassifyModalProps) {
 
         <Input label="Tags / keywords" {...register('tags')} placeholder="comma-separated, e.g. policy, vendor, q2" />
         <Textarea label="Summary" {...register('summary')} rows={2} placeholder="Short, indexed description for search" />
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" fullWidth loading={mutation.isPending}>Save Classification</Button>
-        </div>
       </form>
     </Modal>
   )

@@ -92,8 +92,19 @@ export function RegisterReceiptModal({ open, onClose }: RegisterReceiptModalProp
   const mode = watch('mode')
 
   return (
-    <Modal open={open} onClose={close} title="Register Document Receipt" size="lg">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={close}
+      title="Register Document Receipt"
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={close} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" form="register-receipt-form" loading={mutation.isPending}>Register Receipt</Button>
+        </>
+      }
+    >
+      <form id="register-receipt-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
           <Inbox className="w-4 h-4 text-violet-700 mt-0.5" />
           <div className="text-[12px] text-violet-900">
@@ -143,11 +154,6 @@ export function RegisterReceiptModal({ open, onClose }: RegisterReceiptModalProp
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input label="Number of pages" type="number" min={0} {...register('pageCount')} />
           <Input label="Attachments" type="number" min={0} {...register('attachments')} />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={close} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" fullWidth loading={mutation.isPending}>Register Receipt</Button>
         </div>
       </form>
     </Modal>

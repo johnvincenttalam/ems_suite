@@ -293,8 +293,19 @@ export function ItemsTab() {
         )}
       </Modal>
 
-      <Modal open={modalMode !== 'closed'} onClose={closeModal} title={isEditing ? 'Edit Inventory Item' : 'Add Inventory Item'} size="lg">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={modalMode !== 'closed'}
+        onClose={closeModal}
+        title={isEditing ? 'Edit Inventory Item' : 'Add Inventory Item'}
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={submitting} onClick={closeModal}>Cancel</Button>
+            <Button type="submit" form="inventory-item-form" loading={submitting}>{isEditing ? 'Save Changes' : 'Add Item'}</Button>
+          </>
+        }
+      >
+        <form id="inventory-item-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="SKU *" {...register('sku')} error={errors.sku?.message} placeholder="e.g. OS-PEN-BLU" />
             <Input label="Name *" {...register('name')} error={errors.name?.message} />
@@ -309,10 +320,6 @@ export function ItemsTab() {
             <Input label="Quantity *" type="number" {...register('quantity', { valueAsNumber: true })} error={errors.quantity?.message} />
             <Input label="Reorder Level *" type="number" {...register('reorderLevel', { valueAsNumber: true })} error={errors.reorderLevel?.message} />
             <Input label="Unit Cost" type="number" step="0.01" {...register('unitCost', { valueAsNumber: true, setValueAs: (v) => v === '' || v == null || Number.isNaN(v) ? undefined : Number(v) })} error={errors.unitCost?.message} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth disabled={submitting} onClick={closeModal}>Cancel</Button>
-            <Button type="submit" fullWidth loading={submitting}>{isEditing ? 'Save Changes' : 'Add Item'}</Button>
           </div>
         </form>
       </Modal>

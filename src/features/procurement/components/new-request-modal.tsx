@@ -93,8 +93,19 @@ export function NewRequestModal({ open, onClose }: NewRequestModalProps) {
   }
 
   return (
-    <Modal open={open} onClose={close} title="New Procurement Request" size="xl">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <Modal
+      open={open}
+      onClose={close}
+      title="New Procurement Request"
+      size="xl"
+      footer={
+        <>
+          <Button type="button" variant="secondary" disabled={createMutation.isPending} onClick={close}>Cancel</Button>
+          <Button type="submit" form="new-request-form" loading={createMutation.isPending}>Submit Request</Button>
+        </>
+      }
+    >
+      <form id="new-request-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <Select label="Department *" {...register('departmentId')} error={errors.departmentId?.message} placeholder="Select department" options={departments.map((d) => ({ value: d.id, label: d.name }))} />
           <Select label="Preferred Supplier" {...register('supplierId')} error={errors.supplierId?.message} placeholder="Optional" options={suppliers.filter((s) => s.status === 'active').map((s) => ({ value: s.id, label: s.name }))} />
@@ -142,10 +153,6 @@ export function NewRequestModal({ open, onClose }: NewRequestModalProps) {
           <span className="text-base font-semibold tabular-nums text-zinc-900">{formatCurrency(total)}</span>
         </div>
 
-        <div className="flex gap-3 pt-1">
-          <Button type="button" variant="secondary" fullWidth disabled={createMutation.isPending} onClick={close}>Cancel</Button>
-          <Button type="submit" fullWidth loading={createMutation.isPending}>Submit Request</Button>
-        </div>
       </form>
     </Modal>
   )

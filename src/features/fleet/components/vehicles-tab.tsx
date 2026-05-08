@@ -215,8 +215,19 @@ export function VehiclesTab() {
         )}
       </Modal>
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }} title="Register Vehicle" size="lg">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showAdd}
+        onClose={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }}
+        title="Register Vehicle"
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }}>Cancel</Button>
+            <Button type="submit" form="register-vehicle-form">Register Vehicle</Button>
+          </>
+        }
+      >
+        <form id="register-vehicle-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Plate Number *" {...register('plateNumber')} error={errors.plateNumber?.message} placeholder="e.g. SGX 5482 K" />
             <Input label="Model *" {...register('model')} error={errors.model?.message} placeholder="e.g. Toyota Hilux" />
@@ -233,10 +244,6 @@ export function VehiclesTab() {
           <div className="grid grid-cols-2 gap-3">
             <Input label="Fuel Capacity (L)" type="number" {...register('fuelCapacityLiters', { valueAsNumber: true, setValueAs: (v) => v === '' || v == null || Number.isNaN(v) ? undefined : Number(v) })} error={errors.fuelCapacityLiters?.message} />
             <Select label="Assigned Driver" {...register('assignedDriverId')} error={errors.assignedDriverId?.message} placeholder="Optional" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }}>Cancel</Button>
-            <Button type="submit" fullWidth>Register Vehicle</Button>
           </div>
         </form>
       </Modal>

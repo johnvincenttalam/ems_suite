@@ -312,8 +312,19 @@ export function WorkOrdersTab() {
         )}
       </Modal>
 
-      <Modal open={showNew} onClose={() => { setShowNew(false); reset({ priority: 'medium' }) }} title="New Work Order" size="lg">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showNew}
+        onClose={() => { setShowNew(false); reset({ priority: 'medium' }) }}
+        title="New Work Order"
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset({ priority: 'medium' }) }} disabled={createMutation.isPending}>Cancel</Button>
+            <Button type="submit" form="new-work-order-form" loading={createMutation.isPending}>Create Work Order</Button>
+          </>
+        }
+      >
+        <form id="new-work-order-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Title *" {...register('title')} error={errors.title?.message} placeholder="e.g. Engine oil & filter service" />
           <Textarea label="Description" {...register('description')} rows={2} />
           <div className="grid grid-cols-2 gap-3">
@@ -328,10 +339,6 @@ export function WorkOrdersTab() {
               { value: 'critical', label: 'Critical' },
             ]} />
             <Input label="Scheduled Date *" type="date" {...register('scheduledDate')} error={errors.scheduledDate?.message} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowNew(false); reset({ priority: 'medium' }) }} disabled={createMutation.isPending}>Cancel</Button>
-            <Button type="submit" fullWidth loading={createMutation.isPending}>Create Work Order</Button>
           </div>
         </form>
       </Modal>
