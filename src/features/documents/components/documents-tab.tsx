@@ -7,7 +7,7 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { Archive, ChevronRight, FileText, GitBranch, Lock, Pencil, Plus, Upload } from 'lucide-react'
+import { Archive, BookmarkPlus, ChevronRight, FileText, GitBranch, Lock, Pencil, Plus, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getModulePath } from '@/config/modules'
@@ -44,6 +44,7 @@ import { UploadModal } from './upload-modal'
 import { ClassifyModal } from './classify-modal'
 import { StartWorkflowModal } from './start-workflow-modal'
 import { FinalizeModal } from './finalize-modal'
+import { AddToStorageModal } from './add-to-storage-modal'
 
 const statusFilters: { value: DocumentStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -85,6 +86,7 @@ export function DocumentsTab() {
   const [showUpload, setShowUpload] = useState(false)
   const [classifyTarget, setClassifyTarget] = useState<AppDocument | null>(null)
   const [workflowTarget, setWorkflowTarget] = useState<AppDocument | null>(null)
+  const [storageTarget, setStorageTarget] = useState<AppDocument | null>(null)
   const [finalizeTarget, setFinalizeTarget] = useState<AppDocument | null>(null)
 
   const urlStatus = searchParams.get('status')
@@ -241,6 +243,15 @@ export function DocumentsTab() {
                 Archive
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<BookmarkPlus className="w-3.5 h-3.5" />}
+              onClick={(e) => { e.stopPropagation(); setStorageTarget(doc) }}
+              title="Add to Storage"
+            >
+              Storage
+            </Button>
             <ChevronRight className="w-4 h-4 text-zinc-300" />
           </div>
         )
@@ -382,6 +393,7 @@ export function DocumentsTab() {
       <ClassifyModal document={classifyTarget} onClose={() => setClassifyTarget(null)} />
       <StartWorkflowModal document={workflowTarget} onClose={() => setWorkflowTarget(null)} />
       <FinalizeModal document={finalizeTarget} onClose={() => setFinalizeTarget(null)} />
+      <AddToStorageModal document={storageTarget} onClose={() => setStorageTarget(null)} />
     </div>
   )
 }

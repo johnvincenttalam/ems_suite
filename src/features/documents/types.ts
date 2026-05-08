@@ -244,3 +244,40 @@ export function getLifecyclePhase(doc: AppDocument): LifecyclePhase {
   if (doc.status === 'draft' && !doc.category) return 'inbox'
   return 'classified'
 }
+
+// ---------------------------------------------------------------------------
+// Storage Module — Phase 1
+// ---------------------------------------------------------------------------
+
+/**
+ * Source module the storage item came from. Phase 1 only stores SDMS docs;
+ * the union exists so adding fleet/asset/inventory references later is a
+ * type-safe extension rather than a refactor.
+ */
+export type SourceModule = 'sdms'
+
+/**
+ * Reference-based storage record. Holds a pointer to the original document
+ * (`documentId`) plus a per-user metadata snapshot (title, description,
+ * tags). The document content lives elsewhere — Storage never duplicates files.
+ *
+ * Per-user: `ownerName` scopes every list query so users only see their own
+ * vault.
+ */
+export interface StorageItem {
+  id: string
+  documentId: string
+  /** Display name of the user who saved this item (owner). */
+  ownerName: string
+  /** Per-user title — defaults to the document's title at add-time. Can be
+   * edited by the owner without affecting the source document. */
+  title: string
+  /** Free-text user note; empty string when the user didn't enter one. */
+  description: string
+  /** User-curated tag set. Independent of the document's own tag list. */
+  tags: string[]
+  /** Always 'sdms' in Phase 1; reserved field for future cross-module storage. */
+  sourceModule: SourceModule
+  createdAt: string
+  updatedAt: string
+}

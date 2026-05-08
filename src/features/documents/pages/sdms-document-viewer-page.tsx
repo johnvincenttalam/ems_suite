@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
+  BookmarkPlus,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -46,6 +47,7 @@ import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/button'
 import { PlacementOverlay, SignatureLayer, SignatureModal } from '@/features/documents/components/signature'
 import { RevokeSignatureModal } from '@/features/documents/components/revoke-signature-modal'
+import { AddToStorageModal } from '@/features/documents/components/add-to-storage-modal'
 import { safeAssetUrl } from '@/features/documents/lib/safe-asset-url'
 
 const PdfViewer = lazy(() => import('@/features/documents/components/pdf-viewer'))
@@ -72,6 +74,7 @@ export function SdmsDocumentViewerPage() {
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false)
   const [signatureModalOpen, setSignatureModalOpen] = useState(false)
   const [revokeOpen, setRevokeOpen] = useState(false)
+  const [addToStorageOpen, setAddToStorageOpen] = useState(false)
   const [placementMode, setPlacementMode] = useState(false)
   const [placementSlot, setPlacementSlot] = useState<Omit<SignatureSlot, 'key'> | null>(null)
   const [repositioningSlotKey, setRepositioningSlotKey] = useState<string | null>(null)
@@ -349,6 +352,14 @@ export function SdmsDocumentViewerPage() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
+            onClick={() => setAddToStorageOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-[13px] text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            <BookmarkPlus className="w-4 h-4" />
+            Add to Storage
+          </button>
+          <button
+            type="button"
             onClick={() => {
               accessMutation.mutate({ docId: doc.id, activity: 'download' })
               toast.success('Mock download — recorded in access log')
@@ -523,6 +534,10 @@ export function SdmsDocumentViewerPage() {
       />
 
       <RevokeSignatureModal document={revokeOpen ? doc : null} onClose={() => setRevokeOpen(false)} />
+      <AddToStorageModal
+        document={addToStorageOpen ? doc : null}
+        onClose={() => setAddToStorageOpen(false)}
+      />
     </motion.div>
   )
 }

@@ -25,6 +25,7 @@ import {
   Bell,
   Workflow,
   Trash2,
+  Bookmark,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureKey } from './features'
@@ -92,6 +93,7 @@ export const modules: EmsModule[] = [
           { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'sdmsDashboard' },
           { label: 'My Tasks', path: 'my-tasks', icon: ListChecks, feature: 'sdmsMyTasks' },
           { label: 'Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
+          { label: 'My Storage', path: 'storage', icon: Bookmark, feature: 'sdmsStorage' },
           { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'documentsReports' },
         ],
       },
