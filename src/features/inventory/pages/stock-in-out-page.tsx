@@ -214,8 +214,6 @@ export function StockInOutPage() {
           </div>
           {isLoading ? (
             <TableSkeleton columns={4} rows={4} />
-          ) : recent.length === 0 ? (
-            <DataTableEmpty colSpan={4} icon={Activity} message="No transactions yet" />
           ) : (
             <table className="w-full">
               <thead>
@@ -227,6 +225,9 @@ export function StockInOutPage() {
                 </tr>
               </thead>
               <tbody>
+                {recent.length === 0 && (
+                  <DataTableEmpty colSpan={4} icon={Activity} message="No transactions yet" />
+                )}
                 {recent.map((m) => (
                   <tr key={m.id} className="border-b border-zinc-100/60">
                     <td className="px-4 py-3 text-[12px] text-zinc-500 whitespace-nowrap">

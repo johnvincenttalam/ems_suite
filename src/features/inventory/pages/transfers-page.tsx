@@ -229,8 +229,6 @@ export function TransfersPage() {
           </div>
           {isLoading ? (
             <TableSkeleton columns={6} rows={4} />
-          ) : transfers.length === 0 ? (
-            <DataTableEmpty colSpan={6} icon={Activity} message="No transfers yet" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -246,6 +244,9 @@ export function TransfersPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {transfers.length === 0 && (
+                    <DataTableEmpty colSpan={7} icon={Activity} message="No transfers yet" />
+                  )}
                   {transfers.map((m) => {
                     const canAct = m.status === 'pending' && m.approverId === currentUser?.name
                     return (

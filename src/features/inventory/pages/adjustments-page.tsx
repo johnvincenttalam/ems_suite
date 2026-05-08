@@ -242,8 +242,6 @@ export function AdjustmentsPage() {
           </div>
           {isLoading ? (
             <TableSkeleton columns={6} rows={4} />
-          ) : adjustments.length === 0 ? (
-            <DataTableEmpty colSpan={6} icon={Activity} message="No adjustments yet" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -258,6 +256,9 @@ export function AdjustmentsPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {adjustments.length === 0 && (
+                    <DataTableEmpty colSpan={6} icon={Activity} message="No adjustments yet" />
+                  )}
                   {adjustments.map((m) => {
                     const canAct = m.status === 'pending' && m.approverId === currentUser?.name
                     return (
