@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { format, parseISO, subDays, isAfter } from 'date-fns'
 import { useAssets, useAssetInspections } from '@/features/assets'
-import { useUsers } from '@/features/users'
 import type { Asset, Inspection, InspectionResult } from '@/features/assets/types'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
@@ -46,16 +45,15 @@ const RESULT_LABELS: Record<InspectionResult, string> = {
 export function AssetInspectionsPage() {
   const { data: assets = [], isLoading: assetsLoading } = useAssets()
   const { data: inspections = [], isLoading: inspectionsLoading } = useAssetInspections()
-  const { data: users = [] } = useUsers()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
-  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
 
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState<InspectionResult | 'all' | 'fail-recent'>('all')
   const [assetFilter, setAssetFilter] = useState<string>('')
   const [inspectorFilter, setInspectorFilter] = useState<string>('')
   const [activeAsset, setActiveAsset] = useState<Asset | null>(null)
+  const [activeTab, setActiveTab] = useState<'overview' | 'inspections'>('overview')
   const [showRecord, setShowRecord] = useState(false)
   const [recordAssetId, setRecordAssetId] = useState<string>('')
 
@@ -188,7 +186,7 @@ export function AssetInspectionsPage() {
                     key={insp.id}
                     inspection={insp}
                     asset={assetMap[insp.assetId]}
-                    onOpenAsset={(a) => setActiveAsset(a)}
+                    onOpenAsset={(a) => { setActiveAsset(a); setActiveTab('inspections') }}
                   />
                 ))
               )}
@@ -200,7 +198,8 @@ export function AssetInspectionsPage() {
       <AssetDetailDrawer
         open={!!activeAsset}
         asset={activeAsset}
-        onClose={() => setActiveAsset(null)}
+        initialTab={activeTab}
+        onClose={() => { setActiveAsset(null); setActiveTab('overview') }}
       />
 
       <Modal
@@ -237,6 +236,7 @@ export function AssetInspectionsPage() {
                 const a = assetMap[recordAssetId]
                 if (a) {
                   setActiveAsset(a)
+                  setActiveTab('inspections')
                   setShowRecord(false)
                   setRecordAssetId('')
                 }
@@ -248,8 +248,6 @@ export function AssetInspectionsPage() {
         </div>
       </Modal>
 
-      {/* Suppress unused-import warning when no inspector pill is rendered. */}
-      <span className="hidden">{userMap[''] ? 'x' : ''}</span>
     </div>
   )
 }

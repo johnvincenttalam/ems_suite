@@ -32,6 +32,7 @@ import {
   useAssetInspections,
   useAssetAssignments,
   depreciationSummary,
+  DISPOSAL_TYPE_LABELS,
 } from '@/features/assets'
 import type {
   Asset,
@@ -43,6 +44,7 @@ import { StatusBadge } from '@/shared/ui/status-badge'
 import { Tabs } from '@/shared/ui/tabs'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
+import { Select } from '@/shared/ui/select'
 import { Textarea } from '@/shared/ui/textarea'
 import { ConditionPill } from '@/features/assets/components/condition-pill'
 import { formatCurrency } from '@/shared/utils/format'
@@ -54,14 +56,16 @@ interface AssetDetailDrawerProps {
   open: boolean
   asset: Asset | null
   onClose: () => void
+  /** Tab to land on when opening. Defaults to 'overview'. */
+  initialTab?: DrawerTab
 }
 
-export function AssetDetailDrawer({ open, asset, onClose }: AssetDetailDrawerProps) {
-  const [tab, setTab] = useState<DrawerTab>('overview')
+export function AssetDetailDrawer({ open, asset, onClose, initialTab = 'overview' }: AssetDetailDrawerProps) {
+  const [tab, setTab] = useState<DrawerTab>(initialTab)
 
   useEffect(() => {
-    if (open) setTab('overview')
-  }, [open, asset?.id])
+    if (open) setTab(initialTab)
+  }, [open, asset?.id, initialTab])
 
   useEffect(() => {
     if (!open) return
@@ -201,7 +205,7 @@ function OverviewTab({ asset }: { asset: Asset }) {
       {asset.disposal && (
         <Section title="Disposal">
           <Grid>
-            <Field label="Type">{asset.disposal.type}</Field>
+            <Field label="Type">{DISPOSAL_TYPE_LABELS[asset.disposal.type]}</Field>
             <Field label="Date">{format(parseISO(asset.disposal.disposedDate), 'MMM d, yyyy')}</Field>
             {asset.disposal.amount !== undefined && (
               <Field label="Amount">{formatCurrency(asset.disposal.amount)}</Field>
@@ -444,25 +448,30 @@ function ScheduleMaintenanceForm({
       <Input label="Title *" placeholder="e.g. Quarterly inspection" {...register('title')} error={errors.title?.message} />
       <Textarea label="Description" rows={2} {...register('description')} />
       <div className="grid grid-cols-2 gap-3">
-        <select
+        <Select
+          label="Technician *"
           {...register('assignedTo')}
-          className="w-full rounded-md border border-zinc-200 bg-white px-2 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-        >
-          <option value="">Select technician</option>
-          {techOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <Input type="date" {...register('scheduledDate')} error={errors.scheduledDate?.message} />
+          error={errors.assignedTo?.message}
+          placeholder="Select technician"
+          options={techOptions}
+        />
+        <Input
+          label="Scheduled Date *"
+          type="date"
+          {...register('scheduledDate')}
+          error={errors.scheduledDate?.message}
+        />
       </div>
-      <select
+      <Select
+        label="Priority *"
         {...register('priority')}
-        className="w-full rounded-md border border-zinc-200 bg-white px-2 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-      >
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
-      </select>
-      {errors.assignedTo && <p className="text-[11px] text-red-600">{errors.assignedTo.message}</p>}
+        options={[
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' },
+          { value: 'critical', label: 'Critical' },
+        ]}
+      />
       <p className="text-[11px] text-zinc-500">
         The work order is created in the Maintenance module as <span className="font-medium">Pending</span>.
         It moves to <span className="font-medium">In Progress</span> when started; the asset flips to maintenance status then.
@@ -691,7 +700,15 @@ function RecordInspectionForm({ asset, onDone }: { asset: Asset; onDone: () => v
       })
     },
     onSuccess: (insp) => {
-      toast.success(insp.status === 'submitted' ? `Inspection submitted — ${insp.overallResult}` : 'Inspection saved as draft')
+      if (insp.status === 'draft') {
+        toast.message('Inspection saved as draft')
+      } else if (insp.overallResult === 'fail') {
+        toast.warning('Inspection submitted — failed', {
+          description: 'One or more checklist items failed; consider scheduling maintenance.',
+        })
+      } else {
+        toast.success('Inspection submitted — passed')
+      }
       queryClient.invalidateQueries({ queryKey: ['assets'] })
       onDone()
     },
@@ -728,7 +745,7 @@ function RecordInspectionForm({ asset, onDone }: { asset: Asset; onDone: () => v
         ))}
         <button
           type="button"
-          onClick={() => append({ label: '', result: 'pass', remarks: '' })}
+          onClick={() => append({ label: `Checklist Item ${fields.length + 1}`, result: 'pass', remarks: '' })}
           className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1"
         >
           <Plus className="w-3 h-3" /> Add item
@@ -805,8 +822,8 @@ function EventIcon({ type }: { type: AssetEventType }) {
     maintenance_started: { icon: Wrench, bg: 'bg-amber-50', color: 'text-amber-700' },
     maintenance_ended: { icon: Wrench, bg: 'bg-emerald-50', color: 'text-emerald-700' },
     disposal_submitted: { icon: AlertTriangle, bg: 'bg-orange-50', color: 'text-orange-700' },
-    disposal_approved: { icon: CheckCircle2, bg: 'bg-red-50', color: 'text-red-700' },
-    disposal_rejected: { icon: XCircle, bg: 'bg-zinc-100', color: 'text-zinc-700' },
+    disposal_approved: { icon: CheckCircle2, bg: 'bg-zinc-100', color: 'text-zinc-700' },
+    disposal_rejected: { icon: XCircle, bg: 'bg-blue-50', color: 'text-blue-700' },
   }
   const meta = map[type] ?? { icon: HistoryIcon, bg: 'bg-zinc-100', color: 'text-zinc-700' }
   const Icon = meta.icon

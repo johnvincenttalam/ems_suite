@@ -31,6 +31,13 @@ const EMPTY: DepreciationSummary = {
  * Returns a zero-everything summary when the asset lacks the inputs we need
  * (purchaseCost, usefulLifeMonths > 0). bookValue is clamped to salvageValue
  * once the asset is fully depreciated.
+ *
+ * Convention: months elapsed is counted in **calendar months** (date-fns'
+ * `differenceInCalendarMonths`), not 30-day windows. An asset purchased
+ * 2024-08-12 is therefore "1 month elapsed" on 2024-09-01 (any day in the
+ * next calendar month), not on 2024-09-12. This matches typical accounting
+ * practice; period-pro-rata depreciation would require day-level math here
+ * and a richer historical-cost record.
  */
 export function depreciationSummary(asset: Asset, asOf: Date = new Date()): DepreciationSummary {
   const cost = asset.purchaseCost

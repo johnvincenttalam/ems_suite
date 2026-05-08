@@ -18,6 +18,7 @@ export {
 export { assetsApi } from './api/assets-api'
 export { depreciationSummary, totalBookValue } from './lib/depreciation'
 export type { DepreciationSummary } from './lib/depreciation'
+export { DISPOSAL_TYPE_LABELS } from './lib/disposal-labels'
 export {
   mockAssets,
   mockAssetAssignments,

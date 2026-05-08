@@ -130,7 +130,12 @@ export function AssetsDashboard() {
   }, [assets, categories])
 
   const inMaintenance = useMemo(() => {
-    return assets.filter((a) => a.status === 'maintenance').slice(0, 5)
+    // Sort by purchase cost descending so the highest-impact down-assets float
+    // to the top — operationally more useful than array order.
+    return assets
+      .filter((a) => a.status === 'maintenance')
+      .sort((a, b) => (b.purchaseCost ?? 0) - (a.purchaseCost ?? 0))
+      .slice(0, 5)
   }, [assets])
 
   const maintenanceDue = useMemo(() => {

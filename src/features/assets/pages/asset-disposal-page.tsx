@@ -14,7 +14,7 @@ import {
   ArrowDownToLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAssets, assetsApi } from '@/features/assets'
+import { useAssets, assetsApi, DISPOSAL_TYPE_LABELS } from '@/features/assets'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import type { Asset, DisposalType } from '@/features/assets/types'
@@ -32,14 +32,6 @@ import { StatCard } from '@/shared/ui/stat-card'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
 import { formatCurrency } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
-
-const DISPOSAL_TYPE_LABELS: Record<DisposalType, string> = {
-  sold: 'Sold',
-  scrapped: 'Scrapped',
-  donated: 'Donated',
-  lost: 'Lost',
-  traded_in: 'Traded In',
-}
 
 const DISPOSAL_TYPE_OPTIONS: { value: DisposalType; label: string }[] = [
   { value: 'sold', label: 'Sold' },

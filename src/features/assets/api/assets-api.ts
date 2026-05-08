@@ -269,6 +269,8 @@ export const assetsApi = {
     await delay(120)
     const asset = findAsset(input.assetId)
     if (asset.status === 'disposed') throw new Error('Cannot assign a disposed asset')
+    if (asset.status === 'maintenance') throw new Error('Cannot assign an asset that is in maintenance')
+    if (asset.status === 'retiring') throw new Error('Cannot assign an asset with a pending disposal')
     if (asset.assignedTo) throw new Error('Asset is already assigned — return it first')
 
     asset.assignedTo = input.userId
@@ -387,7 +389,7 @@ export const assetsApi = {
     emitEvent({
       assetId: asset.id,
       type: 'disposal_submitted',
-      detail: `Disposal submitted: ${input.type}${input.amount ? ` (${input.amount})` : ''}${input.disposedTo ? ` to ${input.disposedTo}` : ''}`,
+      detail: `Disposal submitted: ${input.type}${input.amount !== undefined ? ` (${input.amount})` : ''}${input.disposedTo ? ` to ${input.disposedTo}` : ''}`,
       actorName: input.submittedBy,
       payload: { disposalType: input.type, disposalAmount: input.amount },
     })
@@ -412,7 +414,12 @@ export const assetsApi = {
     }
     const now = new Date().toISOString()
     asset.status = 'disposed'
-    asset.condition = 'out_of_service'
+    // Only force out_of_service for end-of-life dispositions; sold / donated /
+    // traded-in assets retain their last-known condition for the audit record.
+    const destructiveTypes: DisposalType[] = ['scrapped', 'lost']
+    if (destructiveTypes.includes(asset.disposal.type)) {
+      asset.condition = 'out_of_service'
+    }
     asset.assignedTo = undefined
     asset.disposal = {
       ...asset.disposal,
@@ -465,6 +472,9 @@ export const assetsApi = {
   recordInspection: async (input: CreateInspectionInput): Promise<Inspection> => {
     await delay(140)
     findAsset(input.assetId) // throws if missing
+    if (input.lines.length === 0) {
+      throw new Error('Inspection must have at least one checklist item')
+    }
 
     const failed = input.lines.some((l) => l.result === 'fail')
     const overall: InspectionResult = failed ? 'fail' : 'pass'
@@ -499,6 +509,16 @@ export const assetsApi = {
         action: 'create',
         module: 'Assets',
         detail: `Recorded inspection ${inspection.id} for asset ${input.assetId} — ${overall}`,
+      })
+    } else {
+      // Draft path: no lifecycle event (drafts don't reflect state on the
+      // asset until submitted), but the audit log still records the create
+      // so reviewers know the inspector started the form.
+      recordAudit({
+        userId: input.inspector,
+        action: 'create',
+        module: 'Assets',
+        detail: `Saved inspection ${inspection.id} as draft for asset ${input.assetId}`,
       })
     }
     return inspection
