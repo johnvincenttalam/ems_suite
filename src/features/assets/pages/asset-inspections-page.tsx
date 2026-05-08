@@ -9,7 +9,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { format, parseISO, subDays, isAfter } from 'date-fns'
-import { useAssets, useAssetInspections } from '@/features/assets'
+import { useAssets, useAssetInspections, AssetThumbnail } from '@/features/assets'
 import type { Asset, Inspection, InspectionResult } from '@/features/assets/types'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
@@ -273,10 +273,13 @@ function InspectionRow({
       <td className="px-4 py-3 text-[11px] font-mono text-zinc-500">{inspection.id}</td>
       <td className="px-4 py-3 text-[13px] text-zinc-700">
         {asset ? (
-          <>
-            <p className="font-medium text-zinc-900">{asset.name}</p>
-            <p className="text-[11px] text-zinc-400 font-mono">{asset.assetCode}</p>
-          </>
+          <div className="flex items-center gap-2.5">
+            <AssetThumbnail imageUrl={asset.imageUrl} alt={asset.name} size="sm" />
+            <div className="min-w-0">
+              <p className="font-medium text-zinc-900 truncate">{asset.name}</p>
+              <p className="text-[11px] text-zinc-400 font-mono">{asset.assetCode}</p>
+            </div>
+          </div>
         ) : (
           <span className="text-zinc-400">{inspection.assetId}</span>
         )}

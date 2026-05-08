@@ -19,6 +19,7 @@ export { assetsApi } from './api/assets-api'
 export { depreciationSummary, totalBookValue } from './lib/depreciation'
 export type { DepreciationSummary } from './lib/depreciation'
 export { DISPOSAL_TYPE_LABELS } from './lib/disposal-labels'
+export { AssetThumbnail } from './components/asset-thumbnail'
 export {
   mockAssets,
   mockAssetAssignments,

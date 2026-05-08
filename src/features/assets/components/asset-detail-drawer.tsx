@@ -33,6 +33,7 @@ import {
   useAssetAssignments,
   depreciationSummary,
   DISPOSAL_TYPE_LABELS,
+  AssetThumbnail,
 } from '@/features/assets'
 import type {
   Asset,
@@ -128,13 +129,7 @@ function DrawerHeader({ asset, onClose }: { asset: Asset; onClose: () => void })
   return (
     <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-zinc-100">
       <div className="flex items-start gap-4 min-w-0">
-        <div className="w-14 h-14 rounded-lg bg-zinc-100 border border-zinc-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {asset.imageUrl ? (
-            <img src={asset.imageUrl} alt={asset.name} className="w-full h-full object-cover" />
-          ) : (
-            <Package className="w-6 h-6 text-zinc-400" />
-          )}
-        </div>
+        <AssetThumbnail imageUrl={asset.imageUrl} alt={asset.name} size="lg" />
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-mono text-[11px] text-zinc-400">{asset.assetCode}</span>

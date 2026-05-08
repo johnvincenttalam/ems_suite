@@ -14,7 +14,7 @@ import {
   ArrowDownToLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAssets, assetsApi, DISPOSAL_TYPE_LABELS } from '@/features/assets'
+import { useAssets, assetsApi, DISPOSAL_TYPE_LABELS, AssetThumbnail } from '@/features/assets'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import type { Asset, DisposalType } from '@/features/assets/types'
@@ -327,13 +327,18 @@ function PendingTable({
             return (
               <tr key={a.id} className="border-b border-zinc-100/60 align-top">
                 <td className="px-4 py-3 text-[13px] text-zinc-700">
-                  <button
-                    onClick={() => onOpenAsset(a)}
-                    className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
-                  >
-                    {a.name}
-                  </button>
-                  <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
+                  <div className="flex items-center gap-2.5">
+                    <AssetThumbnail imageUrl={a.imageUrl} alt={a.name} size="sm" />
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => onOpenAsset(a)}
+                        className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
+                      >
+                        {a.name}
+                      </button>
+                      <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-[12px] text-zinc-700">{DISPOSAL_TYPE_LABELS[d.type]}</td>
                 <td className="px-4 py-3 text-right text-[13px] tabular-nums text-zinc-700 whitespace-nowrap">
@@ -416,13 +421,18 @@ function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: A
             return (
               <tr key={a.id} className="border-b border-zinc-100/60">
                 <td className="px-4 py-3 text-[13px] text-zinc-700">
-                  <button
-                    onClick={() => onOpenAsset(a)}
-                    className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
-                  >
-                    {a.name}
-                  </button>
-                  <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
+                  <div className="flex items-center gap-2.5">
+                    <AssetThumbnail imageUrl={a.imageUrl} alt={a.name} size="sm" />
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => onOpenAsset(a)}
+                        className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
+                      >
+                        {a.name}
+                      </button>
+                      <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-[12px] text-zinc-700">{DISPOSAL_TYPE_LABELS[d.type]}</td>
                 <td className="px-4 py-3 text-right text-[13px] tabular-nums text-zinc-700 whitespace-nowrap">
