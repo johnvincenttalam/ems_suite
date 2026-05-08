@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList } from 'lucide-react'
+import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2 } from 'lucide-react'
 import { TrackingPanel } from '@/shared/tracking'
-import { ChecklistPanel } from '@/shared/checklists'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { useAssets } from '@/features/assets'
+import { useAssets, assetsApi } from '@/features/assets'
+import type { Asset, AssetStatus, AssetCondition, DisposalType } from '@/features/assets/types'
 import { useCategories } from '@/features/categories'
 import { useWarehouses } from '@/features/warehouses'
 import { useUsers } from '@/features/users'
-import type { Asset, AssetStatus } from '@/features/assets/types'
+import { useAuthStore } from '@/features/auth'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -20,19 +21,45 @@ import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { StatusBadge } from '@/shared/ui/status-badge'
+import { ConditionPill } from '@/features/assets/components/condition-pill'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
+
+const CONDITION_OPTIONS: { value: AssetCondition; label: string }[] = [
+  { value: 'excellent', label: 'Excellent' },
+  { value: 'good', label: 'Good' },
+  { value: 'fair', label: 'Fair' },
+  { value: 'poor', label: 'Poor' },
+  { value: 'out_of_service', label: 'Out of Service' },
+]
+
+const DISPOSAL_TYPES: { value: DisposalType; label: string }[] = [
+  { value: 'sold', label: 'Sold' },
+  { value: 'scrapped', label: 'Scrapped' },
+  { value: 'donated', label: 'Donated' },
+  { value: 'lost', label: 'Lost' },
+  { value: 'traded_in', label: 'Traded In' },
+]
 
 const assetSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   serialNumber: z.string().min(2, 'Serial number is required'),
+  assetCode: z.string().optional(),
+  model: z.string().optional(),
+  vendor: z.string().optional(),
   categoryId: z.string().min(1, 'Category is required'),
   locationId: z.string().min(1, 'Location is required'),
+  condition: z.enum(['excellent', 'good', 'fair', 'poor', 'out_of_service'] as const),
   purchaseDate: z.string().min(1, 'Purchase date is required'),
   purchaseCost: z.number().min(0).optional(),
+  warrantyExpiry: z.string().optional(),
+  usefulLifeMonths: z.number().int().positive().optional(),
+  salvageValue: z.number().min(0).optional(),
+  description: z.string().optional(),
 })
 
 type AssetForm = z.infer<typeof assetSchema>
@@ -52,7 +79,12 @@ const transferSchema = z.object({
 type TransferForm = z.infer<typeof transferSchema>
 
 const disposeSchema = z.object({
+  type: z.enum(['sold', 'scrapped', 'donated', 'lost', 'traded_in'] as const),
+  amount: z.number().min(0).optional(),
+  disposedTo: z.string().optional(),
+  disposedDate: z.string().min(1, 'Disposal date is required'),
   reason: z.string().min(2, 'Reason is required'),
+  approverName: z.string().min(1, 'Approver is required'),
 })
 
 type DisposeForm = z.infer<typeof disposeSchema>
@@ -61,6 +93,7 @@ const statusFilters: { value: AssetStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'maintenance', label: 'Maintenance' },
+  { value: 'retiring', label: 'Retiring' },
   { value: 'disposed', label: 'Disposed' },
 ]
 
@@ -69,6 +102,8 @@ export function RegistryTab() {
   const { data: categories = [] } = useCategories()
   const { data: warehouses = [] } = useWarehouses()
   const { data: users = [] } = useUsers()
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
 
   const categoryMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
   const locationMap = useMemo(() => Object.fromEntries(warehouses.map((w) => [w.id, w])), [warehouses])
@@ -78,7 +113,7 @@ export function RegistryTab() {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
   const [activeAsset, setActiveAsset] = useState<Asset | null>(null)
-  const [activeAction, setActiveAction] = useState<'assign' | 'transfer' | 'dispose' | 'location' | 'inspection' | null>(null)
+  const [activeAction, setActiveAction] = useState<'assign' | 'return' | 'transfer' | 'dispose' | 'location' | 'inspection' | 'view' | null>(null)
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? assets : assets.filter((a) => a.status === statusFilter),
@@ -87,30 +122,155 @@ export function RegistryTab() {
 
   const assetCategories = useMemo(() => categories.filter((c) => c.type === 'asset'), [categories])
 
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['assets'] })
+    queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+  }
+
+  const addForm = useForm<AssetForm>({
+    resolver: zodResolver(assetSchema),
+    defaultValues: { condition: 'good' },
+  })
+  const assignForm = useForm<AssignForm>({ resolver: zodResolver(assignSchema) })
+  const transferForm = useForm<TransferForm>({ resolver: zodResolver(transferSchema) })
+  const disposeForm = useForm<DisposeForm>({
+    resolver: zodResolver(disposeSchema),
+    defaultValues: { type: 'sold', disposedDate: format(new Date(), 'yyyy-MM-dd') },
+  })
+
+  const closeAction = () => {
+    setActiveAsset(null)
+    setActiveAction(null)
+    assignForm.reset()
+    transferForm.reset({})
+    disposeForm.reset({ type: 'sold', disposedDate: format(new Date(), 'yyyy-MM-dd') })
+  }
+
+  const addMutation = useMutation({
+    mutationFn: (data: AssetForm) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return assetsApi.create({ ...data, createdBy: currentUser.name })
+    },
+    onSuccess: (asset) => {
+      toast.success(`Registered ${asset.name}`)
+      setShowAdd(false)
+      addForm.reset({ condition: 'good' })
+      invalidate()
+    },
+    onError: (err) => toast.error('Register failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: (data: AssignForm) => {
+      if (!activeAsset || !currentUser) throw new Error('Asset or user missing')
+      return assetsApi.assign({
+        assetId: activeAsset.id,
+        userId: data.assignedTo,
+        notes: data.notes,
+        actorName: currentUser.name,
+      })
+    },
+    onSuccess: ({ asset, assignment }) => {
+      const u = userMap[assignment.assignedTo]
+      toast.success(`Assigned ${asset.name} to ${u?.name ?? assignment.assignedTo}`)
+      closeAction()
+      invalidate()
+    },
+    onError: (err) => toast.error('Assignment failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const returnMutation = useMutation({
+    mutationFn: () => {
+      if (!activeAsset || !currentUser) throw new Error('Asset or user missing')
+      return assetsApi.return({ assetId: activeAsset.id, actorName: currentUser.name })
+    },
+    onSuccess: (asset) => {
+      toast.success(`${asset.name} returned`)
+      closeAction()
+      invalidate()
+    },
+    onError: (err) => toast.error('Return failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: (data: TransferForm) => {
+      if (!activeAsset || !currentUser) throw new Error('Asset or user missing')
+      return assetsApi.transfer({
+        assetId: activeAsset.id,
+        toLocationId: data.locationId,
+        notes: data.notes,
+        actorName: currentUser.name,
+      })
+    },
+    onSuccess: (asset) => {
+      const dest = locationMap[asset.locationId]
+      toast.success(`Transferred ${asset.name} to ${dest?.name ?? asset.locationId}`)
+      closeAction()
+      invalidate()
+    },
+    onError: (err) => toast.error('Transfer failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const disposeMutation = useMutation({
+    mutationFn: (data: DisposeForm) => {
+      if (!activeAsset || !currentUser) throw new Error('Asset or user missing')
+      return assetsApi.submitDisposal({
+        assetId: activeAsset.id,
+        type: data.type,
+        amount: data.amount,
+        disposedTo: data.disposedTo,
+        disposedDate: data.disposedDate,
+        reason: data.reason,
+        approverName: data.approverName,
+        submittedBy: currentUser.name,
+      })
+    },
+    onSuccess: (asset) => {
+      toast.success(`Disposal of ${asset.name} submitted — awaiting approval`)
+      closeAction()
+      invalidate()
+    },
+    onError: (err) => toast.error('Disposal submit failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
   const columns = useMemo<ColumnDef<Asset>[]>(() => [
-    { accessorKey: 'serialNumber', header: 'Serial', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-500">{getValue() as string}</span> },
+    { accessorKey: 'assetCode', header: 'Code', cell: ({ row }) => (
+      <button
+        onClick={() => { setActiveAsset(row.original); setActiveAction('view') }}
+        className="font-mono text-[12px] text-zinc-700 hover:text-zinc-900 hover:underline cursor-pointer"
+      >
+        {row.original.assetCode}
+      </button>
+    )},
     { accessorKey: 'name', header: 'Asset', cell: ({ row }) => (
       <div>
         <p className="font-medium text-zinc-900">{row.original.name}</p>
         <p className="text-xs text-zinc-400">{categoryMap[row.original.categoryId]?.name ?? '—'}</p>
       </div>
     )},
+    { accessorKey: 'serialNumber', header: 'Serial', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-500">{getValue() as string}</span> },
     { accessorKey: 'locationId', header: 'Location', cell: ({ getValue }) => locationMap[getValue() as string]?.name ?? <span className="text-zinc-400">—</span> },
-    { accessorKey: 'assignedTo', header: 'Assigned To', cell: ({ getValue }) => {
+    { accessorKey: 'assignedTo', header: 'Assigned', cell: ({ getValue }) => {
       const v = getValue() as string | undefined
       if (!v) return <span className="text-zinc-400">Unassigned</span>
       const user = userMap[v]
       return user ? <span className="text-zinc-700">{user.name}</span> : <span className="text-zinc-400">—</span>
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
-    { accessorKey: 'purchaseDate', header: 'Purchased', cell: ({ getValue }) => format(new Date(getValue() as string), 'MMM dd, yyyy') },
+    { accessorKey: 'condition', header: 'Condition', cell: ({ row }) => <ConditionPill condition={row.original.condition} /> },
     { id: 'actions', header: '', cell: ({ row }) => {
       const asset = row.original
       const canAssign = asset.status === 'active' && !asset.assignedTo
+      const canReturn = asset.status !== 'disposed' && !!asset.assignedTo
       const canTransfer = asset.status !== 'disposed'
-      const canDispose = asset.status !== 'disposed'
+      const canDispose = asset.status === 'active' || asset.status === 'maintenance'
       return (
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setActiveAsset(asset); setActiveAction('view') }}
+            title="View details"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+          ><Eye className="w-4 h-4" /></button>
           {asset.checklistId && (
             <button
               onClick={() => { setActiveAsset(asset); setActiveAction('inspection') }}
@@ -130,6 +290,13 @@ export function RegistryTab() {
               className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
             ><UserCheck className="w-4 h-4" /></button>
           )}
+          {canReturn && (
+            <button
+              onClick={() => { setActiveAsset(asset); setActiveAction('return') }}
+              title="Return from assignment"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+            ><Undo2 className="w-4 h-4" /></button>
+          )}
           {canTransfer && (
             <button
               onClick={() => { setActiveAsset(asset); setActiveAction('transfer') }}
@@ -140,7 +307,7 @@ export function RegistryTab() {
           {canDispose && (
             <button
               onClick={() => { setActiveAsset(asset); setActiveAction('dispose') }}
-              title="Dispose"
+              title="Dispose / retire"
               className="p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
             ><Trash2 className="w-4 h-4" /></button>
           )}
@@ -154,41 +321,11 @@ export function RegistryTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const addForm = useForm<AssetForm>({ resolver: zodResolver(assetSchema) })
-  const assignForm = useForm<AssignForm>({ resolver: zodResolver(assignSchema) })
-  const transferForm = useForm<TransferForm>({ resolver: zodResolver(transferSchema) })
-  const disposeForm = useForm<DisposeForm>({ resolver: zodResolver(disposeSchema) })
+  const approverOptions = users
+    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('assets') && u.name !== currentUser?.name)
+    .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
-  const closeAction = () => {
-    setActiveAsset(null)
-    setActiveAction(null)
-    assignForm.reset()
-    transferForm.reset()
-    disposeForm.reset()
-  }
-
-  const onAdd = (_data: AssetForm) => {
-    setShowAdd(false)
-    addForm.reset()
-    toast.success('Asset registered')
-  }
-
-  const onAssign = (data: AssignForm) => {
-    closeAction()
-    toast.success(`Assigned ${activeAsset?.name} to ${userMap[data.assignedTo]?.name ?? 'user'}`)
-  }
-
-  const onTransfer = (data: TransferForm) => {
-    closeAction()
-    toast.success(`Transferred ${activeAsset?.name} to ${locationMap[data.locationId]?.name ?? 'new location'}`)
-  }
-
-  const onDispose = (_data: DisposeForm) => {
-    closeAction()
-    toast.success(`${activeAsset?.name} marked as disposed`)
-  }
-
-  if (isLoading) return <TableSkeleton columns={7} rows={6} />
+  if (isLoading) return <TableSkeleton columns={8} rows={6} />
 
   return (
     <div>
@@ -206,11 +343,13 @@ export function RegistryTab() {
             sheetName="Assets"
             pdfTitle="Asset Registry"
             columns={[
+              { key: 'assetCode', label: 'Code' },
               { key: 'serialNumber', label: 'Serial' },
               { key: 'name', label: 'Name' },
               { key: 'categoryId', label: 'Category' },
               { key: 'locationId', label: 'Location' },
               { key: 'status', label: 'Status' },
+              { key: 'condition', label: 'Condition' },
               { key: 'assignedTo', label: 'Assigned To' },
               { key: 'purchaseDate', label: 'Purchased' },
               { key: 'purchaseCost', label: 'Cost' },
@@ -235,11 +374,19 @@ export function RegistryTab() {
         <DataTablePagination table={table} />
       </div>
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); addForm.reset() }} title="Register Asset" size="lg">
-        <form onSubmit={addForm.handleSubmit(onAdd)} className="space-y-4">
+      <Modal open={showAdd} onClose={() => { setShowAdd(false); addForm.reset({ condition: 'good' }) }} title="Register Asset" size="lg">
+        <form onSubmit={addForm.handleSubmit((d) => addMutation.mutate(d))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Name *" {...addForm.register('name')} error={addForm.formState.errors.name?.message} />
             <Input label="Serial Number *" {...addForm.register('serialNumber')} error={addForm.formState.errors.serialNumber?.message} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Asset Code (optional)" {...addForm.register('assetCode')} placeholder="Auto-generated if blank" />
+            <Input label="Model" {...addForm.register('model')} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Vendor" {...addForm.register('vendor')} />
+            <Select label="Condition *" {...addForm.register('condition')} options={CONDITION_OPTIONS} error={addForm.formState.errors.condition?.message} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Select label="Category *" {...addForm.register('categoryId')} error={addForm.formState.errors.categoryId?.message} placeholder="Select category" options={assetCategories.map((c) => ({ value: c.id, label: c.name }))} />
@@ -247,28 +394,49 @@ export function RegistryTab() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Purchase Date *" type="date" {...addForm.register('purchaseDate')} error={addForm.formState.errors.purchaseDate?.message} />
-            <Input label="Purchase Cost" type="number" step="0.01" {...addForm.register('purchaseCost', { valueAsNumber: true, setValueAs: (v) => v === '' || v == null || Number.isNaN(v) ? undefined : Number(v) })} error={addForm.formState.errors.purchaseCost?.message} />
+            <Input label="Purchase Cost" type="number" step="0.01" {...addForm.register('purchaseCost', { setValueAs: (v) => v === '' || v == null || Number.isNaN(Number(v)) ? undefined : Number(v) })} error={addForm.formState.errors.purchaseCost?.message} />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="Warranty Expiry" type="date" {...addForm.register('warrantyExpiry')} />
+            <Input label="Useful Life (months)" type="number" {...addForm.register('usefulLifeMonths', { setValueAs: (v) => v === '' || v == null || Number.isNaN(Number(v)) ? undefined : Number(v) })} />
+            <Input label="Salvage Value" type="number" step="0.01" {...addForm.register('salvageValue', { setValueAs: (v) => v === '' || v == null || Number.isNaN(Number(v)) ? undefined : Number(v) })} />
+          </div>
+          <Textarea label="Description" {...addForm.register('description')} rows={2} />
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); addForm.reset() }}>Cancel</Button>
-            <Button type="submit" fullWidth>Register Asset</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); addForm.reset({ condition: 'good' }) }} disabled={addMutation.isPending}>Cancel</Button>
+            <Button type="submit" fullWidth loading={addMutation.isPending}>Register Asset</Button>
           </div>
         </form>
       </Modal>
 
       <Modal open={activeAction === 'assign'} onClose={closeAction} title={`Assign ${activeAsset?.name ?? 'Asset'}`} size="md">
-        <form onSubmit={assignForm.handleSubmit(onAssign)} className="space-y-4">
+        <form onSubmit={assignForm.handleSubmit((d) => assignMutation.mutate(d))} className="space-y-4">
           <Select label="Assign To *" {...assignForm.register('assignedTo')} error={assignForm.formState.errors.assignedTo?.message} placeholder="Select user" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
           <Textarea label="Notes" {...assignForm.register('notes')} rows={3} />
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={closeAction}>Cancel</Button>
-            <Button type="submit" fullWidth>Confirm Assignment</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={closeAction} disabled={assignMutation.isPending}>Cancel</Button>
+            <Button type="submit" fullWidth loading={assignMutation.isPending}>Confirm Assignment</Button>
           </div>
         </form>
       </Modal>
 
+      <Modal open={activeAction === 'return'} onClose={closeAction} title={`Return ${activeAsset?.name ?? 'Asset'}`} size="md">
+        <div className="space-y-4">
+          {activeAsset?.assignedTo && (
+            <p className="text-[13px] text-zinc-500">
+              Currently assigned to <span className="font-medium text-zinc-700">{userMap[activeAsset.assignedTo]?.name ?? activeAsset.assignedTo}</span>.
+              Returning closes the open assignment record and frees the asset for reassignment.
+            </p>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="secondary" fullWidth onClick={closeAction} disabled={returnMutation.isPending}>Cancel</Button>
+            <Button type="button" fullWidth loading={returnMutation.isPending} onClick={() => returnMutation.mutate()}>Confirm Return</Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={activeAction === 'transfer'} onClose={closeAction} title={`Transfer ${activeAsset?.name ?? 'Asset'}`} size="md">
-        <form onSubmit={transferForm.handleSubmit(onTransfer)} className="space-y-4">
+        <form onSubmit={transferForm.handleSubmit((d) => transferMutation.mutate(d))} className="space-y-4">
           {activeAsset && (
             <p className="text-[13px] text-zinc-500">
               Currently at <span className="font-medium text-zinc-700">{locationMap[activeAsset.locationId]?.name ?? '—'}</span>
@@ -277,8 +445,31 @@ export function RegistryTab() {
           <Select label="To Location *" {...transferForm.register('locationId')} error={transferForm.formState.errors.locationId?.message} placeholder="Select destination" options={warehouses.filter((w) => w.id !== activeAsset?.locationId).map((w) => ({ value: w.id, label: w.name }))} />
           <Textarea label="Notes" {...transferForm.register('notes')} rows={3} />
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={closeAction}>Cancel</Button>
-            <Button type="submit" fullWidth>Transfer</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={closeAction} disabled={transferMutation.isPending}>Cancel</Button>
+            <Button type="submit" fullWidth loading={transferMutation.isPending}>Transfer</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={activeAction === 'dispose'} onClose={closeAction} title={`Dispose / Retire ${activeAsset?.name ?? 'Asset'}`} size="md">
+        <form onSubmit={disposeForm.handleSubmit((d) => disposeMutation.mutate(d))} className="space-y-4">
+          <p className="text-[13px] text-zinc-500">
+            Submitting moves the asset to <span className="font-medium text-zinc-700">Retiring</span>. The named approver
+            finalizes (or rejects) the disposal — only on approval is the status flipped to Disposed.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="Disposal Type *" {...disposeForm.register('type')} options={DISPOSAL_TYPES} error={disposeForm.formState.errors.type?.message} />
+            <Input label="Disposal Date *" type="date" {...disposeForm.register('disposedDate')} error={disposeForm.formState.errors.disposedDate?.message} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Disposal Amount" type="number" step="0.01" placeholder="e.g. sale proceeds" {...disposeForm.register('amount', { setValueAs: (v) => v === '' || v == null || Number.isNaN(Number(v)) ? undefined : Number(v) })} />
+            <Input label="Disposed To" placeholder="e.g. EcoMetals Recycling" {...disposeForm.register('disposedTo')} />
+          </div>
+          <Select label="Approving Authority *" {...disposeForm.register('approverName')} placeholder="Select approver" options={approverOptions} error={disposeForm.formState.errors.approverName?.message} />
+          <Textarea label="Reason *" {...disposeForm.register('reason')} rows={3} error={disposeForm.formState.errors.reason?.message} placeholder="e.g. Beyond economic repair" />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="secondary" fullWidth onClick={closeAction} disabled={disposeMutation.isPending}>Cancel</Button>
+            <Button type="submit" variant="danger" fullWidth loading={disposeMutation.isPending}>Submit for Approval</Button>
           </div>
         </form>
       </Modal>
@@ -286,11 +477,7 @@ export function RegistryTab() {
       <Modal
         open={activeAction === 'inspection'}
         onClose={closeAction}
-        title={
-          activeAsset
-            ? `Inspection · ${activeAsset.name}`
-            : 'Inspection'
-        }
+        title={activeAsset ? `Inspection · ${activeAsset.name}` : 'Inspection'}
         size="lg"
       >
         {activeAsset && (
@@ -301,11 +488,14 @@ export function RegistryTab() {
                 <> · assigned to {userMap[activeAsset.assignedTo]?.name ?? activeAsset.assignedTo}</>
               )}
             </p>
-            <ChecklistPanel
-              templateId={activeAsset.checklistId}
-              assignedToUserId={activeAsset.assignedTo}
-              readOnly={activeAsset.status === 'disposed'}
-            />
+            <p className="text-[12px] text-zinc-500 mb-3">
+              Open the asset detail drawer ({' '}
+              <button
+                onClick={() => setActiveAction('view')}
+                className="underline hover:text-zinc-900"
+              >Inspections tab</button>
+              ) to record a structured pass/fail check.
+            </p>
           </div>
         )}
       </Modal>
@@ -313,11 +503,7 @@ export function RegistryTab() {
       <Modal
         open={activeAction === 'location'}
         onClose={closeAction}
-        title={
-          activeAsset
-            ? `Location · ${activeAsset.name}`
-            : 'Location'
-        }
+        title={activeAsset ? `Location · ${activeAsset.name}` : 'Location'}
         size="lg"
       >
         {activeAsset && (
@@ -332,18 +518,11 @@ export function RegistryTab() {
         )}
       </Modal>
 
-      <Modal open={activeAction === 'dispose'} onClose={closeAction} title={`Dispose ${activeAsset?.name ?? 'Asset'}`} size="md">
-        <form onSubmit={disposeForm.handleSubmit(onDispose)} className="space-y-4">
-          <p className="text-[13px] text-zinc-500">
-            This marks the asset as disposed. It will be retained in the registry for audit purposes but excluded from active inventory.
-          </p>
-          <Textarea label="Reason *" {...disposeForm.register('reason')} rows={3} error={disposeForm.formState.errors.reason?.message} placeholder="e.g. End of life, irreparable damage, sold" />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={closeAction}>Cancel</Button>
-            <Button type="submit" variant="danger" fullWidth>Confirm Disposal</Button>
-          </div>
-        </form>
-      </Modal>
+      <AssetDetailDrawer
+        open={activeAction === 'view'}
+        asset={activeAsset}
+        onClose={closeAction}
+      />
     </div>
   )
 }

@@ -57,6 +57,7 @@ function buildBreakdown<K extends string>(
 const STATUS_LABEL: Record<AssetStatus, string> = {
   active: 'Active',
   maintenance: 'Maintenance',
+  retiring: 'Retiring',
   disposed: 'Disposed',
 }
 

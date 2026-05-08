@@ -8,3 +8,17 @@ export function useAssets() {
 export function useAssetAssignments() {
   return useQuery({ queryKey: ['assets', 'assignments'], queryFn: assetsApi.listAssignments })
 }
+
+export function useAssetEvents(assetId?: string) {
+  return useQuery({
+    queryKey: ['assets', 'events', assetId ?? 'all'],
+    queryFn: () => assetsApi.listEvents(assetId),
+  })
+}
+
+export function useAssetInspections(assetId?: string) {
+  return useQuery({
+    queryKey: ['assets', 'inspections', assetId ?? 'all'],
+    queryFn: () => assetsApi.listInspections(assetId),
+  })
+}

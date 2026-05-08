@@ -194,11 +194,13 @@ describe('scoreInventoryItems', () => {
 
 const assetFixture = (p: Partial<Asset>): Asset => ({
   id: 'AST-X',
+  assetCode: 'AST-X',
   name: 'Asset',
   serialNumber: 'SN-001',
   categoryId: 'C1',
   locationId: 'L1',
   status: 'active',
+  condition: 'good',
   purchaseDate: '2026-01-01',
   createdAt: '2026-01-01',
   ...p,

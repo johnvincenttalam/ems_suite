@@ -34,7 +34,7 @@ import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { formatCompactCurrency } from '@/shared/utils/format'
-import type { Asset, AssetStatus } from '@/features/assets'
+import type { Asset, AssetCondition } from '@/features/assets'
 import { cn } from '@/shared/utils/cn'
 
 const containerVariants = {
@@ -46,16 +46,20 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.21, 0.47, 0.32, 0.98] as const } },
 }
 
-const STATUS_COLORS: Record<AssetStatus, string> = {
-  active: '#10b981',
-  maintenance: '#f59e0b',
-  disposed: '#71717a',
+const CONDITION_COLORS: Record<AssetCondition, string> = {
+  excellent: '#10b981',
+  good: '#3b82f6',
+  fair: '#f59e0b',
+  poor: '#f97316',
+  out_of_service: '#ef4444',
 }
 
-const STATUS_LABEL: Record<AssetStatus, string> = {
-  active: 'Active',
-  maintenance: 'Maintenance',
-  disposed: 'Disposed',
+const CONDITION_LABEL: Record<AssetCondition, string> = {
+  excellent: 'Excellent',
+  good: 'Good',
+  fair: 'Fair',
+  poor: 'Poor',
+  out_of_service: 'Out of Service',
 }
 
 const tooltipStyle = {
@@ -87,13 +91,21 @@ export function AssetsDashboard() {
     return { total, active, inMaintenance, disposed, openAssignments, totalValue }
   }, [assets, assignments])
 
-  const statusBreakdown = useMemo(() => {
-    const counts = new Map<AssetStatus, number>()
-    for (const a of assets) counts.set(a.status, (counts.get(a.status) ?? 0) + 1)
+  const conditionBreakdown = useMemo(() => {
+    // Disposed assets keep their last-known condition for history but shouldn't
+    // show up on the operational health donut — filter them out.
+    const live = assets.filter((a) => a.status !== 'disposed')
+    const counts = new Map<AssetCondition, number>()
+    for (const a of live) counts.set(a.condition, (counts.get(a.condition) ?? 0) + 1)
     return Array.from(counts.entries())
-      .map(([status, value]) => ({ status, name: STATUS_LABEL[status], value }))
-      .sort((a, b) => b.value - a.value)
+      .map(([condition, value]) => ({ condition, name: CONDITION_LABEL[condition], value }))
+      .sort((a, b) => {
+        const order: AssetCondition[] = ['excellent', 'good', 'fair', 'poor', 'out_of_service']
+        return order.indexOf(a.condition) - order.indexOf(b.condition)
+      })
   }, [assets])
+
+  const conditionTotal = conditionBreakdown.reduce((s, b) => s + b.value, 0)
 
   const byCategory = useMemo(() => {
     const totals = new Map<string, { name: string; count: number; value: number }>()
@@ -257,29 +269,37 @@ export function AssetsDashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>By Status</CardTitle>
+          <CardHeader className="flex-row items-center justify-between flex">
+            <CardTitle>By Condition</CardTitle>
+            <span className="text-[11px] text-zinc-400">{conditionTotal} live</span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div style={{ width: '100%', height: 240 }}>
-              {statusBreakdown.length === 0 ? (
+              {conditionBreakdown.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-[13px] text-zinc-400">No assets</div>
               ) : (
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
-                      data={statusBreakdown}
+                      data={conditionBreakdown}
                       dataKey="value"
                       nameKey="name"
                       innerRadius={50}
                       outerRadius={80}
                       paddingAngle={2}
                     >
-                      {statusBreakdown.map((entry) => (
-                        <Cell key={entry.status} fill={STATUS_COLORS[entry.status]} />
+                      {conditionBreakdown.map((entry) => (
+                        <Cell key={entry.condition} fill={CONDITION_COLORS[entry.condition]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value, name) => {
+                        const n = Number(value)
+                        const pct = conditionTotal === 0 ? 0 : Math.round((n / conditionTotal) * 100)
+                        return [`${n} (${pct}%)`, name]
+                      }}
+                    />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
