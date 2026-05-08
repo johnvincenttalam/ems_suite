@@ -13,6 +13,8 @@ export {
   useAssetInspections,
 } from './hooks/use-assets'
 export { assetsApi } from './api/assets-api'
+export { depreciationSummary, totalBookValue } from './lib/depreciation'
+export type { DepreciationSummary } from './lib/depreciation'
 export {
   mockAssets,
   mockAssetAssignments,

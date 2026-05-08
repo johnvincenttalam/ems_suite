@@ -24,11 +24,14 @@ import { useUsers } from '@/features/users'
 import { useCategories } from '@/features/categories'
 import { useWarehouses } from '@/features/warehouses'
 import { useAuthStore } from '@/features/auth'
+import { useWorkOrders } from '@/features/maintenance'
+import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance'
 import {
   assetsApi,
   useAssetEvents,
   useAssetInspections,
   useAssetAssignments,
+  depreciationSummary,
 } from '@/features/assets'
 import type {
   Asset,
@@ -193,6 +196,8 @@ function OverviewTab({ asset }: { asset: Asset }) {
         </Grid>
       </Section>
 
+      <DepreciationSection asset={asset} />
+
       {asset.disposal && (
         <Section title="Disposal">
           <Grid>
@@ -216,6 +221,45 @@ function OverviewTab({ asset }: { asset: Asset }) {
         </Section>
       )}
     </div>
+  )
+}
+
+function DepreciationSection({ asset }: { asset: Asset }) {
+  const summary = depreciationSummary(asset)
+  if (!summary.schedulable) return null
+
+  const life = asset.usefulLifeMonths ?? 0
+  const remaining = life - summary.monthsElapsed
+  const pct = life === 0 ? 0 : Math.min(100, (summary.monthsElapsed / life) * 100)
+
+  return (
+    <Section title="Depreciation (Straight-line)">
+      <Grid>
+        <Field label="Book Value">{formatCurrency(summary.bookValue)}</Field>
+        <Field label="Depreciation to Date">{formatCurrency(summary.depreciationToDate)}</Field>
+        <Field label="Monthly">{formatCurrency(summary.monthlyDepreciation)}</Field>
+        <Field label="Months Elapsed">
+          {summary.monthsElapsed} / {life}
+          {summary.fullyDepreciated && <span className="ml-1 text-[11px] text-zinc-400">(fully depreciated)</span>}
+        </Field>
+      </Grid>
+      <div className="mt-3">
+        <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all',
+              summary.fullyDepreciated ? 'bg-zinc-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500',
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-zinc-500 mt-1.5">
+          {summary.fullyDepreciated
+            ? 'Fully depreciated — book value held at salvage.'
+            : `${remaining} month${remaining === 1 ? '' : 's'} of useful life remaining`}
+        </p>
+      </div>
+    </Section>
   )
 }
 
@@ -264,47 +308,127 @@ function AssignmentsTab({ asset }: { asset: Asset }) {
 }
 
 function MaintenanceTab({ asset }: { asset: Asset }) {
-  const { data: events = [] } = useAssetEvents(asset.id)
-  const maintenanceEvents = events.filter(
-    (e) => e.type === 'maintenance_started' || e.type === 'maintenance_ended',
+  const { data: workOrders = [] } = useWorkOrders()
+  const { data: users = [] } = useUsers()
+  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+
+  const orders = useMemo(
+    () =>
+      workOrders
+        .filter((wo) => wo.assetId === asset.id)
+        .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate)),
+    [workOrders, asset.id],
   )
 
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/40 p-4 text-[12px] text-zinc-500">
-        <p className="font-medium text-zinc-700 mb-1">Cross-module integration coming next</p>
-        Maintenance scheduling, work orders, and service costs will surface here once
-        the Maintenance module is connected. For now the lifecycle log records when
-        an asset enters or leaves maintenance.
-      </div>
+  const upcoming = orders.filter((wo) => wo.status !== 'completed')
+  const completed = orders.filter((wo) => wo.status === 'completed')
 
-      {maintenanceEvents.length === 0 ? (
-        <EmptyState icon={Wrench} message="No maintenance activity yet" />
-      ) : (
-        <ul className="space-y-2">
-          {maintenanceEvents.map((e) => (
-            <li key={e.id} className="rounded-lg border border-zinc-200 bg-white p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[13px] text-zinc-900">{e.detail}</p>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">
-                    {format(parseISO(e.timestamp), 'MMM d, yyyy · HH:mm')} · {e.actorName}
-                  </p>
-                </div>
-                <span className={cn(
-                  'inline-flex items-center px-2 py-0.5 rounded-md border text-[10.5px] font-medium',
-                  e.type === 'maintenance_started'
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                )}>
-                  {e.type === 'maintenance_started' ? 'Started' : 'Ended'}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
+  if (orders.length === 0) {
+    return <EmptyState icon={Wrench} message="No work orders for this asset yet" />
+  }
+
+  return (
+    <div className="space-y-5">
+      {upcoming.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+            Upcoming · {upcoming.length}
+          </p>
+          <ul className="space-y-2">
+            {upcoming.map((wo) => (
+              <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {completed.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+            Completed · {completed.length}
+          </p>
+          <ul className="space-y-2">
+            {completed.map((wo) => (
+              <WorkOrderRow key={wo.id} order={wo} userMap={userMap} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
+  )
+}
+
+function WorkOrderRow({
+  order,
+  userMap,
+}: {
+  order: WorkOrder
+  userMap: Record<string, { id: string; name: string }>
+}) {
+  const technician = userMap[order.assignedTo]
+  return (
+    <li className="rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-[11px] text-zinc-400">{order.id}</span>
+            <PriorityPill priority={order.priority} />
+            <WorkOrderStatusPill status={order.status} />
+          </div>
+          <p className="text-[13px] font-medium text-zinc-900 mt-1">{order.title}</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {format(parseISO(order.scheduledDate), 'MMM d, yyyy')}
+            {' · '}
+            {technician?.name ?? order.assignedTo}
+            {order.completedDate && <> · completed {format(parseISO(order.completedDate), 'MMM d')}</>}
+          </p>
+          {order.description && (
+            <p className="text-[12px] text-zinc-600 italic mt-1.5">{order.description}</p>
+          )}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+const PRIORITY_STYLES: Record<WorkOrderPriority, string> = {
+  low: 'bg-zinc-100 text-zinc-600 border-zinc-200',
+  medium: 'bg-blue-50 text-blue-700 border-blue-200',
+  high: 'bg-amber-50 text-amber-700 border-amber-200',
+  critical: 'bg-red-50 text-red-700 border-red-200',
+}
+
+const PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+}
+
+function PriorityPill({ priority }: { priority: WorkOrderPriority }) {
+  return (
+    <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10.5px] font-medium', PRIORITY_STYLES[priority])}>
+      {PRIORITY_LABELS[priority]}
+    </span>
+  )
+}
+
+const WORK_ORDER_STATUS_STYLES: Record<WorkOrderStatus, string> = {
+  pending: 'bg-zinc-100 text-zinc-600 border-zinc-200',
+  ongoing: 'bg-blue-50 text-blue-700 border-blue-200',
+  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
+
+const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  pending: 'Pending',
+  ongoing: 'In Progress',
+  completed: 'Completed',
+}
+
+function WorkOrderStatusPill({ status }: { status: WorkOrderStatus }) {
+  return (
+    <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10.5px] font-medium', WORK_ORDER_STATUS_STYLES[status])}>
+      {WORK_ORDER_STATUS_LABELS[status]}
+    </span>
   )
 }
 

@@ -23,8 +23,9 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
-import { useAssets, useAssetAssignments } from '@/features/assets'
+import { format, formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
+import { useAssets, useAssetAssignments, totalBookValue } from '@/features/assets'
+import { useWorkOrders } from '@/features/maintenance'
 import { useCategories } from '@/features/categories'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
@@ -76,6 +77,7 @@ export function AssetsDashboard() {
   const { data: categories = [] } = useCategories()
   const { data: users = [] } = useUsers()
   const { data: auditEntries = [] } = useAuditLog()
+  const { data: workOrders = [] } = useWorkOrders()
   const { notifications, unreadCount } = useNotifications()
   const navigate = useNavigate()
 
@@ -85,10 +87,11 @@ export function AssetsDashboard() {
     const inMaintenance = assets.filter((a) => a.status === 'maintenance').length
     const disposed = assets.filter((a) => a.status === 'disposed').length
     const openAssignments = assignments.filter((a) => !a.returnedDate).length
-    const totalValue = assets
+    const purchaseValue = assets
       .filter((a) => a.status !== 'disposed')
       .reduce((s, a) => s + (a.purchaseCost ?? 0), 0)
-    return { total, active, inMaintenance, disposed, openAssignments, totalValue }
+    const bookValue = totalBookValue(assets)
+    return { total, active, inMaintenance, disposed, openAssignments, purchaseValue, bookValue }
   }, [assets, assignments])
 
   const conditionBreakdown = useMemo(() => {
@@ -127,6 +130,20 @@ export function AssetsDashboard() {
   const inMaintenance = useMemo(() => {
     return assets.filter((a) => a.status === 'maintenance').slice(0, 5)
   }, [assets])
+
+  const maintenanceDue = useMemo(() => {
+    const today = new Date()
+    return workOrders
+      .filter((wo) => wo.status !== 'completed')
+      .map((wo) => ({
+        wo,
+        asset: assets.find((a) => a.id === wo.assetId),
+        days: differenceInCalendarDays(parseISO(wo.scheduledDate), today),
+      }))
+      .filter((row) => !!row.asset)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 5)
+  }, [workOrders, assets])
 
   const openCheckouts = useMemo(() => {
     const today = new Date()
@@ -230,9 +247,9 @@ export function AssetsDashboard() {
           index={2}
         />
         <StatCard
-          title="Active Value"
-          value={formatCompactCurrency(stats.totalValue)}
-          subtitle={stats.disposed > 0 ? `${stats.disposed} disposed` : 'Excluding disposed'}
+          title="Book Value"
+          value={formatCompactCurrency(stats.bookValue)}
+          subtitle={`Cost ${formatCompactCurrency(stats.purchaseValue)} · straight-line`}
           icon={Tag}
           iconBg="bg-violet-50"
           iconColor="text-violet-600"
@@ -305,6 +322,74 @@ export function AssetsDashboard() {
                 </ResponsiveContainer>
               )}
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between flex">
+            <CardTitle>Maintenance Due</CardTitle>
+            <Link to="/module/maintenance" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
+              Open Maintenance
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {maintenanceDue.length === 0 ? (
+              <div className="px-6 py-10 text-center">
+                <Wrench className="w-6 h-6 text-zinc-300 mx-auto mb-2" />
+                <p className="text-[13px] text-zinc-500">No upcoming work orders</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-50/50">
+                    <th className="px-6 py-2.5 text-left text-[10.5px] font-medium text-zinc-400 uppercase tracking-wider">Asset</th>
+                    <th className="px-6 py-2.5 text-left text-[10.5px] font-medium text-zinc-400 uppercase tracking-wider">Title</th>
+                    <th className="px-6 py-2.5 text-left text-[10.5px] font-medium text-zinc-400 uppercase tracking-wider">Due</th>
+                    <th className="px-6 py-2.5 text-left text-[10.5px] font-medium text-zinc-400 uppercase tracking-wider">Priority</th>
+                    <th className="px-6 py-2.5 text-left text-[10.5px] font-medium text-zinc-400 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintenanceDue.map(({ wo, asset: a, days }) => (
+                    <tr key={wo.id} className="border-t border-zinc-100/60">
+                      <td className="px-6 py-3 text-[13px] text-zinc-700">
+                        {a?.name ?? wo.assetId}
+                        <span className="block text-[10.5px] text-zinc-400 font-mono">{a?.assetCode ?? '—'}</span>
+                      </td>
+                      <td className="px-6 py-3 text-[12px] text-zinc-600">{wo.title}</td>
+                      <td className="px-6 py-3 text-[12px] text-zinc-600 whitespace-nowrap">
+                        {format(parseISO(wo.scheduledDate), 'MMM d, yyyy')}
+                        {days < 0 && <span className="block text-[10.5px] text-red-600">Overdue {Math.abs(days)}d</span>}
+                        {days >= 0 && days <= 7 && <span className="block text-[10.5px] text-amber-600">In {days}d</span>}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={cn(
+                          'inline-flex items-center px-2 py-0.5 rounded-md border text-[10.5px] font-medium',
+                          wo.priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
+                          wo.priority === 'high' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          wo.priority === 'medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-zinc-100 text-zinc-600 border-zinc-200',
+                        )}>
+                          {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={cn(
+                          'inline-flex items-center px-2 py-0.5 rounded-md border text-[10.5px] font-medium',
+                          wo.status === 'ongoing' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-zinc-100 text-zinc-600 border-zinc-200',
+                        )}>
+                          {wo.status === 'ongoing' ? 'In Progress' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </CardContent>
         </Card>
       </motion.div>

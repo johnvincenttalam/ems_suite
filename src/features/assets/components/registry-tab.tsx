@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useAssets, assetsApi } from '@/features/assets'
+import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import type { Asset, AssetStatus, AssetCondition, DisposalType } from '@/features/assets/types'
 import { useCategories } from '@/features/categories'
 import { useWarehouses } from '@/features/warehouses'
@@ -103,6 +104,7 @@ export function RegistryTab() {
   const { data: warehouses = [] } = useWarehouses()
   const { data: users = [] } = useUsers()
   const currentUser = useAuthStore((s) => s.user)
+  const settings = useAssetsSettings((s) => s.settings)
   const queryClient = useQueryClient()
 
   const categoryMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
@@ -129,7 +131,11 @@ export function RegistryTab() {
 
   const addForm = useForm<AssetForm>({
     resolver: zodResolver(assetSchema),
-    defaultValues: { condition: 'good' },
+    defaultValues: {
+      condition: 'good',
+      locationId: settings.defaultLocationId || undefined,
+      usefulLifeMonths: settings.defaultDepreciationMonths,
+    },
   })
   const assignForm = useForm<AssignForm>({ resolver: zodResolver(assignSchema) })
   const transferForm = useForm<TransferForm>({ resolver: zodResolver(transferSchema) })
@@ -154,7 +160,11 @@ export function RegistryTab() {
     onSuccess: (asset) => {
       toast.success(`Registered ${asset.name}`)
       setShowAdd(false)
-      addForm.reset({ condition: 'good' })
+      addForm.reset({
+        condition: 'good',
+        locationId: settings.defaultLocationId || undefined,
+        usefulLifeMonths: settings.defaultDepreciationMonths,
+      })
       invalidate()
     },
     onError: (err) => toast.error('Register failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
@@ -374,7 +384,7 @@ export function RegistryTab() {
         <DataTablePagination table={table} />
       </div>
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); addForm.reset({ condition: 'good' }) }} title="Register Asset" size="lg">
+      <Modal open={showAdd} onClose={() => { setShowAdd(false); addForm.reset({ condition: 'good', locationId: settings.defaultLocationId || undefined, usefulLifeMonths: settings.defaultDepreciationMonths }) }} title="Register Asset" size="lg">
         <form onSubmit={addForm.handleSubmit((d) => addMutation.mutate(d))} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Name *" {...addForm.register('name')} error={addForm.formState.errors.name?.message} />
@@ -403,7 +413,7 @@ export function RegistryTab() {
           </div>
           <Textarea label="Description" {...addForm.register('description')} rows={2} />
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); addForm.reset({ condition: 'good' }) }} disabled={addMutation.isPending}>Cancel</Button>
+            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); addForm.reset({ condition: 'good', locationId: settings.defaultLocationId || undefined, usefulLifeMonths: settings.defaultDepreciationMonths }) }} disabled={addMutation.isPending}>Cancel</Button>
             <Button type="submit" fullWidth loading={addMutation.isPending}>Register Asset</Button>
           </div>
         </form>

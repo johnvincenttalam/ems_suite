@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Bell, Tag, UserCheck, RotateCcw } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Tag, UserCheck, RotateCcw, Sliders } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Toggle } from '@/shared/ui/toggle'
 import { Input } from '@/shared/ui/input'
+import { Select } from '@/shared/ui/select'
 import { Button } from '@/shared/ui/button'
 import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
+import { useWarehouses } from '@/features/warehouses'
 
 const tabs = [
   { label: 'General', value: 'general', icon: SettingsIcon },
-  { label: 'Lifecycle', value: 'lifecycle', icon: Tag },
+  { label: 'Depreciation', value: 'depreciation', icon: Tag },
+  { label: 'Approval Rules', value: 'approvals', icon: Sliders },
   { label: 'Assignments', value: 'assignments', icon: UserCheck },
   { label: 'Notifications', value: 'notifications', icon: Bell },
 ] as const
@@ -20,13 +23,19 @@ type TabKey = (typeof tabs)[number]['value']
 
 export function AssetsSettingsPage() {
   const { settings, update, updateNotify, reset } = useAssetsSettings()
+  const { data: warehouses = [] } = useWarehouses()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
+
+  const locationOptions = [
+    { value: '', label: 'No default — pick on Add' },
+    ...warehouses.map((w) => ({ value: w.id, label: w.name })),
+  ]
 
   return (
     <div>
       <PageHeader
         title="Assets Settings"
-        subtitle="Configure asset lifecycle, assignment rules, and alert behavior"
+        subtitle="Configure asset lifecycle, approval, and alert behavior"
         actions={
           <Button
             variant="outline"
@@ -62,39 +71,87 @@ export function AssetsSettingsPage() {
           {activeTab === 'general' && (
             <Card>
               <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Defaults</h3>
-                <div className="flex items-center justify-between py-3 border-b border-zinc-100/60">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700">Require serial number on create</p>
-                    <p className="text-xs text-zinc-400">New assets must have a serial number for traceability</p>
-                  </div>
-                  <Toggle
-                    checked={settings.requireSerialOnCreate}
-                    onChange={(v) => update({ requireSerialOnCreate: v })}
+                <h3 className="text-sm font-semibold text-zinc-900">Operational Defaults</h3>
+                <div>
+                  <Select
+                    label="Default Location"
+                    value={settings.defaultLocationId}
+                    onChange={(e) => update({ defaultLocationId: e.target.value })}
+                    options={locationOptions}
                   />
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Pre-selected on the Add Asset form. Users can still override per record.
+                  </p>
                 </div>
-                <p className="text-[12px] text-zinc-400 pt-2">
-                  Asset categories and locations are managed under their respective master-data menus in the Inventory module.
+                <SettingRow
+                  title="Require serial number on create"
+                  desc="New assets must have a serial number for traceability."
+                  checked={settings.requireSerialOnCreate}
+                  onChange={(v) => update({ requireSerialOnCreate: v })}
+                  last
+                />
+                <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
+                  Asset categories and warehouses are managed at the module level under
+                  Categories and Locations.
                 </p>
               </CardContent>
             </Card>
           )}
 
-          {activeTab === 'lifecycle' && (
+          {activeTab === 'depreciation' && (
             <Card>
               <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Depreciation</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Depreciation Defaults</h3>
                 <Input
-                  label="Default depreciation period (years)"
+                  label="Default useful life (months)"
                   type="number"
                   min={1}
-                  max={50}
-                  value={settings.defaultDepreciationYears}
+                  max={600}
+                  value={settings.defaultDepreciationMonths}
                   onChange={(e) =>
-                    update({ defaultDepreciationYears: Math.max(1, Math.min(50, Number(e.target.value) || 5)) })
+                    update({ defaultDepreciationMonths: clamp(Number(e.target.value), 1, 600, 60) })
                   }
-                  helperText="Used to calculate book value over time. Per-category overrides will arrive in a future release."
+                  helperText="Pre-fills the Useful Life field on the Add Asset form. Default 60 months (5 years)."
                 />
+                <Input
+                  label="Default salvage value (% of cost)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.defaultSalvagePercent}
+                  onChange={(e) =>
+                    update({ defaultSalvagePercent: clamp(Number(e.target.value), 0, 100, 10) })
+                  }
+                  helperText="Used to suggest a salvage value when one isn't entered. Set 0% to disable."
+                />
+                <p className="text-[12px] text-zinc-400 pt-2 border-t border-zinc-100/60">
+                  Straight-line depreciation only. Per-category overrides will arrive in a future release.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'approvals' && (
+            <Card>
+              <CardContent className="space-y-1 p-6">
+                <h3 className="text-sm font-semibold text-zinc-900 mb-2">Approval Rules</h3>
+                <SettingRow
+                  title="Require approval for disposal"
+                  desc="Disposals submit a pending request the named approver finalizes. Strongly recommended for audit trails."
+                  checked={settings.requireApprovalForDisposal}
+                  onChange={(v) => update({ requireApprovalForDisposal: v })}
+                />
+                <SettingRow
+                  title="Require approval for transfer"
+                  desc="Inter-location transfers go through the same pending → approve flow as disposals."
+                  checked={settings.requireApprovalForTransfer}
+                  onChange={(v) => update({ requireApprovalForTransfer: v })}
+                  last
+                />
+                <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">
+                  Disposals always require an approver to be named on submission, regardless of this toggle —
+                  off means the approver is just the operator themselves.
+                </p>
               </CardContent>
             </Card>
           )}
@@ -110,45 +167,50 @@ export function AssetsSettingsPage() {
                   max={365}
                   value={settings.longCheckoutDays}
                   onChange={(e) =>
-                    update({ longCheckoutDays: Math.max(7, Math.min(365, Number(e.target.value) || 30)) })
+                    update({ longCheckoutDays: clamp(Number(e.target.value), 7, 365, 30) })
                   }
-                  helperText="Open assignments older than this trigger a long-checkout alert"
+                  helperText="Open assignments older than this trigger a long-checkout alert."
                 />
-                <div className="flex items-center justify-between py-3 border-t border-zinc-100/60">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700">Require notes on return</p>
-                    <p className="text-xs text-zinc-400">Custodians must enter notes (condition, location) when returning an asset</p>
-                  </div>
-                  <Toggle
-                    checked={settings.requireReturnNotes}
-                    onChange={(v) => update({ requireReturnNotes: v })}
-                  />
-                </div>
+                <Input
+                  label="Warranty expiring window (days)"
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={settings.warrantyExpiringDays}
+                  onChange={(e) =>
+                    update({ warrantyExpiringDays: clamp(Number(e.target.value), 7, 365, 60) })
+                  }
+                  helperText="Assets within this many days of warranty expiry are flagged in alerts."
+                />
+                <SettingRow
+                  title="Require notes on return"
+                  desc="Custodians must enter notes (condition, location) when returning an asset."
+                  checked={settings.requireReturnNotes}
+                  onChange={(v) => update({ requireReturnNotes: v })}
+                  last
+                />
               </CardContent>
             </Card>
           )}
 
           {activeTab === 'notifications' && (
             <Card>
-              <CardContent className="space-y-6 p-6">
-                <h3 className="text-sm font-semibold text-zinc-900">Asset Alerts</h3>
+              <CardContent className="space-y-1 p-6">
+                <h3 className="text-sm font-semibold text-zinc-900 mb-2">Asset Alerts</h3>
                 {[
-                  { key: 'inMaintenance' as const, label: 'In maintenance', desc: 'When an asset is set to maintenance status' },
-                  { key: 'longCheckout' as const, label: 'Long-running checkout', desc: 'When an open assignment exceeds the long-checkout threshold' },
-                ].map((item) => (
-                  <div
+                  { key: 'inMaintenance' as const, label: 'In maintenance', desc: 'When an asset is set to maintenance status.' },
+                  { key: 'longCheckout' as const, label: 'Long-running checkout', desc: 'When an open assignment exceeds the long-checkout threshold.' },
+                  { key: 'warrantyExpiring' as const, label: 'Warranty expiring', desc: 'When an asset is within the warranty-expiring window.' },
+                  { key: 'inspectionFailed' as const, label: 'Inspection failed', desc: 'When a submitted inspection has any failed line item.' },
+                ].map((item, i, arr) => (
+                  <SettingRow
                     key={item.key}
-                    className="flex items-center justify-between py-3 border-b border-zinc-100/60 last:border-0"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-zinc-700">{item.label}</p>
-                      <p className="text-xs text-zinc-400">{item.desc}</p>
-                    </div>
-                    <Toggle
-                      checked={settings.notify[item.key]}
-                      onChange={(v) => updateNotify({ [item.key]: v })}
-                    />
-                  </div>
+                    title={item.label}
+                    desc={item.desc}
+                    checked={settings.notify[item.key]}
+                    onChange={(v) => updateNotify({ [item.key]: v })}
+                    last={i === arr.length - 1}
+                  />
                 ))}
                 <p className="text-[12px] text-zinc-400 pt-2">
                   These preferences control whether the bell icon and Alerts page surface each kind of event.
@@ -158,6 +220,31 @@ export function AssetsSettingsPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function clamp(v: number, lo: number, hi: number, fallback: number): number {
+  if (!Number.isFinite(v)) return fallback
+  return Math.max(lo, Math.min(hi, v))
+}
+
+interface SettingRowProps {
+  title: string
+  desc: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  last?: boolean
+}
+
+function SettingRow({ title, desc, checked, onChange, last }: SettingRowProps) {
+  return (
+    <div className={cn('flex items-center justify-between py-3 gap-4', !last && 'border-b border-zinc-100/60')}>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-zinc-700">{title}</p>
+        <p className="text-xs text-zinc-400 mt-0.5">{desc}</p>
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
     </div>
   )
 }
