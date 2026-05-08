@@ -1,5 +1,8 @@
 export { RegistryPage } from './pages/registry-page'
 export { AssignmentsPage } from './pages/assignments-page'
+export { AssetsMaintenancePage } from './pages/assets-maintenance-page'
+export { AssetInspectionsPage } from './pages/asset-inspections-page'
+export { AssetDisposalPage } from './pages/asset-disposal-page'
 export { AssetsDashboard } from './pages/assets-dashboard'
 export { AssetsAlertsPage } from './pages/assets-alerts-page'
 export { AssetsLogsPage } from './pages/assets-logs-page'

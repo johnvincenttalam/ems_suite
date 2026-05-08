@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Bell,
   Workflow,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureKey } from './features'
@@ -199,6 +200,9 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Registry', path: 'registry', icon: Package, feature: 'assets' },
           { label: 'Assignments', path: 'assignments', icon: UserCheck, feature: 'assetAssignments' },
+          { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'assetMaintenance' },
+          { label: 'Inspections', path: 'inspections', icon: ClipboardCheck, feature: 'assetInspections' },
+          { label: 'Disposal', path: 'disposal', icon: Trash2, feature: 'assetDisposal' },
         ],
       },
       {

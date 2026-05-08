@@ -9,6 +9,7 @@ export { MaintenanceSettingsPage } from './pages/maintenance-settings-page'
 export { MaintenanceReportsPage } from './pages/maintenance-reports-page'
 export { useWorkOrders } from './hooks/use-maintenance'
 export { maintenanceApi } from './api/maintenance-api'
+export { WorkOrdersTab } from './components/work-orders-tab'
 
 export { mockWorkOrders } from './data/mock-maintenance'
 export type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from './types'
