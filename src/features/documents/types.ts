@@ -158,6 +158,11 @@ export interface AppDocument {
   assetUrl?: string
   /** Predefined signature placement regions on the document. */
   signatureSlots?: SignatureSlot[]
+  /** Plain-text body extracted from the source file. Powers Smart Search:
+   * the search adapter tokenizes this against the user's query and produces
+   * snippets from the best-matching window. Optional because legacy seed
+   * data and uploaded-but-not-yet-processed documents may lack it. */
+  bodyText?: string
 }
 
 export function isFinalized(doc: AppDocument): boolean {

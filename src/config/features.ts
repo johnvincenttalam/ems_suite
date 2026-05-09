@@ -59,6 +59,7 @@ export const features = {
   sdmsDocumentViewer: true,
   sdmsWorkflowTemplates: true,
   sdmsStorage: true,
+  sdmsSmartSearch: true,
   fleet: true,
   fleetTrips: true,
   fleetFuelLogs: true,

@@ -69,6 +69,7 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   sdmsDocumentViewer:  () => import('@/features/documents'),
   sdmsWorkflowTemplates:() => import('@/features/documents'),
   sdmsStorage:         () => import('@/features/documents'),
+  sdmsSmartSearch:     () => import('@/features/documents'),
   fleet:            () => import('@/features/fleet'),
   fleetTrips:       () => import('@/features/fleet'),
   fleetFuelLogs:    () => import('@/features/fleet'),

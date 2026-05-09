@@ -70,6 +70,7 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   sdmsDocumentViewer:  lazy(() => featureImports.sdmsDocumentViewer().then((m: any) => ({ default: m.SdmsDocumentViewerPage }))),
   sdmsWorkflowTemplates:lazy(() => featureImports.sdmsWorkflowTemplates().then((m: any) => ({ default: m.SdmsWorkflowTemplatesPage }))),
   sdmsStorage:         lazy(() => featureImports.sdmsStorage().then((m: any) => ({ default: m.SdmsStoragePage }))),
+  sdmsSmartSearch:     lazy(() => featureImports.sdmsSmartSearch().then((m: any) => ({ default: m.SdmsSmartSearchPage }))),
   fleet:               lazy(() => featureImports.fleet().then((m: any) => ({ default: m.VehiclesPage }))),
   fleetTrips:          lazy(() => featureImports.fleetTrips().then((m: any) => ({ default: m.TripsPage }))),
   fleetFuelLogs:       lazy(() => featureImports.fleetFuelLogs().then((m: any) => ({ default: m.FuelLogsPage }))),
