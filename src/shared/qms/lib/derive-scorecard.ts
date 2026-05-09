@@ -4,6 +4,7 @@ import type { RequestWithItems } from '@/features/procurement'
 import type { AppDocument } from '@/features/documents'
 import type { InventoryItem } from '@/features/inventory'
 import type { Vehicle } from '@/features/fleet'
+import type { Issue } from '@/features/issues'
 
 export type KpiModule = 'maintenance' | 'procurement' | 'sdms' | 'inventory' | 'fleet'
 export type KpiStatus = 'pass' | 'warn' | 'fail'
@@ -51,6 +52,7 @@ interface ScorecardInputs {
   documents: AppDocument[]
   items: InventoryItem[]
   vehicles: Vehicle[]
+  issues: Issue[]
   now?: Date
 }
 
@@ -65,6 +67,7 @@ export function deriveQualityScorecard({
   documents,
   items,
   vehicles,
+  issues,
   now = new Date(),
 }: ScorecardInputs): QualityScorecard {
   const kpis: ScorecardKpi[] = []
@@ -208,6 +211,25 @@ export function deriveQualityScorecard({
     target: 90,
     comparator: 'gte',
     status: statusOf(inServiceRate, 90, 'gte'),
+  })
+
+  const openCriticalFleetIssues = issues.filter(
+    (i) =>
+      i.target.kind === 'vehicle' &&
+      i.severity === 'critical' &&
+      (i.status === 'open' || i.status === 'monitor' || i.status === 'in_progress'),
+  ).length
+  kpis.push({
+    id: 'fleet-critical-issues',
+    module: 'fleet',
+    label: 'Open Critical Issues',
+    value: openCriticalFleetIssues,
+    unit: '',
+    target: 0,
+    comparator: 'lte',
+    // Special-cased: the lte-with-10%-warn band collapses to 0 when target is 0,
+    // so 1+ would always read as 'fail'. Treat 1 as 'warn' and 2+ as 'fail'.
+    status: openCriticalFleetIssues === 0 ? 'pass' : openCriticalFleetIssues === 1 ? 'warn' : 'fail',
   })
 
   const breakdown = kpis.reduce(

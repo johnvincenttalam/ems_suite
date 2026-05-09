@@ -9,6 +9,10 @@ import type {
 } from '@/features/issues/types'
 import { mockIssues } from '@/features/issues/data/mock-issues'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
+import { mockVehicles } from '@/features/fleet/data/mock-fleet'
+import { maintenanceApi } from '@/features/maintenance/api/maintenance-api'
+import type { WorkOrder } from '@/features/maintenance/types'
+import { severityToWorkOrderPriority } from '@/features/issues/lib/derive-priority'
 // import { http } from '@/shared/lib/http'
 
 const delay = (ms?: number) =>
@@ -212,4 +216,89 @@ export const issuesApi = {
     issue.updatedAt = comment.createdAt
     return issue
   },
+
+  findByWorkOrderId: async (workOrderId: string): Promise<Issue | null> => {
+    await delay(80)
+    return mockIssues.find((i) => i.workOrderId === workOrderId) ?? null
+  },
+
+  /**
+   * Escalate an issue into a maintenance work order.
+   *
+   * Resolves the asset to attach the WO to:
+   *   - asset target  → `target.id`
+   *   - vehicle target → vehicle.linkedAssetId (throws if absent)
+   *
+   * Side-effects (atomic from the caller's view; errors roll back nothing
+   * because the only persistent step is the WO create — failures earlier
+   * throw before that):
+   *   1. validate issue + resolve asset
+   *   2. maintenanceApi.create with severity → priority mapping
+   *   3. stamp Issue.workOrderId, transition to 'in_progress' if open/monitor
+   *   4. emit one audit entry under "Issues"
+   */
+  createWorkOrder: async (params: {
+    issueId: string
+    scheduledDate: string
+    assigneeUserId: string
+    actorUserId: string
+  }): Promise<{ issue: Issue; workOrder: WorkOrder }> => {
+    const issue = mockIssues.find((i) => i.id === params.issueId)
+    if (!issue) throw new IssueValidationError(`Issue ${params.issueId} not found`)
+    if (issue.status === 'resolved' || issue.status === 'closed') {
+      throw new IssueValidationError(`Cannot escalate a ${issue.status} issue`)
+    }
+    if (issue.workOrderId) {
+      throw new IssueValidationError(`Issue is already linked to ${issue.workOrderId}`)
+    }
+    if (!params.scheduledDate) throw new IssueValidationError('Scheduled date is required')
+    if (!params.assigneeUserId) throw new IssueValidationError('Technician assignment is required')
+
+    const assetId = resolveAssetId(issue.target)
+    if (!assetId) {
+      throw new IssueValidationError(
+        'This vehicle is not linked to an asset — link it first to escalate to maintenance.',
+      )
+    }
+
+    const wo = await maintenanceApi.create({
+      title: `Issue ${issue.id}: ${issue.title}`,
+      description: issue.description
+        ? `${issue.description}\n\nEscalated from issue ${issue.id}.`
+        : `Escalated from issue ${issue.id}.`,
+      assetId,
+      assignedTo: params.assigneeUserId,
+      priority: severityToWorkOrderPriority(issue.severity),
+      scheduledDate: params.scheduledDate,
+      sourceIssueId: issue.id,
+      createdBy: params.actorUserId,
+    })
+
+    const now = new Date().toISOString()
+    issue.workOrderId = wo.id
+    if (issue.status === 'open' || issue.status === 'monitor') {
+      issue.status = 'in_progress'
+    }
+    issue.updatedAt = now
+
+    recordAudit({
+      userId: params.actorUserId,
+      action: 'create',
+      module: 'Issues',
+      detail: `Escalated ${issue.id} to work order ${wo.id} on asset ${assetId}`,
+    })
+
+    return { issue, workOrder: wo }
+  },
+}
+
+/**
+ * Resolve the maintenance-target asset for an issue. Asset targets pass
+ * through directly; vehicle targets dereference `linkedAssetId`. Returns
+ * null when a vehicle lacks the link — callers turn that into a UX error.
+ */
+function resolveAssetId(target: IssueTarget): string | null {
+  if (target.kind === 'asset') return target.id
+  const vehicle = mockVehicles.find((v) => v.id === target.id)
+  return vehicle?.linkedAssetId ?? null
 }

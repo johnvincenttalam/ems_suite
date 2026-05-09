@@ -28,6 +28,9 @@ export interface WorkOrder {
   cancelledBy?: string
   cancelledReason?: string
   checklistId?: string
+  /** Set when this WO was created by escalating an Issue. Lets the maintenance
+   * UI prompt "Resolve linked issue?" on completion without scanning issues. */
+  sourceIssueId?: string
   createdAt: string
   /** User ID of the creator. */
   createdBy: string

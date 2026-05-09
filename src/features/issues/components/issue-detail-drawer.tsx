@@ -9,12 +9,12 @@ import {
   AlertTriangle,
   ClipboardList,
   MessageSquare,
-  ArrowRight,
   Send,
   CheckCircle2,
   Eye,
   Loader2,
   Archive,
+  Wrench,
 } from 'lucide-react'
 import { useUsers } from '@/features/users'
 import { useVehicles } from '@/features/fleet'
@@ -34,6 +34,8 @@ import {
   formatIssueTarget,
   targetModulePath,
 } from '@/features/issues/lib/format-target'
+import { CreateWorkOrderFromIssueModal } from '@/features/issues/components/create-wo-from-issue-modal'
+import { cn } from '@/shared/utils/cn'
 
 interface IssueDetailDrawerProps {
   open: boolean
@@ -52,12 +54,14 @@ export function IssueDetailDrawer({ open, issue, onClose }: IssueDetailDrawerPro
   const [commentBody, setCommentBody] = useState('')
   const [resolving, setResolving] = useState(false)
   const [resolutionNotes, setResolutionNotes] = useState('')
+  const [escalating, setEscalating] = useState(false)
 
   useEffect(() => {
     if (!open) {
       setCommentBody('')
       setResolving(false)
       setResolutionNotes('')
+      setEscalating(false)
     }
   }, [open, issue?.id])
 
@@ -205,6 +209,20 @@ export function IssueDetailDrawer({ open, issue, onClose }: IssueDetailDrawerPro
                 </Section>
               )}
 
+              {issue.workOrderId && (
+                <Section title="Linked Work Order">
+                  <Link
+                    to={`/module/maintenance/work-orders?wo=${issue.workOrderId}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50/40 border border-blue-200/60 hover:border-blue-300 transition-colors"
+                  >
+                    <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="font-mono text-[12px] text-blue-700">{issue.workOrderId}</span>
+                    <span className="text-[11.5px] text-zinc-500 ml-1">Open in Maintenance</span>
+                    <ExternalLink className="w-3 h-3 text-zinc-400 ml-auto" />
+                  </Link>
+                </Section>
+              )}
+
               {(issue.status === 'resolved' || issue.status === 'closed') && (
                 <Section title="Resolution">
                   <div className="rounded-lg bg-emerald-50/40 border border-emerald-200/60 px-4 py-3 space-y-1">
@@ -284,9 +302,16 @@ export function IssueDetailDrawer({ open, issue, onClose }: IssueDetailDrawerPro
               setResolutionNotes={setResolutionNotes}
               onChangeStatus={onChangeStatus}
               onResolve={onResolve}
+              onEscalate={() => setEscalating(true)}
               pending={setStatus.isPending}
             />
           </motion.aside>
+
+          <CreateWorkOrderFromIssueModal
+            open={escalating}
+            issue={issue}
+            onClose={() => setEscalating(false)}
+          />
         </div>
       )}
     </AnimatePresence>
@@ -321,6 +346,7 @@ interface StatusActionBarProps {
   setResolutionNotes: (v: string) => void
   onChangeStatus: (next: IssueStatus) => void
   onResolve: () => void
+  onEscalate: () => void
   pending: boolean
 }
 
@@ -332,6 +358,7 @@ function StatusActionBar({
   setResolutionNotes,
   onChangeStatus,
   onResolve,
+  onEscalate,
   pending,
 }: StatusActionBarProps) {
   if (issue.status === 'closed') return null
@@ -424,10 +451,31 @@ function StatusActionBar({
         </Button>
       )}
 
-      <span className="text-[11px] text-zinc-400 inline-flex items-center gap-1 ml-auto">
-        Phase 2: Create work order
-        <ArrowRight className="w-3 h-3" />
-      </span>
+      {(issue.status === 'open' || issue.status === 'in_progress' || issue.status === 'monitor') &&
+        !issue.workOrderId && (
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<Wrench className="w-3.5 h-3.5" />}
+            onClick={onEscalate}
+            disabled={pending}
+            className="ml-auto"
+          >
+            Create Work Order
+          </Button>
+        )}
+
+      {issue.workOrderId && (
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 ml-auto px-2 py-0.5 rounded-md',
+            'bg-blue-50 text-blue-700 text-[11px] font-medium',
+          )}
+        >
+          <Wrench className="w-3 h-3" />
+          Linked to {issue.workOrderId}
+        </span>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle } from 'lucide-react'
+import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle, AlertCircle } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { ChecklistPanel } from '@/shared/checklists'
 import { useSearchParams } from 'react-router-dom'
@@ -16,6 +16,7 @@ import { useWorkOrders, maintenanceApi } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
+import { issuesApi } from '@/features/issues'
 import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
@@ -108,11 +109,43 @@ export function WorkOrdersTab() {
       if (!currentUser) throw new Error('Not signed in')
       return maintenanceApi.complete(wo.id, currentUser.id, notes)
     },
-    onSuccess: (wo) => {
-      toast.success(`Completed ${wo.id}`)
+    onSuccess: (wo, vars) => {
       setCompletingWO(null)
       setCompletionNotes('')
       invalidate()
+
+      if (wo.sourceIssueId && currentUser) {
+        const issueId = wo.sourceIssueId
+        const notes = vars.notes?.trim() || `Resolved via work order ${wo.id}`
+        toast.success(`Completed ${wo.id}`, {
+          description: `Linked issue ${issueId} is open — close it out?`,
+          action: {
+            label: 'Resolve issue',
+            onClick: async () => {
+              try {
+                await issuesApi.setStatus({
+                  id: issueId,
+                  status: 'resolved',
+                  actorUserId: currentUser.id,
+                  resolutionNotes: notes,
+                })
+                queryClient.invalidateQueries({ queryKey: ['issues'] })
+                queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+                toast.success(`Issue ${issueId} resolved`)
+              } catch (e) {
+                toast.error('Resolve failed', {
+                  description:
+                    e instanceof Error
+                      ? `${e.message}. Open the issue to resolve manually.`
+                      : 'Open the issue to resolve manually.',
+                })
+              }
+            },
+          },
+        })
+      } else {
+        toast.success(`Completed ${wo.id}`)
+      }
     },
     onError: (err) => toast.error('Complete failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
   })
@@ -157,7 +190,15 @@ export function WorkOrdersTab() {
     { accessorKey: 'id', header: 'Order', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-700">{getValue() as string}</span> },
     { accessorKey: 'title', header: 'Title', cell: ({ row }) => (
       <div>
-        <p className="font-medium text-zinc-900">{row.original.title}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium text-zinc-900">{row.original.title}</p>
+          {row.original.sourceIssueId && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 text-[10.5px] font-medium">
+              <AlertCircle className="w-2.5 h-2.5" />
+              {row.original.sourceIssueId}
+            </span>
+          )}
+        </div>
         {row.original.description && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{row.original.description}</p>}
       </div>
     )},

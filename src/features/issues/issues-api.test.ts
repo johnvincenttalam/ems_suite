@@ -303,6 +303,164 @@ describe('issuesApi.addComment', () => {
   })
 })
 
+describe('issuesApi.createWorkOrder', () => {
+  it('escalates an asset-targeted issue and stamps the workOrderId + transitions to in_progress', async () => {
+    const issue = await issuesApi.create({
+      title: 'Escalation test (asset)',
+      severity: 'major',
+      source: 'manual',
+      target: { kind: 'asset', id: 'AST-008' },
+      reportedByUserId: ACTOR,
+    })
+    const auditBefore = mockAuditLog.length
+
+    const { issue: updated, workOrder } = await issuesApi.createWorkOrder({
+      issueId: issue.id,
+      scheduledDate: '2026-06-01',
+      assigneeUserId: 'U006',
+      actorUserId: ACTOR,
+    })
+    expect(workOrder.id).toMatch(/^WO-\d{4}-\d{4}$/)
+    expect(workOrder.assetId).toBe('AST-008')
+    expect(workOrder.sourceIssueId).toBe(issue.id)
+    expect(workOrder.priority).toBe('high')
+    expect(updated.workOrderId).toBe(workOrder.id)
+    expect(updated.status).toBe('in_progress')
+    expect(mockAuditLog.length).toBe(auditBefore + 2) // maintenance.create + issues.create-WO
+    dropIssuesCreatedDuringTest()
+  })
+
+  it('escalates a vehicle-targeted issue via the vehicle.linkedAssetId', async () => {
+    const issue = await issuesApi.create({
+      title: 'Escalation test (vehicle)',
+      severity: 'critical',
+      source: 'manual',
+      target: { kind: 'vehicle', id: 'V001' }, // V001 → AST-008
+      reportedByUserId: ACTOR,
+    })
+    const { workOrder, issue: updated } = await issuesApi.createWorkOrder({
+      issueId: issue.id,
+      scheduledDate: '2026-06-01',
+      assigneeUserId: 'U006',
+      actorUserId: ACTOR,
+    })
+    expect(workOrder.assetId).toBe('AST-008')
+    expect(workOrder.priority).toBe('critical')
+    expect(updated.workOrderId).toBe(workOrder.id)
+    dropIssuesCreatedDuringTest()
+  })
+
+  it('refuses to escalate a vehicle that is not linked to an asset', async () => {
+    const issue = await issuesApi.create({
+      title: 'Unlinked vehicle escalation',
+      severity: 'major',
+      source: 'manual',
+      target: { kind: 'vehicle', id: 'V003' }, // V003 has no linkedAssetId in seed
+      reportedByUserId: ACTOR,
+    })
+    await expect(
+      issuesApi.createWorkOrder({
+        issueId: issue.id,
+        scheduledDate: '2026-06-01',
+        assigneeUserId: 'U006',
+        actorUserId: ACTOR,
+      }),
+    ).rejects.toThrow(/not linked to an asset/i)
+    // The issue should NOT have been mutated.
+    expect(issue.workOrderId).toBeUndefined()
+    expect(issue.status).toBe('open')
+    dropIssuesCreatedDuringTest()
+  })
+
+  it('refuses to escalate an issue that already has a linked WO', async () => {
+    const issue = await issuesApi.create({
+      title: 'Double escalation',
+      severity: 'major',
+      source: 'manual',
+      target: { kind: 'asset', id: 'AST-008' },
+      reportedByUserId: ACTOR,
+    })
+    await issuesApi.createWorkOrder({
+      issueId: issue.id,
+      scheduledDate: '2026-06-01',
+      assigneeUserId: 'U006',
+      actorUserId: ACTOR,
+    })
+    await expect(
+      issuesApi.createWorkOrder({
+        issueId: issue.id,
+        scheduledDate: '2026-06-02',
+        assigneeUserId: 'U006',
+        actorUserId: ACTOR,
+      }),
+    ).rejects.toThrow(/already linked/i)
+    dropIssuesCreatedDuringTest()
+  })
+
+  it('refuses to escalate a resolved issue', async () => {
+    const issue = await issuesApi.create({
+      title: 'Already resolved',
+      severity: 'minor',
+      source: 'manual',
+      target: { kind: 'asset', id: 'AST-008' },
+      reportedByUserId: ACTOR,
+    })
+    await issuesApi.setStatus({ id: issue.id, status: 'resolved', actorUserId: ACTOR })
+    await expect(
+      issuesApi.createWorkOrder({
+        issueId: issue.id,
+        scheduledDate: '2026-06-01',
+        assigneeUserId: 'U006',
+        actorUserId: ACTOR,
+      }),
+    ).rejects.toThrow(/Cannot escalate a resolved issue/i)
+    dropIssuesCreatedDuringTest()
+  })
+
+  it('does NOT downgrade an issue that is already in_progress to a different state', async () => {
+    const issue = await issuesApi.create({
+      title: 'Already in progress',
+      severity: 'major',
+      source: 'manual',
+      target: { kind: 'asset', id: 'AST-008' },
+      reportedByUserId: ACTOR,
+    })
+    await issuesApi.setStatus({ id: issue.id, status: 'in_progress', actorUserId: ACTOR })
+    const { issue: updated } = await issuesApi.createWorkOrder({
+      issueId: issue.id,
+      scheduledDate: '2026-06-01',
+      assigneeUserId: 'U006',
+      actorUserId: ACTOR,
+    })
+    expect(updated.status).toBe('in_progress')
+    dropIssuesCreatedDuringTest()
+  })
+})
+
+describe('issuesApi.findByWorkOrderId', () => {
+  it('finds the issue linked to a work order, or null when none', async () => {
+    const issue = await issuesApi.create({
+      title: 'Find-by-WO test',
+      severity: 'major',
+      source: 'manual',
+      target: { kind: 'asset', id: 'AST-008' },
+      reportedByUserId: ACTOR,
+    })
+    const { workOrder } = await issuesApi.createWorkOrder({
+      issueId: issue.id,
+      scheduledDate: '2026-06-01',
+      assigneeUserId: 'U006',
+      actorUserId: ACTOR,
+    })
+    const found = await issuesApi.findByWorkOrderId(workOrder.id)
+    expect(found?.id).toBe(issue.id)
+
+    const notFound = await issuesApi.findByWorkOrderId('WO-XXXX-9999')
+    expect(notFound).toBeNull()
+    dropIssuesCreatedDuringTest()
+  })
+})
+
 describe('seed data integrity', () => {
   it('every seeded issue has a target that references a known vehicle or asset id namespace', async () => {
     const all = await issuesApi.list()

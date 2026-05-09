@@ -8,6 +8,14 @@ import type {
   IssueSeverity,
 } from '@/features/issues/types'
 
+export function useIssueByWorkOrder(workOrderId: string | undefined) {
+  return useQuery({
+    queryKey: ['issues', 'by-work-order', workOrderId],
+    queryFn: () => issuesApi.findByWorkOrderId(workOrderId!),
+    enabled: !!workOrderId,
+  })
+}
+
 export function useIssues(opts: IssueListOptions = {}) {
   return useQuery({
     queryKey: ['issues', 'list', opts],
@@ -34,6 +42,13 @@ export function useIssuesForTarget(target: IssueTarget | null) {
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['issues'] })
   qc.invalidateQueries({ queryKey: ['audit-log'] })
+}
+
+function invalidateAfterEscalation(qc: ReturnType<typeof useQueryClient>) {
+  invalidateAll(qc)
+  // Maintenance also gains a new work order — invalidate any consumer keyed
+  // off WO list / per-asset views so the new WO appears immediately.
+  qc.invalidateQueries({ queryKey: ['maintenance'] })
 }
 
 export function useCreateIssue() {
@@ -80,5 +95,18 @@ export function useAssignIssue() {
     mutationFn: (input: { id: string; assigneeUserId: string | null; actorUserId: string }) =>
       issuesApi.assign(input),
     onSuccess: () => invalidateAll(qc),
+  })
+}
+
+export function useCreateWorkOrderFromIssue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      issueId: string
+      scheduledDate: string
+      assigneeUserId: string
+      actorUserId: string
+    }) => issuesApi.createWorkOrder(input),
+    onSuccess: () => invalidateAfterEscalation(qc),
   })
 }

@@ -55,6 +55,8 @@ interface CreateWorkOrderInput {
   priority: WorkOrderPriority
   scheduledDate: string
   checklistId?: string
+  /** Optional back-reference to the Issue that spawned this WO. */
+  sourceIssueId?: string
   /** User ID of the creator. */
   createdBy: string
 }
@@ -87,6 +89,7 @@ export const maintenanceApi = {
       status: 'pending',
       scheduledDate: input.scheduledDate,
       checklistId: input.checklistId,
+      sourceIssueId: input.sourceIssueId,
       createdAt: now,
       createdBy: input.createdBy,
     }

@@ -9,6 +9,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { useReportsData } from '@/features/reports/hooks/use-reports-data'
+import { useIssues } from '@/features/issues'
 import { StatCard } from '@/shared/ui/stat-card'
 import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
@@ -43,6 +44,8 @@ const tooltipStyle = {
 export function AdminDashboard() {
   const data = useReportsData()
   const k = data.kpis
+  const { data: issues = [] } = useIssues({ status: 'all-open' })
+  const openCritical = issues.filter((i) => i.severity === 'critical').length
 
   if (data.isLoading) {
     return (
@@ -57,10 +60,11 @@ export function AdminDashboard() {
   }
 
   const attentionItems = [
-    { label: 'Overdue work orders', value: k.overdueWorkOrders, to: '/module/maintenance', tone: k.overdueWorkOrders > 0 ? 'danger' : 'ok' },
-    { label: 'Items below reorder', value: k.lowStockCount,     to: '/module/inventory',   tone: k.lowStockCount > 0 ? 'warn' : 'ok' },
-    { label: 'Pending approvals',   value: k.pendingRequests,   to: '/module/procurement', tone: k.pendingRequests > 0 ? 'warn' : 'ok' },
-    { label: 'Documents in review', value: k.docsInReview,      to: '/module/sdms',        tone: k.docsInReview > 0 ? 'warn' : 'ok' },
+    { label: 'Critical issues open',   value: openCritical,        to: '/module/fleet/issues',  tone: openCritical > 0 ? 'danger' : 'ok' },
+    { label: 'Overdue work orders',    value: k.overdueWorkOrders, to: '/module/maintenance',   tone: k.overdueWorkOrders > 0 ? 'danger' : 'ok' },
+    { label: 'Items below reorder',    value: k.lowStockCount,     to: '/module/inventory',     tone: k.lowStockCount > 0 ? 'warn' : 'ok' },
+    { label: 'Pending approvals',      value: k.pendingRequests,   to: '/module/procurement',   tone: k.pendingRequests > 0 ? 'warn' : 'ok' },
+    { label: 'Documents in review',    value: k.docsInReview,      to: '/module/sdms',          tone: k.docsInReview > 0 ? 'warn' : 'ok' },
   ] as const
 
   const totalAttention = attentionItems.reduce((s, i) => s + (i.tone !== 'ok' ? i.value : 0), 0)
@@ -89,7 +93,7 @@ export function AdminDashboard() {
               </p>
             </div>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-6 pt-0">
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-6 pt-0">
             {attentionItems.map((item) => {
               const dotColor = item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warn' ? 'bg-amber-500' : 'bg-emerald-500'
               const valueColor = item.tone === 'danger' ? 'text-red-700' : item.tone === 'warn' ? 'text-amber-700' : 'text-zinc-900'

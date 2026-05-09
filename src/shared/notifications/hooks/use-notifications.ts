@@ -5,6 +5,7 @@ import { useWorkOrders } from '@/features/maintenance'
 import { useInventoryItems } from '@/features/inventory'
 import { useAssets, useAssetAssignments } from '@/features/assets'
 import { useVehicles, useTrips } from '@/features/fleet'
+import { useIssues } from '@/features/issues'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { deriveDocumentNotifications } from '@/shared/notifications/lib/derive'
 import { deriveProcurementNotifications } from '@/shared/notifications/lib/derive-procurement'
@@ -12,6 +13,7 @@ import { deriveMaintenanceNotifications } from '@/shared/notifications/lib/deriv
 import { deriveInventoryNotifications } from '@/shared/notifications/lib/derive-inventory'
 import { deriveAssetNotifications } from '@/shared/notifications/lib/derive-assets'
 import { deriveFleetNotifications } from '@/shared/notifications/lib/derive-fleet'
+import { deriveIssueNotifications } from '@/shared/notifications/lib/derive-issues'
 import { useNotificationReadStore } from '@/shared/notifications/store/notification-read-store'
 import type { AppNotification } from '@/shared/notifications/types'
 import type { ModuleKey } from '@/config/modules'
@@ -35,6 +37,7 @@ export function useNotifications(moduleKey?: ModuleKey): UseNotificationsResult 
   const { data: assetAssignments = [] } = useAssetAssignments()
   const { data: vehicles = [] } = useVehicles()
   const { data: trips = [] } = useTrips()
+  const { data: issues = [] } = useIssues()
   const { user } = useAuthStore()
   const readIds = useNotificationReadStore((s) => s.readIds)
   const markRead = useNotificationReadStore((s) => s.markRead)
@@ -48,14 +51,15 @@ export function useNotifications(moduleKey?: ModuleKey): UseNotificationsResult 
     const fromInv = deriveInventoryNotifications(inventoryItems, user.id)
     const fromAssets = deriveAssetNotifications(assets, assetAssignments, user.id)
     const fromFleet = deriveFleetNotifications(vehicles, trips, user.id)
-    const all = [...fromDocs, ...fromProc, ...fromMaint, ...fromInv, ...fromAssets, ...fromFleet].sort(
+    const fromIssues = deriveIssueNotifications(issues, user.id)
+    const all = [...fromDocs, ...fromProc, ...fromMaint, ...fromInv, ...fromAssets, ...fromFleet, ...fromIssues].sort(
       (a, b) => b.timestamp.localeCompare(a.timestamp),
     )
     const scoped = moduleKey && !GLOBAL_MODULES.has(moduleKey)
       ? all.filter((n) => n.module === moduleKey)
       : all
     return scoped.map((n) => ({ ...n, read: readIds.has(n.id) }))
-  }, [documents, requests, workOrders, inventoryItems, assets, assetAssignments, vehicles, trips, user, readIds, moduleKey])
+  }, [documents, requests, workOrders, inventoryItems, assets, assetAssignments, vehicles, trips, issues, user, readIds, moduleKey])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

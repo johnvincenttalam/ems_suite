@@ -21,6 +21,9 @@ export type NotificationKind =
   | 'asset_assignment_open'
   | 'vehicle_in_maintenance'
   | 'trip_in_progress_long'
+  | 'issue_critical_open'
+  | 'issue_assigned'
+  | 'issue_stale'
 
 export type NotificationSeverity = 'info' | 'warning' | 'success' | 'danger'
 
