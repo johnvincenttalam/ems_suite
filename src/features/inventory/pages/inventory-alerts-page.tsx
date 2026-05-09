@@ -6,7 +6,7 @@ import type { NotificationKind, NotificationSeverity } from '@/shared/notificati
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { FilterChips } from '@/shared/ui/filter-chips'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { cn } from '@/shared/utils/cn'
 
 const INV_KINDS: NotificationKind[] = ['low_stock', 'stock_out']
@@ -86,22 +86,24 @@ export function InventoryAlertsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center">
-        <div className="max-w-sm flex-1">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search alerts..." />
-        </div>
-        <FilterChips options={severityFilters} value={severity} onChange={(v) => setSeverity(v as SeverityFilter)} />
-        <button
-          type="button"
-          onClick={() => setUnreadOnly((v) => !v)}
-          className={cn(
-            'px-3 py-1.5 rounded-full text-[12.5px] font-medium border transition-colors',
-            unreadOnly ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400',
-          )}
-        >
-          Unread only
-        </button>
-      </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, placeholder: 'Search alerts...' }}
+        filter={
+          <>
+            <FilterChips options={severityFilters} value={severity} onChange={(v) => setSeverity(v as SeverityFilter)} />
+            <button
+              type="button"
+              onClick={() => setUnreadOnly((v) => !v)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-[12.5px] font-medium border transition-colors',
+                unreadOnly ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400',
+              )}
+            >
+              Unread only
+            </button>
+          </>
+        }
+      />
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
         {filtered.length === 0 ? (
