@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2, Upload, X, Pencil } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { TrackingPanel } from '@/shared/tracking'
@@ -24,11 +24,10 @@ import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { ConditionPill } from '@/features/assets/components/condition-pill'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
 
 const CONDITION_OPTIONS: { value: AssetCondition; label: string }[] = [
@@ -445,50 +444,37 @@ export function RegistryTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search assets..." />
-          </div>
-          <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
-        </div>
-        <div className="flex gap-2">
-          <ExportMenu
-            rows={assets as unknown as Record<string, unknown>[]}
-            baseFilename="assets"
-            sheetName="Assets"
-            pdfTitle="Asset Registry"
-            columns={[
-              { key: 'assetCode', label: 'Code' },
-              { key: 'serialNumber', label: 'Serial' },
-              { key: 'name', label: 'Name' },
-              { key: 'categoryId', label: 'Category' },
-              { key: 'locationId', label: 'Location' },
-              { key: 'status', label: 'Status' },
-              { key: 'condition', label: 'Condition' },
-              { key: 'assignedTo', label: 'Assigned To' },
-              { key: 'purchaseDate', label: 'Purchased' },
-              { key: 'purchaseCost', label: 'Cost' },
-            ]}
-          />
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd(true)}>Register Asset</Button>
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search assets...' }}
+        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+      >
+        <ExportMenu
+          rows={assets as unknown as Record<string, unknown>[]}
+          baseFilename="assets"
+          sheetName="Assets"
+          pdfTitle="Asset Registry"
+          columns={[
+            { key: 'assetCode', label: 'Code' },
+            { key: 'serialNumber', label: 'Serial' },
+            { key: 'name', label: 'Name' },
+            { key: 'categoryId', label: 'Category' },
+            { key: 'locationId', label: 'Location' },
+            { key: 'status', label: 'Status' },
+            { key: 'condition', label: 'Condition' },
+            { key: 'assignedTo', label: 'Assigned To' },
+            { key: 'purchaseDate', label: 'Purchased' },
+            { key: 'purchaseCost', label: 'Cost' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd(true)}>Register Asset</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Boxes} message="No assets found" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Boxes}
+        emptyMessage="No assets found"
+      />
 
       <Modal
         open={formOpen}
