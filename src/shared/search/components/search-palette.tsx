@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Command, FileText, Search } from 'lucide-react'
@@ -148,6 +148,11 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
                           <p className="text-[13px] font-medium text-zinc-900 mt-0.5 truncate">
                             <Highlighted text={hit.title} tokens={tokens} />
                           </p>
+                          {hit.snippet && (
+                            <p className="text-[11.5px] text-zinc-600 mt-1 leading-snug line-clamp-2">
+                              <HighlightedRanges text={hit.snippet} matches={hit.matches ?? []} />
+                            </p>
+                          )}
                           {hit.meta && <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{hit.meta}</p>}
                         </div>
                         {idx === activeIdx && <ArrowRight className="w-3.5 h-3.5 text-zinc-400 mt-1 flex-shrink-0" />}
@@ -181,6 +186,52 @@ function Highlighted({ text, tokens }: { text: string; tokens: string[] }) {
           ? <mark key={i} className="bg-amber-100 text-zinc-900 rounded px-0.5">{span}</mark>
           : <span key={i}>{span}</span>,
       )}
+    </>
+  )
+}
+
+/**
+ * Render `text` with bolded segments at the given character ranges. Used for
+ * pre-computed match ranges from the search adapter (snippets), where we
+ * want to bold exact char windows rather than re-tokenize on the client.
+ */
+function HighlightedRanges({
+  text,
+  matches,
+}: {
+  text: string
+  matches: Array<[number, number]>
+}) {
+  if (matches.length === 0) return <>{text}</>
+
+  // Sort + merge overlapping ranges so the render walk stays simple.
+  const sorted = [...matches].sort((a, b) => a[0] - b[0])
+  const merged: Array<[number, number]> = []
+  for (const [s, e] of sorted) {
+    const last = merged[merged.length - 1]
+    if (last && s <= last[1]) {
+      last[1] = Math.max(last[1], e)
+    } else {
+      merged.push([s, e])
+    }
+  }
+
+  const segments: Array<{ text: string; bold: boolean }> = []
+  let cursor = 0
+  for (const [s, e] of merged) {
+    if (s > cursor) segments.push({ text: text.slice(cursor, s), bold: false })
+    segments.push({ text: text.slice(s, e), bold: true })
+    cursor = e
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), bold: false })
+
+  return (
+    <>
+      {segments.map((seg, i) => (
+        <Fragment key={i}>
+          {seg.bold ? <mark className="bg-amber-100 text-zinc-900 rounded px-0.5">{seg.text}</mark> : seg.text}
+        </Fragment>
+      ))}
     </>
   )
 }

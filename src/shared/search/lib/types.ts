@@ -19,6 +19,15 @@ export interface GlobalSearchHit {
   subtitle?: string
   /** Tertiary line — usually status/category badges as plain text. */
   meta?: string
+  /** Optional ~140-char body excerpt with the matched window. Currently set
+   * by document scoring when the query hits the document body — gives users
+   * a peek at *why* the doc matched without opening it. The palette renders
+   * this with `matches` highlighted; absent for entity types that don't
+   * have indexed body text yet. */
+  snippet?: string
+  /** Character ranges within `snippet` (start, end exclusive) where query
+   * tokens were matched. Consumers wrap these in <mark>. */
+  matches?: Array<[number, number]>
   /** Per-result entity icon — drives the leading 32px square. */
   icon: LucideIcon
   iconBg: string

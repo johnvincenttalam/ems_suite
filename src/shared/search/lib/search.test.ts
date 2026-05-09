@@ -105,6 +105,48 @@ describe('scoreDocuments', () => {
     const docs = [docFixture({ title: 'Procurement' })]
     expect(scoreDocuments(docs, 'PROCUREMENT')).toHaveLength(1)
   })
+
+  it('matches against doc.bodyText (the field set by PDF extraction at upload)', () => {
+    const docs = [
+      docFixture({ id: 'A', title: 'Some Title', bodyText: 'this body discusses zorgblat thoroughly' }),
+      docFixture({ id: 'B', title: 'Another Title' }),
+    ]
+    const hits = scoreDocuments(docs, 'zorgblat')
+    expect(hits).toHaveLength(1)
+    expect(hits[0].id).toBe('document:A')
+  })
+
+  it('returns a snippet + match ranges for body hits so the palette can render them', () => {
+    const docs = [
+      docFixture({
+        id: 'A',
+        title: 'Internal Memo',
+        bodyText: 'This memo describes the upcoming task force formed to review the Q3 inventory cycle counts and follow-up actions.',
+      }),
+    ]
+    const hits = scoreDocuments(docs, 'task')
+    expect(hits).toHaveLength(1)
+    const hit = hits[0]
+    expect(hit.snippet).toBeTruthy()
+    expect(hit.snippet?.toLowerCase()).toContain('task')
+    expect(hit.matches).toBeDefined()
+    expect(hit.matches!.length).toBeGreaterThan(0)
+    // Each range should point at "task" within the snippet.
+    for (const [s, e] of hit.matches!) {
+      expect(hit.snippet!.slice(s, e).toLowerCase()).toBe('task')
+    }
+  })
+
+  it('omits snippet/matches when the match was title-only (no body hit)', () => {
+    const docs = [
+      docFixture({ id: 'A', title: 'Procurement Policy 2026', bodyText: 'completely unrelated content here' }),
+    ]
+    const hits = scoreDocuments(docs, 'procurement')
+    expect(hits).toHaveLength(1)
+    // Title matched but body did not — snippet should be undefined.
+    expect(hits[0].snippet).toBeUndefined()
+    expect(hits[0].matches).toBeUndefined()
+  })
 })
 
 const reqFixture = (p: Partial<RequestWithItems>): RequestWithItems => ({
