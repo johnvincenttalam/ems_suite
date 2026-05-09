@@ -101,6 +101,11 @@ export function SdmsCreateDocumentPage() {
   const [signatureSlots, setSignatureSlots] = useState<SignatureSlot[]>([])
   const [pickedFile, setPickedFile] = useState<File | null>(null)
   const [pickedFileUrl, setPickedFileUrl] = useState<string | null>(null)
+  const [extractedBodyText, setExtractedBodyText] = useState<string | null>(null)
+  /** 'idle' before any file is picked; 'extracting' while pdfjs runs;
+   * 'extracted' once we have body text; 'unsupported' for non-PDF / failed
+   * extraction (search just falls back to title/tags). */
+  const [extractStatus, setExtractStatus] = useState<'idle' | 'extracting' | 'extracted' | 'unsupported'>('idle')
   const [existingAssetUrl, setExistingAssetUrl] = useState<string | undefined>(undefined)
   const [dragOver, setDragOver] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
@@ -235,6 +240,35 @@ export function SdmsCreateDocumentPage() {
     setPickedFile(file)
     setPickedFileUrl(url)
     setValue('fileName', file.name, { shouldValidate: true })
+
+    // Reset previous extraction before kicking off a new one.
+    setExtractedBodyText(null)
+    const isPdfLike =
+      file.type === 'application/pdf' ||
+      file.name.toLowerCase().endsWith('.pdf') ||
+      file.type === 'text/plain'
+    if (isPdfLike) {
+      setExtractStatus('extracting')
+      // Lazy-load the extractor so pdfjs (which needs DOMMatrix) only enters
+      // the bundle/runtime when a user actually picks a file. Without this
+      // every test that pulls in this page via the documents barrel would
+      // try to evaluate pdfjs in jsdom.
+      import('@/features/documents/lib/extract-text')
+        .then(({ extractTextFromFile }) => extractTextFromFile(file))
+        .then((text) => {
+          if (text && text.length > 0) {
+            setExtractedBodyText(text)
+            setExtractStatus('extracted')
+          } else {
+            setExtractStatus('unsupported')
+          }
+        })
+        .catch(() => setExtractStatus('unsupported'))
+    } else {
+      // DOCX / images / other — no in-browser extraction available in the mock.
+      setExtractStatus('unsupported')
+    }
+
     toast.success(`File ready: ${file.name}`)
   }
 
@@ -242,6 +276,8 @@ export function SdmsCreateDocumentPage() {
     if (pickedFileUrl) URL.revokeObjectURL(pickedFileUrl)
     setPickedFile(null)
     setPickedFileUrl(null)
+    setExtractedBodyText(null)
+    setExtractStatus('idle')
     if (selectedTemplate?.referenceUrl) {
       const inferredName = selectedTemplate.referenceUrl.split('/').pop() || ''
       setValue('fileName', inferredName, { shouldValidate: true })
@@ -315,6 +351,10 @@ export function SdmsCreateDocumentPage() {
       toast.error('Not signed in')
       return
     }
+    // Preserve existing body text when editing without re-uploading the file;
+    // otherwise carry through whatever the in-browser extractor produced.
+    const bodyText =
+      extractedBodyText ?? (isEditMode ? editingDoc?.bodyText : undefined)
     const sharedFields = {
       title: values.title,
       description: values.description,
@@ -328,6 +368,7 @@ export function SdmsCreateDocumentPage() {
       tags: tags.length ? tags : undefined,
       signatureSlots: signatureSlots.length ? signatureSlots : undefined,
       assetUrl: effectiveAssetUrl,
+      bodyText,
     }
     if (isEditMode && editingDoc) {
       updateDraftMutation.mutate({ docId: editingDoc.id, patch: sharedFields })
@@ -345,6 +386,8 @@ export function SdmsCreateDocumentPage() {
       toast.error('Add at least one approver before submitting')
       return
     }
+    const bodyText =
+      extractedBodyText ?? (isEditMode ? editingDoc?.bodyText : undefined)
     const sharedFields = {
       title: values.title,
       description: values.description,
@@ -358,6 +401,7 @@ export function SdmsCreateDocumentPage() {
       departmentId: values.departmentId,
       signatureSlots: signatureSlots.length ? signatureSlots : undefined,
       assetUrl: effectiveAssetUrl,
+      bodyText,
     }
     if (isEditMode && editingDoc) {
       updateAndStartMutation.mutate({ docId: editingDoc.id, patch: sharedFields, approverIds: approvers })
@@ -471,6 +515,27 @@ export function SdmsCreateDocumentPage() {
                   <FileText className="w-7 h-7 text-emerald-600 mb-2" />
                   <p className="text-[13px] text-zinc-900 font-medium">{pickedFile.name}</p>
                   <p className="text-[11px] text-zinc-500 mt-1">{formatFileSize(pickedFile.size)} · click to replace</p>
+                  {extractStatus !== 'idle' && (
+                    <p className={cn(
+                      'mt-2 text-[10.5px] inline-flex items-center gap-1',
+                      extractStatus === 'extracting' && 'text-zinc-500',
+                      extractStatus === 'extracted' && 'text-emerald-700',
+                      extractStatus === 'unsupported' && 'text-amber-700',
+                    )}>
+                      {extractStatus === 'extracting' && (
+                        <>
+                          <span className="inline-block w-2.5 h-2.5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+                          Extracting text for search…
+                        </>
+                      )}
+                      {extractStatus === 'extracted' && extractedBodyText && (
+                        <>✓ Indexed for search · {extractedBodyText.length.toLocaleString()} chars</>
+                      )}
+                      {extractStatus === 'unsupported' && (
+                        <>⚠ Searchable by title / tags only (text extraction needs a real backend for this format)</>
+                      )}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); removeFile() }}

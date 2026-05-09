@@ -130,3 +130,37 @@ describe('searchAdapter binding', () => {
     expect(searchAdapter.modeLabel).toMatch(/keyword|demo/i)
   })
 })
+
+describe('mockSearchAdapter — bodyText override (uploaded vs seeded)', () => {
+  it('prefers doc.bodyText over the hand-authored mock-document-bodies fallback', async () => {
+    // Inject a synthetic doc with a unique-token bodyText that doesn't appear
+    // in any seed body. If the adapter is reading doc.bodyText correctly,
+    // searching for the unique token should find this doc.
+    const { mockDocuments } = await import('@/features/documents/data/mock-documents')
+    const uniqueToken = 'zorgblat' + Date.now() // guaranteed not in any seed body
+    const synthetic = {
+      ...mockDocuments[0],
+      id: 'DOC-TEST-BODYTEXT',
+      title: 'Synthetic test doc',
+      bodyText: `Some content with ${uniqueToken} buried in the middle.`,
+    }
+    mockDocuments.push(synthetic)
+    try {
+      const results = await mockSearchAdapter.search(uniqueToken)
+      expect(results.length).toBe(1)
+      expect(results[0].document.id).toBe('DOC-TEST-BODYTEXT')
+      expect(results[0].snippet).toContain(uniqueToken)
+    } finally {
+      // Clean up so we don't pollute later tests
+      const idx = mockDocuments.findIndex((d) => d.id === 'DOC-TEST-BODYTEXT')
+      if (idx !== -1) mockDocuments.splice(idx, 1)
+    }
+  })
+
+  it('falls back to the seeded mock-document-bodies when doc.bodyText is missing', async () => {
+    // DOC-006 has no live bodyText (it's a seeded doc); but mock-document-
+    // bodies has hydraulic content. Searching "hydraulic" must still find it.
+    const results = await mockSearchAdapter.search('hydraulic')
+    expect(results.some((r) => r.document.id === 'DOC-006')).toBe(true)
+  })
+})

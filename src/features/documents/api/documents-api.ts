@@ -74,6 +74,10 @@ interface UploadDocumentInput {
   deadline?: string
   signatureSlots?: SignatureSlot[]
   assetUrl?: string
+  /** Plain-text body extracted from the source file. Powers Smart Search +
+   * the global palette body matches. Real backends produce this from a PDF
+   * extraction / OCR service; the mock extracts from PDFs in-browser. */
+  bodyText?: string
 }
 
 interface CreateDraftInput {
@@ -90,6 +94,7 @@ interface CreateDraftInput {
   departmentId?: string
   signatureSlots?: SignatureSlot[]
   assetUrl?: string
+  bodyText?: string
 }
 
 function nextDocumentId(): string {
@@ -344,6 +349,7 @@ export const documentsApi = {
       deadline: input.deadline,
       signatureSlots: input.signatureSlots && input.signatureSlots.length > 0 ? input.signatureSlots : undefined,
       assetUrl: input.assetUrl,
+      bodyText: input.bodyText,
     }
     mockDocuments.push(doc)
 
@@ -386,6 +392,7 @@ export const documentsApi = {
       departmentId: input.departmentId,
       signatureSlots: input.signatureSlots && input.signatureSlots.length > 0 ? input.signatureSlots : undefined,
       assetUrl: input.assetUrl,
+      bodyText: input.bodyText,
     }
     mockDocuments.push(doc)
 
@@ -427,6 +434,7 @@ export const documentsApi = {
       doc.signatureSlots = patch.signatureSlots && patch.signatureSlots.length > 0 ? patch.signatureSlots : undefined
     }
     if (patch.assetUrl !== undefined) doc.assetUrl = patch.assetUrl
+    if (patch.bodyText !== undefined) doc.bodyText = patch.bodyText
 
     recordAudit({
       userId: updaterId,

@@ -1,6 +1,7 @@
 import type { AppDocument } from '@/features/documents/types'
 import { mockDocuments } from '@/features/documents/data/mock-documents'
 import { getDocumentBody } from '@/features/documents/data/mock-document-bodies'
+import { extractSnippet } from '@/features/documents/lib/extract-snippet'
 import type { SearchAdapter, SmartSearchOpts, SmartSearchResult } from './search-adapter'
 
 /**
@@ -48,7 +49,9 @@ function scoreDocument(doc: AppDocument, queryTokens: string[]): {
   const titleTokens = tokenize(doc.title)
   const tagTokens = tokenize((doc.tags ?? []).join(' '))
   const categoryTokens = doc.category ? tokenize(doc.category) : []
-  const body = getDocumentBody(doc.id)
+  // Live extracted text wins; fall back to seeded mock-bodies for the
+  // hand-authored seed documents that don't have an uploaded file.
+  const body = doc.bodyText ?? getDocumentBody(doc.id)
   const bodyTokens = tokenize(body)
 
   let titleHits = 0
@@ -84,72 +87,6 @@ function scoreDocument(doc: AppDocument, queryTokens: string[]): {
   return { score, matchedIn }
 }
 
-const SNIPPET_RADIUS = 70 // chars on each side of the matched range
-
-/**
- * Find the best snippet window in `body` for the query. Strategy: scan a
- * sliding window of word positions, pick the one containing the most distinct
- * query tokens (ties broken by earliest position). Returns the snippet text
- * (preserving original casing) with character match ranges.
- */
-function extractSnippet(
-  body: string,
-  queryTokens: string[],
-): { snippet: string; matches: Array<[number, number]> } {
-  if (!body || queryTokens.length === 0) return { snippet: '', matches: [] }
-
-  const lowerBody = body.toLowerCase()
-
-  // Find all match positions for any query token; record where each landed.
-  type Hit = { start: number; end: number; token: string }
-  const hits: Hit[] = []
-  for (const qt of queryTokens) {
-    let idx = 0
-    while ((idx = lowerBody.indexOf(qt, idx)) !== -1) {
-      hits.push({ start: idx, end: idx + qt.length, token: qt })
-      idx += qt.length
-    }
-  }
-  if (hits.length === 0) return { snippet: '', matches: [] }
-
-  // Pick the hit cluster maximizing distinct-token coverage.
-  hits.sort((a, b) => a.start - b.start)
-  let best = { start: hits[0].start, end: hits[0].end, distinct: new Set([hits[0].token]) }
-  for (let i = 0; i < hits.length; i++) {
-    const window = new Set<string>()
-    let j = i
-    while (j < hits.length && hits[j].start - hits[i].start < SNIPPET_RADIUS * 2) {
-      window.add(hits[j].token)
-      j++
-    }
-    if (window.size > best.distinct.size) {
-      best = { start: hits[i].start, end: hits[j - 1].end, distinct: window }
-    }
-  }
-
-  const lo = Math.max(0, best.start - SNIPPET_RADIUS)
-  const hi = Math.min(body.length, best.end + SNIPPET_RADIUS)
-
-  // Trim to whole-word boundaries on each end to avoid mid-word cuts.
-  let snippetStart = lo
-  while (snippetStart > 0 && /\S/.test(body[snippetStart - 1])) snippetStart--
-  let snippetEnd = hi
-  while (snippetEnd < body.length && /\S/.test(body[snippetEnd])) snippetEnd++
-
-  const snippet =
-    (snippetStart > 0 ? '…' : '') +
-    body.slice(snippetStart, snippetEnd).trim() +
-    (snippetEnd < body.length ? '…' : '')
-
-  // Re-locate match ranges within the snippet (with optional leading "…").
-  const offset = (snippetStart > 0 ? 1 : 0) - snippetStart
-  const matches: Array<[number, number]> = hits
-    .filter((h) => h.start >= snippetStart && h.end <= snippetEnd)
-    .map((h): [number, number] => [h.start + offset, h.end + offset])
-
-  return { snippet, matches }
-}
-
 /**
  * Mock SearchAdapter. Honest about being keyword-based; the swap to a real
  * AI / vector backend is a different SearchAdapter implementation behind the
@@ -179,7 +116,7 @@ export const mockSearchAdapter: SearchAdapter = {
       })
       .map((doc) => {
         const { score, matchedIn } = scoreDocument(doc, tokens)
-        const body = getDocumentBody(doc.id)
+        const body = doc.bodyText ?? getDocumentBody(doc.id)
         const { snippet, matches } = extractSnippet(body, tokens)
         return { document: doc, score, snippet, matches, matchedIn }
       })
