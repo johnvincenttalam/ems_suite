@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Eye, Undo2, Upload, X, Pencil } from 'lucide-react'
+import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Undo2, Upload, X, Pencil } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { TrackingPanel } from '@/shared/tracking'
 import { useForm, useWatch } from 'react-hook-form'
@@ -337,12 +337,7 @@ export function RegistryTab() {
 
   const columns = useMemo<ColumnDef<Asset>[]>(() => [
     { accessorKey: 'assetCode', header: 'Code', cell: ({ row }) => (
-      <button
-        onClick={() => { setActiveAsset(row.original); setActiveAction('view') }}
-        className="font-mono text-[12px] text-zinc-700 hover:text-zinc-900 hover:underline cursor-pointer"
-      >
-        {row.original.assetCode}
-      </button>
+      <span className="font-mono text-[12px] text-zinc-700">{row.original.assetCode}</span>
     )},
     { accessorKey: 'name', header: 'Asset', cell: ({ row }) => (
       <div className="flex items-center gap-2.5">
@@ -419,12 +414,7 @@ export function RegistryTab() {
       ]
 
       return (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => { setActiveAsset(asset); setActiveAction('view') }}
-            title="View details"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-          ><Eye className="w-4 h-4" /></button>
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <ActionMenu items={menuItems} />
         </div>
       )
@@ -474,6 +464,7 @@ export function RegistryTab() {
         columns={columns}
         emptyIcon={Boxes}
         emptyMessage="No assets found"
+        onRowClick={(asset) => { setActiveAsset(asset); setActiveAction('view') }}
       />
 
       <Modal
