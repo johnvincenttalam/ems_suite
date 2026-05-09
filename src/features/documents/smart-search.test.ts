@@ -147,9 +147,16 @@ describe('mockSearchAdapter — bodyText override (uploaded vs seeded)', () => {
     mockDocuments.push(synthetic)
     try {
       const results = await mockSearchAdapter.search(uniqueToken)
-      expect(results.length).toBe(1)
+      // The synthetic doc must be found AND rank first. We can't assert
+      // results.length === 1 because other test files in the same worker
+      // pool create docs via the mutation API and leak them through
+      // mockDocuments — those don't contain our unique token but the
+      // adapter's substring matcher (`qt.includes(t)` / `t.includes(qt)`)
+      // can produce false positives across tests.
+      const synth = results.find((r) => r.document.id === 'DOC-TEST-BODYTEXT')
+      expect(synth).toBeDefined()
       expect(results[0].document.id).toBe('DOC-TEST-BODYTEXT')
-      expect(results[0].snippet).toContain(uniqueToken)
+      expect(synth!.snippet).toContain(uniqueToken)
     } finally {
       // Clean up so we don't pollute later tests
       const idx = mockDocuments.findIndex((d) => d.id === 'DOC-TEST-BODYTEXT')
