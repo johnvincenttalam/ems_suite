@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { fleetApi } from './api/fleet-api'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { fleetApi, FleetValidationError } from './api/fleet-api'
 import { mockUsers } from '@/features/users'
 import { mockAssets } from '@/features/assets'
+import { mockVehicles } from './data/mock-fleet'
+import { mockAuditLog } from '@/features/audit-log/data/mock-audit'
 
 describe('fleetApi.listVehicles', () => {
   it('returns at least one vehicle', async () => {
@@ -97,6 +99,253 @@ describe('driver license data', () => {
     const drivers = mockUsers.filter((u) => driverIds.has(u.id))
     expect(drivers.length).toBeGreaterThan(0)
     expect(drivers.every((u) => !!u.licenseExpiry)).toBe(true)
+  })
+})
+
+describe('fleetApi.createVehicle', () => {
+  let originalLength: number
+  beforeEach(() => {
+    originalLength = mockVehicles.length
+  })
+  // The mock array is shared module state across the worker pool. Tests
+  // append; clean up so other test files aren't polluted.
+  function cleanup() {
+    while (mockVehicles.length > originalLength) mockVehicles.pop()
+  }
+
+  it('creates a vehicle with status=active by default and emits an audit entry', async () => {
+    const auditBefore = mockAuditLog.length
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'TEST 0001 X',
+      model: 'Test Truck',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    expect(vehicle.id).toMatch(/^V\d{3}$/)
+    expect(vehicle.status).toBe('active')
+    expect(vehicle.plateNumber).toBe('TEST 0001 X')
+    expect(mockAuditLog.length).toBe(auditBefore + 1)
+    expect(mockAuditLog[0].module).toBe('Fleet')
+    expect(mockAuditLog[0].action).toBe('create')
+    cleanup()
+  })
+
+  it('rejects duplicate plates (case-insensitive)', async () => {
+    await fleetApi.createVehicle({
+      plateNumber: 'DUPE 1234 Z',
+      model: 'A',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    await expect(
+      fleetApi.createVehicle({
+        plateNumber: 'dupe 1234 z',
+        model: 'B',
+        year: 2026,
+        fuelType: 'diesel',
+        currentOdometer: 0,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(FleetValidationError)
+    cleanup()
+  })
+
+  it('forces fuelCapacityLiters=0 for electric vehicles', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'EV TEST 1',
+      model: 'Tesla Test',
+      year: 2026,
+      fuelType: 'electric',
+      currentOdometer: 0,
+      fuelCapacityLiters: 999, // explicitly try to set; should be ignored
+      createdBy: 'U001',
+    })
+    expect(vehicle.fuelCapacityLiters).toBe(0)
+    cleanup()
+  })
+
+  it('rejects out-of-range year and negative odometer', async () => {
+    await expect(
+      fleetApi.createVehicle({
+        plateNumber: 'BAD YEAR',
+        model: 'X',
+        year: 1800,
+        fuelType: 'diesel',
+        currentOdometer: 0,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/Year is out of range/)
+
+    await expect(
+      fleetApi.createVehicle({
+        plateNumber: 'NEG OD',
+        model: 'X',
+        year: 2026,
+        fuelType: 'diesel',
+        currentOdometer: -1,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/cannot be negative/)
+    cleanup()
+  })
+})
+
+describe('fleetApi.updateVehicle', () => {
+  let originalLength: number
+  beforeEach(() => {
+    originalLength = mockVehicles.length
+  })
+  function cleanup() {
+    while (mockVehicles.length > originalLength) mockVehicles.pop()
+  }
+
+  it('applies a partial patch and audits only when something changed', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'UPDATE 1',
+      model: 'Old Model',
+      year: 2024,
+      fuelType: 'diesel',
+      currentOdometer: 100,
+      createdBy: 'U001',
+    })
+    const auditBefore = mockAuditLog.length
+    const updated = await fleetApi.updateVehicle(vehicle.id, {
+      model: 'New Model',
+      currentOdometer: 200,
+      updatedBy: 'U001',
+    })
+    expect(updated.model).toBe('New Model')
+    expect(updated.currentOdometer).toBe(200)
+    expect(mockAuditLog.length).toBe(auditBefore + 1)
+    expect(mockAuditLog[0].detail).toContain('model, currentOdometer')
+
+    // No-op patch shouldn't audit.
+    const auditBefore2 = mockAuditLog.length
+    await fleetApi.updateVehicle(vehicle.id, { updatedBy: 'U001' })
+    expect(mockAuditLog.length).toBe(auditBefore2)
+    cleanup()
+  })
+
+  it('refuses to decrease the odometer (typo guard)', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'ODO GUARD',
+      model: 'Test',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 50_000,
+      createdBy: 'U001',
+    })
+    await expect(
+      fleetApi.updateVehicle(vehicle.id, { currentOdometer: 49_999, updatedBy: 'U001' }),
+    ).rejects.toThrow(/Odometer can't decrease/)
+    cleanup()
+  })
+
+  it('clears nullable fields when patch passes null', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'CLEAR FIELDS',
+      model: 'Test',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      assignedDriverId: 'U002',
+      linkedAssetId: 'AST-001',
+      createdBy: 'U001',
+    })
+    const updated = await fleetApi.updateVehicle(vehicle.id, {
+      assignedDriverId: null,
+      linkedAssetId: null,
+      updatedBy: 'U001',
+    })
+    expect(updated.assignedDriverId).toBeUndefined()
+    expect(updated.linkedAssetId).toBeUndefined()
+    cleanup()
+  })
+
+  it('refuses to re-activate a retired vehicle through edit', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'RETIRED EDIT',
+      model: 'Test',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    await fleetApi.retireVehicle(vehicle.id, 'U001')
+    await expect(
+      fleetApi.updateVehicle(vehicle.id, { status: 'active', updatedBy: 'U001' }),
+    ).rejects.toThrow(/cannot be re-activated/i)
+    cleanup()
+  })
+
+  it('refuses duplicate plates on rename', async () => {
+    const v1 = await fleetApi.createVehicle({
+      plateNumber: 'PLATE A',
+      model: 'A',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    await fleetApi.createVehicle({
+      plateNumber: 'PLATE B',
+      model: 'B',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    await expect(
+      fleetApi.updateVehicle(v1.id, { plateNumber: 'PLATE B', updatedBy: 'U001' }),
+    ).rejects.toThrow(/already registered/i)
+    cleanup()
+  })
+})
+
+describe('fleetApi.retireVehicle', () => {
+  let originalLength: number
+  beforeEach(() => {
+    originalLength = mockVehicles.length
+  })
+  function cleanup() {
+    while (mockVehicles.length > originalLength) mockVehicles.pop()
+  }
+
+  it('flips status to retired, clears assigned driver, and audits', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'RETIRE TEST',
+      model: 'Test',
+      year: 2020,
+      fuelType: 'diesel',
+      currentOdometer: 200_000,
+      assignedDriverId: 'U002',
+      createdBy: 'U001',
+    })
+    const auditBefore = mockAuditLog.length
+    const retired = await fleetApi.retireVehicle(vehicle.id, 'U001', 'End of useful life')
+    expect(retired.status).toBe('retired')
+    expect(retired.assignedDriverId).toBeUndefined()
+    expect(mockAuditLog.length).toBe(auditBefore + 1)
+    expect(mockAuditLog[0].detail).toContain('End of useful life')
+    cleanup()
+  })
+
+  it('refuses to retire an already-retired vehicle', async () => {
+    const vehicle = await fleetApi.createVehicle({
+      plateNumber: 'DOUBLE RETIRE',
+      model: 'Test',
+      year: 2026,
+      fuelType: 'diesel',
+      currentOdometer: 0,
+      createdBy: 'U001',
+    })
+    await fleetApi.retireVehicle(vehicle.id, 'U001')
+    await expect(fleetApi.retireVehicle(vehicle.id, 'U001')).rejects.toThrow(/already retired/i)
+    cleanup()
   })
 })
 

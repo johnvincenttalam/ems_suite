@@ -1,39 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { Truck, Car, Zap, Fuel, Plus, MapPin, ClipboardList } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { TrackingPanel } from '@/shared/tracking'
 import { ChecklistPanel } from '@/shared/checklists'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
-import { useForm } from 'react-hook-form'
-import { z } from 'zod/v4'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { format, parseISO } from 'date-fns'
-import { toast } from 'sonner'
 import { useVehicles } from '@/features/fleet'
 import { useUsers } from '@/features/users'
 import type { Vehicle, VehicleStatus, FuelType } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
-
-const vehicleSchema = z.object({
-  plateNumber: z.string().min(2, 'Plate number is required'),
-  model: z.string().min(2, 'Model is required'),
-  year: z.number().int().min(1990).max(2100),
-  fuelType: z.enum(['petrol', 'diesel', 'electric']),
-  currentOdometer: z.number().int().min(0),
-  fuelCapacityLiters: z.number().min(0).optional(),
-  assignedDriverId: z.string().optional(),
-})
-
-type VehicleForm = z.infer<typeof vehicleSchema>
+import { VehicleFormModal } from '@/features/fleet/components/vehicle-form-modal'
+import { VehicleDetailDrawer } from '@/features/fleet/components/vehicle-detail-drawer'
 
 const statusFilters: { value: VehicleStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -54,16 +39,50 @@ export function VehiclesTab() {
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedVehicleId = searchParams.get('vehicle')
+
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<VehicleStatus | 'all'>('all')
-  const [showAdd, setShowAdd] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
   const [locationVehicle, setLocationVehicle] = useState<Vehicle | null>(null)
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
+
+  const selectedVehicle = useMemo(
+    () => (selectedVehicleId ? vehicles.find((v) => v.id === selectedVehicleId) ?? null : null),
+    [selectedVehicleId, vehicles],
+  )
+
+  // Drawer is open whenever the URL carries a valid ?vehicle= for a known
+  // vehicle. The data may arrive after the URL (vehicles is loading), so we
+  // gate on vehicles.length too — otherwise the drawer flashes-empty on
+  // direct navigation from the dashboard.
+  const drawerOpen = !!selectedVehicle
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? vehicles : vehicles.filter((v) => v.status === statusFilter),
     [vehicles, statusFilter],
   )
+
+  const openVehicle = (id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('vehicle', id)
+      return next
+    }, { replace: false })
+  }
+
+  const closeDrawer = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('vehicle')
+      return next
+    }, { replace: false })
+  }
+
+  // Stop the row click from re-firing on action-column clicks.
+  const stopRowClick = (e: React.MouseEvent) => e.stopPropagation()
 
   const columns = useMemo<ColumnDef<Vehicle>[]>(() => [
     { accessorKey: 'plateNumber', header: 'Plate', cell: ({ row }) => (
@@ -92,7 +111,7 @@ export function VehiclesTab() {
     { id: 'actions', header: '', cell: ({ row }) => {
       const vehicle = row.original
       return (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" onClick={stopRowClick}>
           {vehicle.checklistId && (
             <button
               onClick={() => setInspectionVehicle(vehicle)}
@@ -115,16 +134,18 @@ export function VehiclesTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<VehicleForm>({
-    resolver: zodResolver(vehicleSchema),
-    defaultValues: { fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 },
-  })
-
-  const onSubmit = (_data: VehicleForm) => {
-    setShowAdd(false)
-    reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 })
-    toast.success('Vehicle registered')
-  }
+  // Defer cleanup of stale ?vehicle= until vehicles have loaded — otherwise we
+  // wipe the param mid-fetch and break direct deep-link navigation.
+  useEffect(() => {
+    if (isLoading) return
+    if (selectedVehicleId && !selectedVehicle) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('vehicle')
+        return next
+      }, { replace: true })
+    }
+  }, [isLoading, selectedVehicleId, selectedVehicle, setSearchParams])
 
   if (isLoading) return <TableSkeleton columns={6} rows={5} />
 
@@ -153,7 +174,9 @@ export function VehiclesTab() {
               { key: 'assignedDriverId', label: 'Driver' },
             ]}
           />
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd(true)}>Register Vehicle</Button>
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => { setEditingVehicle(null); setShowForm(true) }}>
+            Register Vehicle
+          </Button>
         </div>
       </div>
 
@@ -162,7 +185,15 @@ export function VehiclesTab() {
           <table className="w-full">
             <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
             <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+              {table.getRowModel().rows.map(row => (
+                <tr
+                  key={row.id}
+                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
+                  onClick={() => openVehicle(row.original.id)}
+                >
+                  {row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
+                </tr>
+              ))}
               {table.getRowModel().rows.length === 0 && (
                 <DataTableEmpty colSpan={columns.length} icon={Truck} message="No vehicles match your filters" />
               )}
@@ -171,6 +202,27 @@ export function VehiclesTab() {
         </div>
         <DataTablePagination table={table} />
       </div>
+
+      <VehicleDetailDrawer
+        open={drawerOpen}
+        vehicle={selectedVehicle}
+        onClose={closeDrawer}
+        onEdit={(v) => {
+          setEditingVehicle(v)
+          setShowForm(true)
+        }}
+      />
+
+      <VehicleFormModal
+        open={showForm}
+        onClose={() => { setShowForm(false); setEditingVehicle(null) }}
+        vehicle={editingVehicle}
+        onSaved={(v) => {
+          // After registering a brand-new vehicle, jump straight into its drawer
+          // so the user can add a driver / linked asset / checklist.
+          if (!editingVehicle) openVehicle(v.id)
+        }}
+      />
 
       <Modal
         open={!!inspectionVehicle}
@@ -213,39 +265,6 @@ export function VehiclesTab() {
             <TrackingPanel entityType="vehicle" entityId={locationVehicle.id} />
           </div>
         )}
-      </Modal>
-
-      <Modal
-        open={showAdd}
-        onClose={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }}
-        title="Register Vehicle"
-        size="lg"
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset({ fuelType: 'diesel', year: new Date().getFullYear(), currentOdometer: 0 }) }}>Cancel</Button>
-            <Button type="submit" form="register-vehicle-form">Register Vehicle</Button>
-          </>
-        }
-      >
-        <form id="register-vehicle-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Plate Number *" {...register('plateNumber')} error={errors.plateNumber?.message} placeholder="e.g. SGX 5482 K" />
-            <Input label="Model *" {...register('model')} error={errors.model?.message} placeholder="e.g. Toyota Hilux" />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Input label="Year *" type="number" {...register('year', { valueAsNumber: true })} error={errors.year?.message} />
-            <Select label="Fuel Type *" {...register('fuelType')} error={errors.fuelType?.message} options={[
-              { value: 'petrol', label: 'Petrol' },
-              { value: 'diesel', label: 'Diesel' },
-              { value: 'electric', label: 'Electric' },
-            ]} />
-            <Input label="Odometer *" type="number" {...register('currentOdometer', { valueAsNumber: true })} error={errors.currentOdometer?.message} helperText="km" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Fuel Capacity (L)" type="number" {...register('fuelCapacityLiters', { valueAsNumber: true, setValueAs: (v) => v === '' || v == null || Number.isNaN(v) ? undefined : Number(v) })} error={errors.fuelCapacityLiters?.message} />
-            <Select label="Assigned Driver" {...register('assignedDriverId')} error={errors.assignedDriverId?.message} placeholder="Optional" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
-          </div>
-        </form>
       </Modal>
     </div>
   )
