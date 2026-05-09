@@ -27,6 +27,7 @@ import {
   Trash2,
   Bookmark,
   Sparkles,
+  AlertCircle,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureKey } from './features'
@@ -204,8 +205,9 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Registry', path: 'registry', icon: Package, feature: 'assets' },
           { label: 'Assignments', path: 'assignments', icon: UserCheck, feature: 'assetAssignments' },
-          { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'assetMaintenance' },
           { label: 'Inspections', path: 'inspections', icon: ClipboardCheck, feature: 'assetInspections' },
+          { label: 'Issues', path: 'issues', icon: AlertCircle, feature: 'assetsIssues' },
+          { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'assetMaintenance' },
           { label: 'Disposal', path: 'disposal', icon: Trash2, feature: 'assetDisposal' },
         ],
       },
@@ -252,6 +254,7 @@ export const modules: EmsModule[] = [
           { label: 'Vehicles', path: 'vehicles', icon: Truck, feature: 'fleet' },
           { label: 'Trips', path: 'trips', icon: RouteIcon, feature: 'fleetTrips' },
           { label: 'Fuel Logs', path: 'fuel-logs', icon: Fuel, feature: 'fleetFuelLogs' },
+          { label: 'Issues', path: 'issues', icon: AlertCircle, feature: 'fleetIssues' },
           { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'fleetMaintenance' },
         ],
       },

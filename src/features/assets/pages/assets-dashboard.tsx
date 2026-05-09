@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -25,6 +25,8 @@ import {
 } from 'recharts'
 import { format, formatDistanceToNow, parseISO, differenceInCalendarDays } from 'date-fns'
 import { useAssets, useAssetAssignments, totalBookValue } from '@/features/assets'
+import { useIssues, IssueList, IssueDetailDrawer } from '@/features/issues'
+import type { Issue } from '@/features/issues'
 import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import { useWorkOrders } from '@/features/maintenance'
 import { useCategories } from '@/features/categories'
@@ -80,6 +82,8 @@ export function AssetsDashboard() {
   const { data: auditEntries = [] } = useAuditLog()
   const { data: workOrders = [] } = useWorkOrders()
   const { notifications, unreadCount } = useNotifications()
+  const { data: openIssues = [] } = useIssues({ targetKind: 'asset', status: 'all-open' })
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const settings = useAssetsSettings((s) => s.settings)
   const navigate = useNavigate()
 
@@ -401,6 +405,33 @@ export function AssetsDashboard() {
         </Card>
       </motion.div>
 
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between flex">
+            <CardTitle className="flex items-center gap-2">
+              Open Issues
+              {openIssues.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">
+                  {openIssues.length}
+                </span>
+              )}
+            </CardTitle>
+            <Link to="issues" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
+              View all
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <IssueList
+              issues={openIssues.slice(0, 5)}
+              onSelect={setSelectedIssue}
+              emptyTitle="No open issues"
+              emptyDescription="No issues reported against assets — everything is running clean."
+            />
+          </CardContent>
+        </Card>
+      </motion.div>
+
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex-row items-center justify-between flex">
@@ -572,6 +603,12 @@ export function AssetsDashboard() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <IssueDetailDrawer
+        open={!!selectedIssue}
+        issue={selectedIssue}
+        onClose={() => setSelectedIssue(null)}
+      />
 
       {assetAlerts.length > 0 && (
         <motion.div variants={itemVariants}>

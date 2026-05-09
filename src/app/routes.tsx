@@ -81,6 +81,8 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   fleetUsers:          lazy(() => featureImports.fleetUsers().then((m: any) => ({ default: m.FleetUsersPage }))),
   fleetSettings:       lazy(() => featureImports.fleetSettings().then((m: any) => ({ default: m.FleetSettingsPage }))),
   fleetReports:        lazy(() => featureImports.fleetReports().then((m: any) => ({ default: m.FleetReportsPage }))),
+  fleetIssues:         lazy(() => featureImports.fleetIssues().then((m: any) => ({ default: m.FleetIssuesPage }))),
+  assetsIssues:        lazy(() => featureImports.assetsIssues().then((m: any) => ({ default: m.AssetsIssuesPage }))),
   warehouses:          lazy(() => featureImports.warehouses().then((m: any) => ({ default: m.WarehousesPage }))),
   categories:          lazy(() => featureImports.categories().then((m: any) => ({ default: m.CategoriesPage }))),
   uom:                 lazy(() => featureImports.uom().then((m: any) => ({ default: m.UomPage }))),

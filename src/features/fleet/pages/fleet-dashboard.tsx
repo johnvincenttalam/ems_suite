@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -40,6 +40,8 @@ import { useVehicles, useTrips, useFuelLogs } from '@/features/fleet'
 import { useUsers } from '@/features/users'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
+import { useIssues, IssueList, IssueDetailDrawer } from '@/features/issues'
+import type { Issue } from '@/features/issues'
 import { QualityStrip } from '@/shared/qms'
 import { StatCard } from '@/shared/ui/stat-card'
 import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
@@ -109,6 +111,8 @@ export function FleetDashboard() {
   const { data: users = [] } = useUsers()
   const { data: auditEntries = [] } = useAuditLog()
   const { notifications, unreadCount } = useNotifications()
+  const { data: openIssues = [] } = useIssues({ targetKind: 'vehicle', status: 'all-open' })
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const navigate = useNavigate()
 
   const stats = useMemo(() => {
@@ -642,6 +646,34 @@ export function FleetDashboard() {
         </Card>
       </motion.div>
 
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between flex">
+            <CardTitle className="flex items-center gap-2">
+              Open Issues
+              {openIssues.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">
+                  {openIssues.length}
+                </span>
+              )}
+            </CardTitle>
+            <Link to="issues" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
+              View all
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <IssueList
+              issues={openIssues.slice(0, 5)}
+              onSelect={setSelectedIssue}
+              hideTarget={false}
+              emptyTitle="No open issues"
+              emptyDescription="Your fleet is clean — nothing reported, nothing flagged."
+            />
+          </CardContent>
+        </Card>
+      </motion.div>
+
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex-row items-center justify-between flex">
@@ -729,6 +761,12 @@ export function FleetDashboard() {
       <motion.div variants={itemVariants}>
         <QualityStrip module="fleet" />
       </motion.div>
+
+      <IssueDetailDrawer
+        open={!!selectedIssue}
+        issue={selectedIssue}
+        onClose={() => setSelectedIssue(null)}
+      />
 
       {fleetAlerts.length > 0 && (
         <motion.div variants={itemVariants}>

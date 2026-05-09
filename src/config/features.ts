@@ -70,6 +70,8 @@ export const features = {
   fleetUsers: true,
   fleetSettings: true,
   fleetReports: true,
+  fleetIssues: true,
+  assetsIssues: true,
 
   // EMS — administration / master data
   warehouses: true,

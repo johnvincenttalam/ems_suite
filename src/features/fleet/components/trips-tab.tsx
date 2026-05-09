@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { Route, Plus, MapPin, Loader2, ClipboardList } from 'lucide-react'
+import { Route, Plus, MapPin, Loader2, ClipboardList, AlertCircle } from 'lucide-react'
 import { ChecklistPanel } from '@/shared/checklists'
 import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTrips, useVehicles } from '@/features/fleet'
 import { useUsers } from '@/features/users'
+import { ReportIssueModal } from '@/features/issues'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
@@ -51,6 +52,7 @@ export function TripsTab() {
   const [statusFilter, setStatusFilter] = useState<TripStatus | 'all'>('all')
   const [showNew, setShowNew] = useState(false)
   const [inspectionTrip, setInspectionTrip] = useState<Trip | null>(null)
+  const [reportIssueForTrip, setReportIssueForTrip] = useState<Trip | null>(null)
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? trips : trips.filter((t) => t.status === statusFilter),
@@ -200,10 +202,29 @@ export function TripsTab() {
                 assignedToUserId={inspectionTrip.driverId}
                 readOnly={inspectionTrip.status === 'completed'}
               />
+              <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between gap-3">
+                <p className="text-[11.5px] text-zinc-500">
+                  Spotted something during inspection? File it as an issue so it doesn't get lost.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  leftIcon={<AlertCircle className="w-3.5 h-3.5" />}
+                  onClick={() => setReportIssueForTrip(inspectionTrip)}
+                >
+                  Report Issue
+                </Button>
+              </div>
             </div>
           )
         })()}
       </Modal>
+
+      <ReportIssueModal
+        open={!!reportIssueForTrip}
+        onClose={() => setReportIssueForTrip(null)}
+        target={reportIssueForTrip ? { kind: 'vehicle', id: reportIssueForTrip.vehicleId } : undefined}
+      />
 
       <Modal open={showNew} onClose={() => { setShowNew(false); reset() }} title="Start Trip" size="md">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

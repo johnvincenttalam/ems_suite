@@ -13,6 +13,7 @@ import {
   ArrowLeftRight,
   Plus,
   AlertTriangle,
+  AlertCircle,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -35,6 +36,13 @@ import {
   DISPOSAL_TYPE_LABELS,
   AssetThumbnail,
 } from '@/features/assets'
+import {
+  useIssuesForTarget,
+  IssueList,
+  IssueDetailDrawer,
+  ReportIssueModal,
+} from '@/features/issues'
+import type { Issue } from '@/features/issues'
 import type {
   Asset,
   AssetEventType,
@@ -51,7 +59,7 @@ import { ConditionPill } from '@/features/assets/components/condition-pill'
 import { formatCurrency } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
 
-type DrawerTab = 'overview' | 'assignments' | 'maintenance' | 'inspections' | 'history'
+type DrawerTab = 'overview' | 'assignments' | 'maintenance' | 'inspections' | 'issues' | 'history'
 
 interface AssetDetailDrawerProps {
   open: boolean
@@ -82,6 +90,7 @@ export function AssetDetailDrawer({ open, asset, onClose, initialTab = 'overview
     { label: 'Assignments', value: 'assignments' },
     { label: 'Maintenance', value: 'maintenance' },
     { label: 'Inspections', value: 'inspections' },
+    { label: 'Issues', value: 'issues' },
     { label: 'History', value: 'history' },
   ]
 
@@ -114,6 +123,7 @@ export function AssetDetailDrawer({ open, asset, onClose, initialTab = 'overview
               {tab === 'assignments' && <AssignmentsTab asset={asset} />}
               {tab === 'maintenance' && <MaintenanceTab asset={asset} />}
               {tab === 'inspections' && <InspectionsTab asset={asset} />}
+              {tab === 'issues' && <IssuesTab asset={asset} />}
               {tab === 'history' && <HistoryTab asset={asset} />}
             </div>
           </motion.aside>
@@ -783,6 +793,47 @@ function ResultSelect({ index, register }: { index: number; register: ReturnType
       <option value="fail">Fail</option>
       <option value="na">N/A</option>
     </select>
+  )
+}
+
+function IssuesTab({ asset }: { asset: Asset }) {
+  const { data: issues = [] } = useIssuesForTarget({ kind: 'asset', id: asset.id })
+  const [selected, setSelected] = useState<Issue | null>(null)
+  const [reporting, setReporting] = useState(false)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[12.5px] text-zinc-500">
+          Reported issues against this asset — open and historical.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={<AlertCircle className="w-3.5 h-3.5" />}
+          onClick={() => setReporting(true)}
+        >
+          Report Issue
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-zinc-200/60 overflow-hidden bg-white">
+        <IssueList
+          issues={issues}
+          onSelect={setSelected}
+          hideTarget
+          emptyTitle="No issues reported"
+          emptyDescription="Nothing has been raised against this asset yet."
+        />
+      </div>
+
+      <IssueDetailDrawer open={!!selected} issue={selected} onClose={() => setSelected(null)} />
+      <ReportIssueModal
+        open={reporting}
+        onClose={() => setReporting(false)}
+        target={{ kind: 'asset', id: asset.id }}
+      />
+    </div>
   )
 }
 
