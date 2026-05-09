@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Fuel, Plus } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { format, parseISO } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
@@ -18,8 +16,9 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 
 const fuelSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle is required'),
@@ -104,45 +103,34 @@ export function FuelLogsTab() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="max-w-sm flex-1">
-          <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search fuel logs..." />
-        </div>
-        <div className="flex gap-2">
-          <ExportMenu
-            rows={logs as unknown as Record<string, unknown>[]}
-            baseFilename="fuel-logs"
-            sheetName="Fuel Logs"
-            pdfTitle="Fleet Fuel Logs"
-            columns={[
-              { key: 'date', label: 'Date' },
-              { key: 'vehicleId', label: 'Vehicle' },
-              { key: 'driverId', label: 'Driver' },
-              { key: 'liters', label: 'Liters' },
-              { key: 'costPerLiter', label: '$/L' },
-              { key: 'totalCost', label: 'Total' },
-              { key: 'odometer', label: 'Odometer' },
-              { key: 'station', label: 'Station' },
-            ]}
-          />
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd(true)}>Add Fuel Log</Button>
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search fuel logs...' }}
+      >
+        <ExportMenu
+          rows={logs as unknown as Record<string, unknown>[]}
+          baseFilename="fuel-logs"
+          sheetName="Fuel Logs"
+          pdfTitle="Fleet Fuel Logs"
+          columns={[
+            { key: 'date', label: 'Date' },
+            { key: 'vehicleId', label: 'Vehicle' },
+            { key: 'driverId', label: 'Driver' },
+            { key: 'liters', label: 'Liters' },
+            { key: 'costPerLiter', label: '$/L' },
+            { key: 'totalCost', label: 'Total' },
+            { key: 'odometer', label: 'Odometer' },
+            { key: 'station', label: 'Station' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd(true)}>Add Fuel Log</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Fuel} message="No fuel logs found" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Fuel}
+        emptyMessage="No fuel logs found"
+      />
 
       <Modal open={showAdd} onClose={() => { setShowAdd(false); reset() }} title="Log Fuel" size="md">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

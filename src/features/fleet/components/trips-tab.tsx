@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Route, Plus, MapPin, Loader2, ClipboardList, AlertCircle } from 'lucide-react'
 import { ChecklistPanel } from '@/shared/checklists'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { format, formatDistanceStrict, parseISO } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
@@ -20,9 +18,10 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 
 const tripSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle is required'),
@@ -105,11 +104,13 @@ export function TripsTab() {
       const vehicle = vehicleMap[trip.vehicleId]
       if (!vehicle?.checklistId) return null
       return (
-        <button
-          onClick={() => setInspectionTrip(trip)}
-          title="Pre-trip inspection"
-          className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-        ><ClipboardList className="w-4 h-4" /></button>
+        <div onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setInspectionTrip(trip)}
+            title="Pre-trip inspection"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+          ><ClipboardList className="w-4 h-4" /></button>
+        </div>
       )
     }},
   ], [vehicleMap, userMap])
@@ -133,48 +134,35 @@ export function TripsTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search trips..." />
-          </div>
-          <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
-        </div>
-        <div className="flex gap-2">
-          <ExportMenu
-            rows={trips as unknown as Record<string, unknown>[]}
-            baseFilename="trips"
-            sheetName="Trips"
-            pdfTitle="Fleet Trips"
-            columns={[
-              { key: 'id', label: 'Trip' },
-              { key: 'vehicleId', label: 'Vehicle' },
-              { key: 'driverId', label: 'Driver' },
-              { key: 'startTime', label: 'Start' },
-              { key: 'endTime', label: 'End' },
-              { key: 'distance', label: 'Distance (km)' },
-              { key: 'purpose', label: 'Purpose' },
-              { key: 'status', label: 'Status' },
-            ]}
-          />
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>Start Trip</Button>
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search trips...' }}
+        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+      >
+        <ExportMenu
+          rows={trips as unknown as Record<string, unknown>[]}
+          baseFilename="trips"
+          sheetName="Trips"
+          pdfTitle="Fleet Trips"
+          columns={[
+            { key: 'id', label: 'Trip' },
+            { key: 'vehicleId', label: 'Vehicle' },
+            { key: 'driverId', label: 'Driver' },
+            { key: 'startTime', label: 'Start' },
+            { key: 'endTime', label: 'End' },
+            { key: 'distance', label: 'Distance (km)' },
+            { key: 'purpose', label: 'Purpose' },
+            { key: 'status', label: 'Status' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>Start Trip</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Route} message="No trips match your filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Route}
+        emptyMessage="No trips match your filters"
+      />
 
       <Modal
         open={!!inspectionTrip}

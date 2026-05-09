@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Wrench } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { format, parseISO } from 'date-fns'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useVehicles } from '@/features/fleet'
 import { useWorkOrders } from '@/features/maintenance'
 import { useUsers } from '@/features/users'
@@ -12,6 +11,8 @@ import { Avatar } from '@/shared/ui/avatar'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { EmptyState } from '@/shared/ui/empty-state'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { cn } from '@/shared/utils/cn'
 
 const priorityStyles: Record<WorkOrderPriority, string> = {
@@ -25,6 +26,7 @@ export function FleetMaintenanceTab() {
   const { data: vehicles = [] } = useVehicles()
   const { data: workOrders = [], isLoading } = useWorkOrders()
   const { data: users = [] } = useUsers()
+  const navigate = useNavigate()
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
   const vehicleByAssetId = useMemo(() => {
@@ -95,21 +97,24 @@ export function FleetMaintenanceTab() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-[13px] text-zinc-500">{fleetWorkOrders.length} work orders linked to fleet vehicles. Manage in the <Link to="/module/maintenance" className="text-zinc-900 font-medium underline-offset-2 hover:underline">Maintenance module</Link>.</p>
-      </div>
+      <p className="text-[13px] text-zinc-500 mb-4">
+        {fleetWorkOrders.length} work orders linked to fleet vehicles. Manage in the{' '}
+        <Link to="/module/maintenance" className="text-zinc-900 font-medium underline-offset-2 hover:underline">
+          Maintenance module
+        </Link>.
+      </p>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, placeholder: 'Search work orders...' }}
+      />
+
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Wrench}
+        emptyMessage="No work orders match your search"
+        onRowClick={(wo) => navigate(`/module/maintenance/work-orders?wo=${wo.id}`)}
+      />
     </div>
   )
 }
