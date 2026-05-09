@@ -251,6 +251,17 @@
   .dark .border-amber-100 { border-color: rgba(245, 158, 11, 0.20) !important; }
   .dark .border-blue-100 { border-color: rgba(59, 130, 246, 0.20) !important; }
 
+  /* <mark> + bg-amber-100 highlight pill — used by search palette and
+     smart-search results to bold matched terms. The light-amber background
+     stays bright in dark mode without an override; combined with the
+     text-zinc-900 → #fafafa flip from elsewhere, the result was white-on-
+     light-amber and unreadable. Switch to a darker amber tint with light
+     text for dark mode so highlights stay visible. */
+  .dark .bg-amber-100 {
+    background-color: rgba(245, 158, 11, 0.30) !important;
+    color: #fef3c7 !important;
+  }
+
   /* Tabs active count badge — span.bg-zinc-900 isn't covered by the
      button-only rule below; in dark mode the literal black blends into the
      surface, so invert it to white pill with dark text. */

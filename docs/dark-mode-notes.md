@@ -283,6 +283,35 @@ The trick is that `.surface-paper` is your own custom class — no dark override
 
 ---
 
+## Bug 9 — `<mark>` highlight pills go invisible
+
+**Symptom:** Search results / smart-search snippets bold the matched terms with `<mark className="bg-amber-100 text-zinc-900">`. In dark mode the matched text disappears — it reads as white-on-very-light-amber.
+
+**Cause:** Two-step interaction:
+1. The base class `bg-amber-100` has no dark override → stays bright pastel
+2. Some downstream rule flips `text-zinc-900` to `#fafafa` for dark mode (button overrides cascade through `<mark>`'s default `display: inline`)
+
+The combination is bright pastel + nearly-white text — totally unreadable.
+
+**Fix:**
+
+```css
+.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.30) !important;
+  color: #fef3c7 !important;
+}
+```
+
+The matched span now reads as light-amber text on a dark amber-tinted pill. Same recipe works for any `bg-{color}-100` pill that wraps text.
+
+**Where to look for this:** anywhere you render search-result snippets, autocomplete matches, or filter-applied chips with `<mark>` or hand-rolled emphasis spans. Grep for:
+
+```
+grep -rEn '<mark|bg-amber-100' src/
+```
+
+---
+
 ## Audit checklist for a new template
 
 Run this over any admin template using class-targeted dark mode:
@@ -294,6 +323,7 @@ Run this over any admin template using class-targeted dark mode:
 - [ ] `grep -rl 'recharts\|<LineChart\|<BarChart\|<PieChart' src/` — if you find Recharts, drop in the `.recharts-*` overrides from the CSS block.
 - [ ] `grep -rE 'fill="#|stroke="#' src/` — any custom SVG with hex literals breaks dark mode. Switch to `fill="currentColor"` / `stroke="currentColor"` and apply `text-zinc-*` on the wrapper.
 - [ ] `grep -r 'SignatureCanvas\|<Page \|react-pdf\|paper.*bg-white' src/` — find any "ink on paper" surfaces and migrate them to `.surface-paper`.
+- [ ] `grep -rE '<mark|bg-amber-100|bg-yellow-100' src/` — any highlight pill needs a dark-mode override; `text-zinc-900` cascades into `<mark>` and flips to white in dark mode, so light pastel backgrounds become unreadable.
 - [ ] Toggle dark mode on **every page** after building. Anything that looks washed-out gray (instead of tinted) is missing an alpha override. Anything dark-on-dark (like a signature you can't see) is a paper-surface issue.
 - [ ] Specifically check expandable rows, metric tiles, KPI cards, filter chips, tab badges, avatar circles, modal backgrounds, **chart axes/grids/tooltips**, **signature canvases**, **rendered document pages**.
 - [ ] Verify `border-t border-zinc-100/60` (or your chosen unified weight) is the convention across all tables.
@@ -361,6 +391,15 @@ Copy this block into your `index.css` (or wherever your dark-mode rules live), u
    both light and dark mode. Apply via className="surface-paper" instead
    of bg-white (which gets dark-flipped). === */
 .surface-paper { background-color: #ffffff !important; }
+
+/* === <mark> highlight pills — bg-amber-100 stays bright in dark mode,
+   and text-zinc-900 cascades to white via the button override; the result
+   is white-on-pastel and unreadable. Switch to a darker amber tint with
+   light text for dark mode. === */
+.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.30) !important;
+  color: #fef3c7 !important;
+}
 ```
 
 ---
