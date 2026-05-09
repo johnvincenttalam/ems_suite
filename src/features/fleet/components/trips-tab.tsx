@@ -36,6 +36,7 @@ const statusFilters: { value: TripStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 export function TripsTab() {
@@ -82,12 +83,15 @@ export function TripsTab() {
       if (row.original.status === 'in_progress') {
         return <span className="inline-flex items-center gap-1 text-[12px] text-blue-700"><Loader2 className="w-3 h-3 animate-spin" />Running</span>
       }
+      if (row.original.status === 'cancelled') {
+        return <span className="inline-flex items-center gap-1 text-[12px] text-rose-700">Cancelled</span>
+      }
       const dur = formatDistanceStrict(parseISO(row.original.endTime!), parseISO(row.original.startTime))
       return <span className="text-zinc-600 tabular-nums">{dur}</span>
     }},
     { accessorKey: 'distance', header: 'Distance', cell: ({ getValue, row }) => {
       const v = getValue() as number
-      if (row.original.status === 'in_progress') return <span className="text-zinc-400">—</span>
+      if (row.original.status !== 'completed') return <span className="text-zinc-400">—</span>
       return <span className="tabular-nums font-medium text-zinc-900">{v.toLocaleString()} km</span>
     }},
     { accessorKey: 'purpose', header: 'Purpose', cell: ({ getValue }) => {

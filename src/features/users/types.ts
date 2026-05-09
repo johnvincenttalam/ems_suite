@@ -13,6 +13,9 @@ export interface User {
   departmentId?: string
   position?: string
   status: 'active' | 'inactive'
+  /** Driver's license expiry (ISO yyyy-mm-dd). Optional — only set on users
+   * who drive fleet vehicles. Surfaced by the Fleet dashboard's expiry watch. */
+  licenseExpiry?: string
   createdAt: string
   /** Modules this user can access. An empty list means no module access. */
   modules: ModuleKey[]

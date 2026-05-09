@@ -32,6 +32,13 @@ describe('fleetApi.listVehicles', () => {
     const electric = result.filter((v) => v.fuelType === 'electric')
     expect(electric.every((v) => v.fuelCapacityLiters === 0)).toBe(true)
   })
+
+  it('non-retired vehicles have a nextServiceDate so the dashboard can flag due services', async () => {
+    const result = await fleetApi.listVehicles()
+    const inService = result.filter((v) => v.status !== 'retired')
+    expect(inService.length).toBeGreaterThan(0)
+    expect(inService.every((v) => !!v.nextServiceDate)).toBe(true)
+  })
 })
 
 describe('fleetApi.listTrips', () => {
@@ -73,6 +80,23 @@ describe('fleetApi.listTrips', () => {
   it('in-progress trips do not have endTime', async () => {
     const result = await fleetApi.listTrips()
     expect(result.filter((t) => t.status === 'in_progress').every((t) => !t.endTime)).toBe(true)
+  })
+
+  it('cancelled trips have no endTime, no endOdometer, and zero distance', async () => {
+    const result = await fleetApi.listTrips()
+    const cancelled = result.filter((t) => t.status === 'cancelled')
+    expect(cancelled.length).toBeGreaterThan(0)
+    expect(cancelled.every((t) => !t.endTime && t.endOdometer == null && t.distance === 0)).toBe(true)
+  })
+})
+
+describe('driver license data', () => {
+  it('users referenced as fleet drivers carry a licenseExpiry', async () => {
+    const trips = await fleetApi.listTrips()
+    const driverIds = new Set(trips.map((t) => t.driverId))
+    const drivers = mockUsers.filter((u) => driverIds.has(u.id))
+    expect(drivers.length).toBeGreaterThan(0)
+    expect(drivers.every((u) => !!u.licenseExpiry)).toBe(true)
   })
 })
 

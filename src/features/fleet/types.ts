@@ -1,6 +1,6 @@
 export type VehicleStatus = 'active' | 'maintenance' | 'retired'
 export type FuelType = 'petrol' | 'diesel' | 'electric'
-export type TripStatus = 'in_progress' | 'completed'
+export type TripStatus = 'in_progress' | 'completed' | 'cancelled'
 
 export interface Vehicle {
   id: string
@@ -15,6 +15,9 @@ export interface Vehicle {
   linkedAssetId?: string
   /** Optional checklist template — used for pre-trip inspection. */
   checklistId?: string
+  /** Next scheduled service date (ISO yyyy-mm-dd). Used by the dashboard's
+   * "Maintenance Due" panel to flag vehicles approaching or past due. */
+  nextServiceDate?: string
   createdAt: string
 }
 
