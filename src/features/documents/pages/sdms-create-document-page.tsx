@@ -7,10 +7,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { ArrowLeft, FileText, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUsers, UserInfoPopover } from '@/features/users'
+import { useUsers } from '@/features/users'
 import { useDepartments } from '@/features/departments'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { documentsApi } from '@/features/documents/api/documents-api'
+import { ApproverChainEditor } from '@/features/documents/components/approver-chain-editor'
 import { useWorkflowTemplates } from '@/features/documents/hooks/use-workflow-templates'
 import {
   CATEGORY_LABEL,
@@ -677,27 +678,12 @@ export function SdmsCreateDocumentPage() {
               <span className="text-[11px] text-zinc-400">in order</span>
             </div>
             {approvers.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3 p-2 rounded-lg bg-zinc-50 border border-zinc-200/60">
-                {approvers.map((id, idx) => {
-                  const u = users.find((x) => x.id === id)
-                  const nameNode = u
-                    ? (
-                      <UserInfoPopover user={u}>
-                        <span className="hover:underline underline-offset-2">{u.name}</span>
-                      </UserInfoPopover>
-                    )
-                    : <span>{id}</span>
-                  return (
-                    <span key={id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border border-zinc-200 text-[12px]">
-                      <span className="text-[10px] font-mono text-zinc-400">{idx + 1}.</span>
-                      {nameNode}
-                      <button type="button" onClick={() => toggleApprover(id)} className="text-zinc-400 hover:text-red-600">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )
-                })}
-              </div>
+              <ApproverChainEditor
+                approverIds={approvers}
+                users={users}
+                onChange={setApprovers}
+                className="mb-3"
+              />
             )}
             <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
               {activeUsers.map((u) => {

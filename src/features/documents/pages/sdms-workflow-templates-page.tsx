@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapPin, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react'
+import { MapPin, Pencil, Plus, Trash2, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUsers, UserInfoPopover } from '@/features/users'
 import { useWorkflowTemplates } from '@/features/documents/hooks/use-workflow-templates'
@@ -16,6 +16,7 @@ import {
   type WorkflowTemplate,
 } from '@/features/documents/types'
 import { SignatureSlotEditor } from '@/features/documents/components/signature'
+import { ApproverChainEditor } from '@/features/documents/components/approver-chain-editor'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -309,17 +310,6 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
     setApprovers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const moveApprover = (idx: number, dir: -1 | 1) => {
-    setApproversTouched(true)
-    setApprovers((prev) => {
-      const next = [...prev]
-      const j = idx + dir
-      if (j < 0 || j >= next.length) return prev
-      ;[next[idx], next[j]] = [next[j], next[idx]]
-      return next
-    })
-  }
-
   const onSubmit = (values: FormValues) => {
     if (approvers.length === 0) {
       setApproversTouched(true)
@@ -371,22 +361,13 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
             <span className="text-[11px] text-zinc-400">in order — first signs first</span>
           </div>
           {approvers.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3 p-2 rounded-lg bg-zinc-50 border border-zinc-200/60">
-              {approvers.map((id, idx) => {
-                const u = users.find((x) => x.id === id)
-                return (
-                  <span key={`${id}-${idx}`} className="inline-flex items-center gap-1 pl-1.5 pr-1 py-1 rounded-md bg-white border border-zinc-200 text-[12px]">
-                    <span className="text-[10px] font-mono text-zinc-400">{idx + 1}.</span>
-                    {u?.name ?? id}
-                    <button type="button" onClick={() => moveApprover(idx, -1)} disabled={idx === 0} className="px-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-30">↑</button>
-                    <button type="button" onClick={() => moveApprover(idx, 1)} disabled={idx === approvers.length - 1} className="px-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-30">↓</button>
-                    <button type="button" onClick={() => toggleApprover(id)} className="px-1 text-zinc-400 hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )
-              })}
-            </div>
+            <ApproverChainEditor
+              approverIds={approvers}
+              users={users}
+              onChange={setApprovers}
+              onTouch={() => setApproversTouched(true)}
+              className="mb-3"
+            />
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
             {activeUsers.map((u) => {
