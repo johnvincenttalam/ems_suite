@@ -110,7 +110,17 @@ export function ModuleSelectorPage() {
           </motion.div>
         ) : (
           <>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center text-center"
+            >
+              <img
+                src="/jv-lockup.png"
+                alt="Shimizu - Fujita - Takenaka - EEI Joint Venture"
+                className="w-full max-w-[360px] h-auto logo-invert mb-8"
+              />
               <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight text-zinc-900">
                 Select a system
               </h1>
