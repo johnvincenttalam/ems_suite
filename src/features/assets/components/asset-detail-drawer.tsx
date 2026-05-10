@@ -56,10 +56,11 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Textarea } from '@/shared/ui/textarea'
 import { ConditionPill } from '@/features/assets/components/condition-pill'
+import { TrackingPanel } from '@/shared/tracking'
 import { formatCurrency } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
 
-type DrawerTab = 'overview' | 'assignments' | 'maintenance' | 'inspections' | 'issues' | 'history'
+type DrawerTab = 'overview' | 'assignments' | 'maintenance' | 'inspections' | 'issues' | 'tracking' | 'history'
 
 interface AssetDetailDrawerProps {
   open: boolean
@@ -91,6 +92,7 @@ export function AssetDetailDrawer({ open, asset, onClose, initialTab = 'overview
     { label: 'Maintenance', value: 'maintenance' },
     { label: 'Inspections', value: 'inspections' },
     { label: 'Issues', value: 'issues' },
+    { label: 'Tracking', value: 'tracking' },
     { label: 'History', value: 'history' },
   ]
 
@@ -124,6 +126,7 @@ export function AssetDetailDrawer({ open, asset, onClose, initialTab = 'overview
               {tab === 'maintenance' && <MaintenanceTab asset={asset} />}
               {tab === 'inspections' && <InspectionsTab asset={asset} />}
               {tab === 'issues' && <IssuesTab asset={asset} />}
+              {tab === 'tracking' && <TrackingPanel entityType="asset" entityId={asset.id} />}
               {tab === 'history' && <HistoryTab asset={asset} />}
             </div>
           </motion.aside>

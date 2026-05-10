@@ -3,11 +3,12 @@ import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowMo
 import { Boxes, Plus, UserCheck, ArrowLeftRight, Trash2, MapPin, ClipboardList, Undo2, Upload, X, Pencil } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { TrackingPanel } from '@/shared/tracking'
+import { useTags, useTrackingLogs } from '@/features/tracking'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { useAssets, assetsApi, AssetThumbnail } from '@/features/assets'
 import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
@@ -131,6 +132,22 @@ export function RegistryTab() {
   const categoryMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
   const locationMap = useMemo(() => Object.fromEntries(warehouses.map((w) => [w.id, w])), [warehouses])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+
+  const { data: tags = [] } = useTags()
+  const { data: trackingLogs = [] } = useTrackingLogs()
+  const trackingByAssetId = useMemo(() => {
+    const tagByAsset: Record<string, typeof tags[number]> = {}
+    for (const t of tags) {
+      if (t.boundEntityType === 'asset') tagByAsset[t.boundEntityId] = t
+    }
+    const lastLogByAsset: Record<string, string> = {}
+    for (const l of trackingLogs) {
+      if (l.entityType !== 'asset') continue
+      const prev = lastLogByAsset[l.entityId]
+      if (!prev || l.timestamp > prev) lastLogByAsset[l.entityId] = l.timestamp
+    }
+    return { tagByAsset, lastLogByAsset }
+  }, [tags, trackingLogs])
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all')
@@ -358,6 +375,23 @@ export function RegistryTab() {
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
     { accessorKey: 'condition', header: 'Condition', cell: ({ row }) => <ConditionPill condition={row.original.condition} /> },
+    { id: 'tracking', header: 'Tracking', cell: ({ row }) => {
+      const tag = trackingByAssetId.tagByAsset[row.original.id]
+      const lastSeen = trackingByAssetId.lastLogByAsset[row.original.id]
+      if (!tag && !lastSeen) return <span className="text-zinc-400">—</span>
+      return (
+        <div className="leading-tight">
+          {tag ? (
+            <p className="font-mono text-[11.5px] text-zinc-700">{tag.code}</p>
+          ) : (
+            <p className="text-[11.5px] text-zinc-400">No tag</p>
+          )}
+          {lastSeen && (
+            <p className="text-[10.5px] text-zinc-400">{formatDistanceToNow(parseISO(lastSeen), { addSuffix: true })}</p>
+          )}
+        </div>
+      )
+    }},
     { id: 'actions', header: '', cell: ({ row }) => {
       const asset = row.original
       const canAssign = asset.status === 'active' && !asset.assignedTo
@@ -419,7 +453,7 @@ export function RegistryTab() {
         </div>
       )
     }},
-  ], [categoryMap, locationMap, userMap])
+  ], [categoryMap, locationMap, userMap, trackingByAssetId])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,

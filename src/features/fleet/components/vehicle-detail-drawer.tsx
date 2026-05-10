@@ -40,7 +40,7 @@ import { Avatar } from '@/shared/ui/avatar'
 import { formatCompactCurrency, formatCurrency } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
 
-type DrawerTab = 'overview' | 'issues' | 'maintenance' | 'trips' | 'fuel' | 'history'
+type DrawerTab = 'overview' | 'issues' | 'maintenance' | 'trips' | 'fuel' | 'tracking' | 'history'
 
 interface VehicleDetailDrawerProps {
   open: boolean
@@ -96,6 +96,7 @@ export function VehicleDetailDrawer({ open, vehicle, onClose, onEdit }: VehicleD
     { label: 'Maintenance', value: 'maintenance' },
     { label: 'Trips', value: 'trips' },
     { label: 'Fuel', value: 'fuel' },
+    { label: 'Tracking', value: 'tracking' },
     { label: 'History', value: 'history' },
   ]
 
@@ -134,6 +135,7 @@ export function VehicleDetailDrawer({ open, vehicle, onClose, onEdit }: VehicleD
               {tab === 'maintenance' && <MaintenanceTab vehicle={vehicle} />}
               {tab === 'trips' && <TripsTab vehicle={vehicle} />}
               {tab === 'fuel' && <FuelTab vehicle={vehicle} />}
+              {tab === 'tracking' && <TrackingPanel entityType="vehicle" entityId={vehicle.id} />}
               {tab === 'history' && <HistoryTab vehicle={vehicle} />}
             </div>
           </motion.aside>
