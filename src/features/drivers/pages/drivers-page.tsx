@@ -21,6 +21,7 @@ import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { DataTable } from '@/shared/ui/data-table'
 import { Avatar } from '@/shared/ui/avatar'
 import { CreateEditDriverModal } from '@/features/drivers/components/create-edit-driver-modal'
+import { DriverDetailDrawer } from '@/features/drivers/components/driver-detail-drawer'
 import { cn } from '@/shared/utils/cn'
 
 type ModalMode = 'closed' | 'add' | 'edit'
@@ -50,6 +51,7 @@ export function DriversPage() {
   const [modalMode, setModalMode] = useState<ModalMode>('closed')
   const [editing, setEditing] = useState<Driver | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<Driver | null>(null)
+  const [viewing, setViewing] = useState<Driver | null>(null)
 
   const filtered = useMemo(
     () => (statusFilter === 'all' ? drivers : drivers.filter((d) => d.status === statusFilter)),
@@ -210,6 +212,13 @@ export function DriversPage() {
         columns={columns}
         emptyIcon={IdCard}
         emptyMessage="No drivers match your filters"
+        onRowClick={(driver) => setViewing(driver)}
+      />
+
+      <DriverDetailDrawer
+        open={!!viewing}
+        driver={viewing}
+        onClose={() => setViewing(null)}
       />
 
       <CreateEditDriverModal
