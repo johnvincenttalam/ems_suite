@@ -5,7 +5,6 @@ import {
   XCircle,
   MinusCircle,
   Plus,
-  Eye,
   AlertTriangle,
 } from 'lucide-react'
 import { format, parseISO, subDays, isAfter } from 'date-fns'
@@ -15,10 +14,10 @@ import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
-import { SearchInput } from '@/shared/ui/search-input'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { StatCard } from '@/shared/ui/stat-card'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
 import { cn } from '@/shared/utils/cn'
@@ -140,28 +139,23 @@ export function AssetInspectionsPage() {
         <StatCard title="Drafts" value={stats.drafts} icon={MinusCircle} iconBg="bg-blue-50" iconColor="text-blue-600" index={4} />
       </div>
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search inspections..." />
-          </div>
-          <FilterChips options={RESULT_FILTERS} value={resultFilter} onChange={setResultFilter} />
-        </div>
-        <div className="flex gap-2">
-          <Select
-            value={assetFilter}
-            onChange={(e) => setAssetFilter(e.target.value)}
-            options={assetOptions}
-            className="min-w-[200px]"
-          />
-          <Select
-            value={inspectorFilter}
-            onChange={(e) => setInspectorFilter(e.target.value)}
-            options={inspectorOptions}
-            className="min-w-[180px]"
-          />
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, placeholder: 'Search inspections...' }}
+        filter={<FilterChips options={RESULT_FILTERS} value={resultFilter} onChange={setResultFilter} />}
+      >
+        <Select
+          value={assetFilter}
+          onChange={(e) => setAssetFilter(e.target.value)}
+          options={assetOptions}
+          className="min-w-[200px]"
+        />
+        <Select
+          value={inspectorFilter}
+          onChange={(e) => setInspectorFilter(e.target.value)}
+          options={inspectorOptions}
+          className="min-w-[180px]"
+        />
+      </ListToolbar>
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
         <div className="overflow-x-auto">
@@ -174,12 +168,11 @@ export function AssetInspectionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Inspector</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Items</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Result</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <DataTableEmpty colSpan={7} icon={ClipboardCheck} message={inspections.length === 0 ? 'No inspections yet — click Record Inspection to log one.' : 'No inspections match your filters.'} />
+                <DataTableEmpty colSpan={6} icon={ClipboardCheck} message={inspections.length === 0 ? 'No inspections yet — click Record Inspection to log one.' : 'No inspections match your filters.'} />
               ) : (
                 filtered.map((insp) => (
                   <InspectionRow
@@ -207,6 +200,30 @@ export function AssetInspectionsPage() {
         onClose={() => { setShowRecord(false); setRecordAssetId('') }}
         title="Record Inspection"
         size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => { setShowRecord(false); setRecordAssetId('') }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!recordAssetId}
+              onClick={() => {
+                const a = assetMap[recordAssetId]
+                if (a) {
+                  setActiveAsset(a)
+                  setActiveTab('inspections')
+                  setShowRecord(false)
+                  setRecordAssetId('')
+                }
+              }}
+            >
+              Open Asset
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -221,30 +238,6 @@ export function AssetInspectionsPage() {
               .filter((a) => a.status !== 'disposed')
               .map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))}
           />
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => { setShowRecord(false); setRecordAssetId('') }}
-            >
-              Cancel
-            </Button>
-            <Button
-              fullWidth
-              disabled={!recordAssetId}
-              onClick={() => {
-                const a = assetMap[recordAssetId]
-                if (a) {
-                  setActiveAsset(a)
-                  setActiveTab('inspections')
-                  setShowRecord(false)
-                  setRecordAssetId('')
-                }
-              }}
-            >
-              Open Asset
-            </Button>
-          </div>
         </div>
       </Modal>
 
@@ -305,15 +298,6 @@ function InspectionRow({
         <span className={cn('inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-medium', RESULT_PILL_STYLES[inspection.overallResult])}>
           {RESULT_LABELS[inspection.overallResult]}
         </span>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <button
-          onClick={(e) => { e.stopPropagation(); if (asset) onOpenAsset(asset) }}
-          title="Open asset details"
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
       </td>
     </tr>
   )

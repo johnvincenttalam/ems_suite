@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
 import { Activity } from 'lucide-react'
@@ -14,11 +13,10 @@ import type { AuditAction, AuditEntry } from '@/features/audit-log/types'
 import { Avatar } from '@/shared/ui/avatar'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { PageHeader } from '@/shared/ui/page-header'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { cn } from '@/shared/utils/cn'
 
 const actionStyles: Record<AuditAction, string> = {
@@ -115,27 +113,23 @@ export function AssetsLogsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center">
-        <div className="max-w-sm flex-1">
-          <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search by user or detail..." />
-        </div>
-        <FilterChips options={actionFilters} value={actionFilter} onChange={(v) => setActionFilter(v as AuditAction | 'all')} />
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search by user or detail...' }}
+        filter={
+          <FilterChips
+            options={actionFilters}
+            value={actionFilter}
+            onChange={(v) => setActionFilter(v as AuditAction | 'all')}
+          />
+        }
+      />
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Activity} message="No events match your filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Activity}
+        emptyMessage="No events match your filters"
+      />
     </div>
   )
 }

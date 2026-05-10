@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Eye,
   ArrowDownToLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,8 +24,8 @@ import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { Tabs } from '@/shared/ui/tabs'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { StatCard } from '@/shared/ui/stat-card'
 import { AssetDetailDrawer } from '@/features/assets/components/asset-detail-drawer'
@@ -207,9 +206,9 @@ export function AssetDisposalPage() {
         />
       </div>
 
-      <div className="mb-4 max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search assets..." />
-      </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, placeholder: 'Search assets...' }}
+      />
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
         {tab === 'pending' ? (
@@ -246,6 +245,25 @@ export function AssetDisposalPage() {
         onClose={() => { setRejectTarget(null); setRejectReason('') }}
         title={`Reject disposal of ${rejectTarget?.name ?? ''}`}
         size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => { setRejectTarget(null); setRejectReason('') }}
+              disabled={rejectMutation.isPending}
+            >
+              Back
+            </Button>
+            <Button
+              variant="danger"
+              loading={rejectMutation.isPending}
+              disabled={rejectReason.trim().length < 2}
+              onClick={() => rejectTarget && rejectMutation.mutate({ asset: rejectTarget, reason: rejectReason.trim() })}
+            >
+              Confirm Rejection
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -259,25 +277,6 @@ export function AssetDisposalPage() {
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="e.g. Still has resale value; recommend extending useful life"
           />
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => { setRejectTarget(null); setRejectReason('') }}
-              disabled={rejectMutation.isPending}
-            >
-              Back
-            </Button>
-            <Button
-              variant="danger"
-              fullWidth
-              loading={rejectMutation.isPending}
-              disabled={rejectReason.trim().length < 2}
-              onClick={() => rejectTarget && rejectMutation.mutate({ asset: rejectTarget, reason: rejectReason.trim() })}
-            >
-              Confirm Rejection
-            </Button>
-          </div>
         </div>
       </Modal>
     </div>
@@ -325,17 +324,16 @@ function PendingTable({
             const d = a.disposal!
             const canActOnThis = !!currentUserName && (!d.pendingApproverName || d.pendingApproverName === currentUserName)
             return (
-              <tr key={a.id} className="border-b border-zinc-100/60 align-top">
+              <tr
+                key={a.id}
+                className="border-b border-zinc-100/60 align-top hover:bg-zinc-50/50 cursor-pointer"
+                onClick={() => onOpenAsset(a)}
+              >
                 <td className="px-4 py-3 text-[13px] text-zinc-700">
                   <div className="flex items-center gap-2.5">
                     <AssetThumbnail imageUrl={a.imageUrl} alt={a.name} size="sm" />
                     <div className="min-w-0">
-                      <button
-                        onClick={() => onOpenAsset(a)}
-                        className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
-                      >
-                        {a.name}
-                      </button>
+                      <p className="font-medium text-zinc-900">{a.name}</p>
                       <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
                     </div>
                   </div>
@@ -357,15 +355,8 @@ function PendingTable({
                     <span className="block text-[11px] text-zinc-500 mt-0.5">→ {d.disposedTo}</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right whitespace-nowrap">
+                <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1 justify-end">
-                    <button
-                      onClick={() => onOpenAsset(a)}
-                      title="View details"
-                      className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
                     {canActOnThis && (
                       <>
                         <Button
@@ -409,27 +400,25 @@ function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: A
             <th className="px-4 py-3 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider">Amount</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Disposed To</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Approved</th>
-            <th className="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <DataTableEmpty colSpan={6} icon={Trash2} message="No disposed assets in the archive yet" />
+            <DataTableEmpty colSpan={5} icon={Trash2} message="No disposed assets in the archive yet" />
           )}
           {rows.map((a) => {
             const d = a.disposal!
             return (
-              <tr key={a.id} className="border-b border-zinc-100/60">
+              <tr
+                key={a.id}
+                className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
+                onClick={() => onOpenAsset(a)}
+              >
                 <td className="px-4 py-3 text-[13px] text-zinc-700">
                   <div className="flex items-center gap-2.5">
                     <AssetThumbnail imageUrl={a.imageUrl} alt={a.name} size="sm" />
                     <div className="min-w-0">
-                      <button
-                        onClick={() => onOpenAsset(a)}
-                        className="font-medium text-zinc-900 hover:underline cursor-pointer text-left"
-                      >
-                        {a.name}
-                      </button>
+                      <p className="font-medium text-zinc-900">{a.name}</p>
                       <p className="text-[11px] text-zinc-400 font-mono">{a.assetCode}</p>
                     </div>
                   </div>
@@ -442,15 +431,6 @@ function ArchiveTable({ rows, onOpenAsset }: { rows: Asset[]; onOpenAsset: (a: A
                 <td className="px-4 py-3 text-[12px] text-zinc-500 whitespace-nowrap">
                   {d.approvedAt ? format(parseISO(d.approvedAt), 'MMM d, yyyy') : <span className="text-zinc-400">—</span>}
                   {d.approvedBy && <span className="block text-[10.5px] text-zinc-400">{d.approvedBy}</span>}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => onOpenAsset(a)}
-                    title="View details"
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
                 </td>
               </tr>
             )
@@ -523,8 +503,24 @@ function SubmitDisposalModal({
       onClose={() => { reset({ type: 'sold', disposedDate: format(new Date(), 'yyyy-MM-dd') }); onClose() }}
       title="Submit Disposal"
       size="md"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => { reset({ type: 'sold', disposedDate: format(new Date(), 'yyyy-MM-dd') }); onClose() }}
+            disabled={submitMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" form="submit-disposal-form" variant="danger" loading={submitMutation.isPending}>
+            Submit for Approval
+          </Button>
+        </>
+      }
     >
       <form
+        id="submit-disposal-form"
         onSubmit={handleSubmit((d) => submitMutation.mutate(d))}
         className="space-y-4"
       >
@@ -580,20 +576,6 @@ function SubmitDisposalModal({
           error={errors.reason?.message}
           placeholder="e.g. Beyond economic repair"
         />
-        <div className="flex gap-3 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            fullWidth
-            onClick={() => { reset({ type: 'sold', disposedDate: format(new Date(), 'yyyy-MM-dd') }); onClose() }}
-            disabled={submitMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" variant="danger" fullWidth loading={submitMutation.isPending}>
-            Submit for Approval
-          </Button>
-        </div>
       </form>
     </Modal>
   )
