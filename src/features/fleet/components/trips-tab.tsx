@@ -7,8 +7,9 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { useTrips, useVehicles } from '@/features/fleet'
+import { useTrips, useVehicles, useCreateTrip } from '@/features/fleet'
 import { useDrivers } from '@/features/drivers'
+import { useAuthStore } from '@/features/auth'
 import { ReportIssueModal } from '@/features/issues'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -43,6 +44,8 @@ export function TripsTab() {
   const { data: trips = [], isLoading } = useTrips()
   const { data: vehicles = [] } = useVehicles()
   const { data: drivers = [] } = useDrivers()
+  const currentUser = useAuthStore((s) => s.user)
+  const createTrip = useCreateTrip()
 
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
   const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d])), [drivers])
@@ -122,10 +125,25 @@ export function TripsTab() {
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<TripForm>({ resolver: zodResolver(tripSchema) })
 
-  const onSubmit = (_data: TripForm) => {
-    setShowNew(false)
-    reset()
-    toast.success('Trip started')
+  const onSubmit = async (data: TripForm) => {
+    if (!currentUser) {
+      toast.error('Sign in required')
+      return
+    }
+    try {
+      const trip = await createTrip.mutateAsync({
+        vehicleId: data.vehicleId,
+        driverId: data.driverId,
+        startOdometer: data.startOdometer,
+        purpose: data.purpose || undefined,
+        createdBy: currentUser.id,
+      })
+      toast.success(`Trip ${trip.id} started`)
+      setShowNew(false)
+      reset()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Start trip failed')
+    }
   }
 
   if (isLoading) return <TableSkeleton columns={6} rows={6} />
@@ -222,8 +240,8 @@ export function TripsTab() {
         size="md"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
-            <Button type="submit" form="start-trip-form">Start Trip</Button>
+            <Button type="button" variant="secondary" disabled={createTrip.isPending} onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="start-trip-form" loading={createTrip.isPending}>Start Trip</Button>
           </>
         }
       >

@@ -6,8 +6,9 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { useFuelLogs, useVehicles } from '@/features/fleet'
+import { useFuelLogs, useVehicles, useCreateFuelLog } from '@/features/fleet'
 import { useDrivers } from '@/features/drivers'
+import { useAuthStore } from '@/features/auth'
 import type { FuelLog } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { formatCurrency } from '@/shared/utils/format'
@@ -37,6 +38,8 @@ export function FuelLogsTab() {
   const { data: logs = [], isLoading } = useFuelLogs()
   const { data: vehicles = [] } = useVehicles()
   const { data: drivers = [] } = useDrivers()
+  const currentUser = useAuthStore((s) => s.user)
+  const createFuelLog = useCreateFuelLog()
 
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
   const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d])), [drivers])
@@ -78,10 +81,29 @@ export function FuelLogsTab() {
   const costPerLiter = watch('costPerLiter')
   const computedTotal = (Number(liters) || 0) * (Number(costPerLiter) || 0)
 
-  const onSubmit = (_data: FuelForm) => {
-    setShowAdd(false)
-    reset()
-    toast.success('Fuel log recorded')
+  const onSubmit = async (data: FuelForm) => {
+    if (!currentUser) {
+      toast.error('Sign in required')
+      return
+    }
+    try {
+      const log = await createFuelLog.mutateAsync({
+        vehicleId: data.vehicleId,
+        driverId: data.driverId || undefined,
+        date: data.date,
+        liters: data.liters,
+        costPerLiter: data.costPerLiter,
+        odometer: data.odometer,
+        station: data.station || undefined,
+        notes: data.notes || undefined,
+        createdBy: currentUser.id,
+      })
+      toast.success(`Fuel log ${log.id} recorded`)
+      setShowAdd(false)
+      reset()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Log fuel failed')
+    }
   }
 
   if (isLoading) return <TableSkeleton columns={8} rows={6} />
@@ -139,8 +161,8 @@ export function FuelLogsTab() {
         size="md"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset() }}>Cancel</Button>
-            <Button type="submit" form="log-fuel-form">Log Fuel</Button>
+            <Button type="button" variant="secondary" disabled={createFuelLog.isPending} onClick={() => { setShowAdd(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="log-fuel-form" loading={createFuelLog.isPending}>Log Fuel</Button>
           </>
         }
       >
