@@ -214,6 +214,9 @@ export const modules: EmsModule[] = [
           { label: 'Issues', path: 'issues', icon: AlertCircle, feature: 'assetsIssues' },
           { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'assetMaintenance' },
           { label: 'Disposal', path: 'disposal', icon: Trash2, feature: 'assetDisposal' },
+          { label: 'Live Map', path: 'tracking/map', icon: MapIcon, feature: 'assetsTrackingMap' },
+          { label: 'Tags', path: 'tracking/tags', icon: Tag, feature: 'assetsTrackingTags' },
+          { label: 'Scan History', path: 'tracking/scans', icon: ScanLine, feature: 'assetsTrackingScans' },
         ],
       },
       {

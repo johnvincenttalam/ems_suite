@@ -9,6 +9,9 @@ export { AssetsLogsPage } from './pages/assets-logs-page'
 export { AssetsUsersPage } from './pages/assets-users-page'
 export { AssetsSettingsPage } from './pages/assets-settings-page'
 export { AssetsReportsPage } from './pages/assets-reports-page'
+export { AssetsTrackingMapPage } from './pages/assets-tracking-map-page'
+export { AssetsTrackingTagsPage } from './pages/assets-tracking-tags-page'
+export { AssetsTrackingScansPage } from './pages/assets-tracking-scans-page'
 export {
   useAssets,
   useAssetAssignments,
