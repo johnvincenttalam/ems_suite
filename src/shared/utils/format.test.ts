@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { formatCurrency, formatCompactCurrency, formatNumber } from './format'
 
 describe('formatCurrency', () => {
-  it('formats USD by default', () => {
-    expect(formatCurrency(1234.5)).toBe('$1,234.50')
+  it('formats PHP by default', () => {
+    expect(formatCurrency(1234.5)).toMatch(/₱\s*1,234\.50/)
   })
 
   it('supports a custom currency', () => {
@@ -11,21 +11,21 @@ describe('formatCurrency', () => {
   })
 
   it('always shows 2 decimal places', () => {
-    expect(formatCurrency(10)).toBe('$10.00')
+    expect(formatCurrency(10)).toMatch(/₱\s*10\.00/)
   })
 })
 
 describe('formatCompactCurrency', () => {
   it('abbreviates millions', () => {
-    expect(formatCompactCurrency(2_500_000)).toBe('$2.5M')
+    expect(formatCompactCurrency(2_500_000)).toMatch(/₱\s*2\.5M/)
   })
 
   it('abbreviates thousands', () => {
-    expect(formatCompactCurrency(12_000)).toBe('$12K')
+    expect(formatCompactCurrency(12_000)).toMatch(/₱\s*12K/)
   })
 
   it('leaves small numbers alone', () => {
-    expect(formatCompactCurrency(42)).toBe('$42')
+    expect(formatCompactCurrency(42)).toMatch(/₱\s*42/)
   })
 })
 

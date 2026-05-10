@@ -109,8 +109,8 @@ export function WizardForm() {
                   {...form.register('plan')}
                   error={form.formState.errors.plan?.message}
                   options={[
-                    { label: 'Starter — $9/mo', value: 'starter' },
-                    { label: 'Pro — $29/mo', value: 'pro' },
+                    { label: 'Starter — ₱9/mo', value: 'starter' },
+                    { label: 'Pro — ₱29/mo', value: 'pro' },
                     { label: 'Enterprise — Contact us', value: 'enterprise' },
                   ]}
                 />

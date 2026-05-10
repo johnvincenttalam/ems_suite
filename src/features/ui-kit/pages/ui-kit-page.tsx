@@ -219,7 +219,7 @@ export function UIKitPage() {
       <Section title="Stat Cards" description="Animated counters with trend indicator">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total Users" value={12483} icon={Users} iconBg="bg-blue-50" iconColor="text-blue-600" trend={{ value: 12, positive: true }} index={0} />
-          <StatCard title="Revenue" value="$48,200" icon={TrendingUp} iconBg="bg-emerald-50" iconColor="text-emerald-600" trend={{ value: 8, positive: true }} index={1} />
+          <StatCard title="Revenue" value="₱48,200" icon={TrendingUp} iconBg="bg-emerald-50" iconColor="text-emerald-600" trend={{ value: 8, positive: true }} index={1} />
           <StatCard title="Active" value={342} subtitle="online now" icon={Activity} iconBg="bg-violet-50" iconColor="text-violet-500" index={2} />
           <StatCard title="Inbox" value={24} icon={Inbox} iconBg="bg-amber-50" iconColor="text-amber-500" trend={{ value: 4, positive: false }} index={3} />
         </div>

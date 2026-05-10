@@ -20,10 +20,10 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['value']
 
 const CURRENCIES = [
+  { value: 'PHP', label: 'Philippine Peso (PHP)' },
   { value: 'USD', label: 'US Dollar (USD)' },
   { value: 'EUR', label: 'Euro (EUR)' },
   { value: 'GBP', label: 'British Pound (GBP)' },
-  { value: 'PHP', label: 'Philippine Peso (PHP)' },
   { value: 'JPY', label: 'Japanese Yen (JPY)' },
   { value: 'AUD', label: 'Australian Dollar (AUD)' },
 ]

@@ -17,7 +17,7 @@ export interface ProcurementSettings {
 const STORAGE_KEY = 'procurement-settings'
 
 const defaults: ProcurementSettings = {
-  defaultCurrency: 'USD',
+  defaultCurrency: 'PHP',
   autoApproveBelow: 0,
   requireSupplier: false,
   requireNeededByDate: true,

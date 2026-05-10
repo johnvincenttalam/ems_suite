@@ -12,8 +12,8 @@ export const env = {
   appShortName: import.meta.env.VITE_APP_SHORT_NAME ?? 'EMS Suite',
   apiUrl: import.meta.env.VITE_API_URL ?? '',
   defaultAccent: parseAccent(import.meta.env.VITE_DEFAULT_ACCENT),
-  defaultCurrency: import.meta.env.VITE_DEFAULT_CURRENCY ?? 'USD',
-  defaultLocale: import.meta.env.VITE_DEFAULT_LOCALE ?? 'en-US',
+  defaultCurrency: import.meta.env.VITE_DEFAULT_CURRENCY ?? 'PHP',
+  defaultLocale: import.meta.env.VITE_DEFAULT_LOCALE ?? 'en-PH',
 }
 
 export type AppEnv = typeof env
