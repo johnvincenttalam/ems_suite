@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Activity, Download, MapPin, QrCode, Radio, Satellite } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { format, parseISO } from 'date-fns'
 import { useTags, useTrackingLogs } from '@/features/tracking'
 import { useVehicles } from '@/features/fleet'
@@ -13,9 +11,10 @@ import type { TrackingLog, TrackingSource } from '@/features/tracking/types'
 import { exportToCSV } from '@/shared/utils/export-csv'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { EntityLabel } from './entity-label'
 import { cn } from '@/shared/utils/cn'
 
@@ -103,13 +102,10 @@ export function ScansTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search scans..." />
-          </div>
-          <FilterChips options={sourceFilters} value={sourceFilter} onChange={setSourceFilter} />
-        </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search scans...' }}
+        filter={<FilterChips options={sourceFilters} value={sourceFilter} onChange={setSourceFilter} />}
+      >
         <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(logs, 'tracking-logs', [
           { key: 'timestamp', label: 'Timestamp' },
           { key: 'tagId', label: 'Tag' },
@@ -121,22 +117,14 @@ export function ScansTab() {
           { key: 'source', label: 'Source' },
           { key: 'scannedBy', label: 'Scanned By' },
         ])}>Export</Button>
-      </div>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Activity} message="No scans match your filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Activity}
+        emptyMessage="No scans match your filters"
+      />
     </div>
   )
 }
