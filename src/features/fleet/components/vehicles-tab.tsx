@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { Truck, Car, Zap, Fuel, Plus, MapPin, ClipboardList } from 'lucide-react'
+import { Truck, Zap, Fuel, Plus, MapPin, ClipboardList } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { TrackingPanel } from '@/shared/tracking'
 import { ChecklistPanel } from '@/shared/checklists'
@@ -18,6 +18,7 @@ import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { DataTable } from '@/shared/ui/data-table'
 import { VehicleFormModal } from '@/features/fleet/components/vehicle-form-modal'
 import { VehicleDetailDrawer } from '@/features/fleet/components/vehicle-detail-drawer'
+import { VehicleThumbnail } from '@/features/fleet/components/vehicle-thumbnail'
 
 const statusFilters: { value: VehicleStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -86,9 +87,7 @@ export function VehiclesTab() {
   const columns = useMemo<ColumnDef<Vehicle>[]>(() => [
     { accessorKey: 'plateNumber', header: 'Plate', cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-zinc-100 flex items-center justify-center">
-          {row.original.fuelType === 'electric' ? <Zap className="w-4 h-4 text-zinc-500" /> : <Car className="w-4 h-4 text-zinc-500" />}
-        </div>
+        <VehicleThumbnail size="sm" imageUrl={row.original.photoUrl} alt={row.original.model} />
         <div>
           <p className="font-mono text-[13px] font-medium text-zinc-900">{row.original.plateNumber}</p>
           <p className="text-xs text-zinc-400">{row.original.model} · {row.original.year}</p>

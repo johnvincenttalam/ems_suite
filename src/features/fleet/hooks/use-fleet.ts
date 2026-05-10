@@ -33,6 +33,7 @@ export function useCreateVehicle() {
       linkedAssetId?: string
       checklistId?: string
       nextServiceDate?: string
+      photoUrl?: string
       status?: VehicleStatus
       createdBy: string
     }) => fleetApi.createVehicle(input),
@@ -56,6 +57,7 @@ export function useUpdateVehicle() {
         linkedAssetId?: string | null
         checklistId?: string | null
         nextServiceDate?: string | null
+        photoUrl?: string | null
         status?: VehicleStatus
         updatedBy: string
       }

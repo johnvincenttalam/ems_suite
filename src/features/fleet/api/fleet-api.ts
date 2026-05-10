@@ -42,6 +42,7 @@ interface CreateVehicleInput {
   linkedAssetId?: string
   checklistId?: string
   nextServiceDate?: string
+  photoUrl?: string
   status?: VehicleStatus
   createdBy: string
 }
@@ -57,6 +58,7 @@ interface UpdateVehicleInput {
   linkedAssetId?: string | null
   checklistId?: string | null
   nextServiceDate?: string | null
+  photoUrl?: string | null
   status?: VehicleStatus
   updatedBy: string
 }
@@ -111,6 +113,7 @@ export const fleetApi = {
       linkedAssetId: input.linkedAssetId || undefined,
       checklistId: input.checklistId || undefined,
       nextServiceDate: input.nextServiceDate || undefined,
+      photoUrl: input.photoUrl || undefined,
       createdAt: new Date().toISOString(),
     }
     mockVehicles.push(vehicle)

@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { Upload, X } from 'lucide-react'
 import { Modal } from '@/shared/ui/modal'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
@@ -12,6 +13,7 @@ import { useDrivers } from '@/features/drivers'
 import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useCreateVehicle, useUpdateVehicle } from '@/features/fleet/hooks/use-fleet'
+import { VehicleThumbnail } from '@/features/fleet/components/vehicle-thumbnail'
 import type { Vehicle } from '@/features/fleet/types'
 
 const FORM_ID = 'vehicle-form'
@@ -27,6 +29,7 @@ const schema = z.object({
   linkedAssetId: z.string().optional(),
   checklistId: z.string().optional(),
   nextServiceDate: z.string().optional(),
+  photoUrl: z.string().optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),
 })
 
@@ -66,6 +69,7 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
         linkedAssetId: vehicle.linkedAssetId,
         checklistId: vehicle.checklistId,
         nextServiceDate: vehicle.nextServiceDate,
+        photoUrl: vehicle.photoUrl,
         status: vehicle.status,
       }
     : {
@@ -79,10 +83,11 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
         linkedAssetId: undefined,
         checklistId: undefined,
         nextServiceDate: undefined,
+        photoUrl: undefined,
         status: 'active',
       }
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, watch, control, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: defaults,
   })
@@ -116,6 +121,7 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
             linkedAssetId: data.linkedAssetId ? data.linkedAssetId : null,
             checklistId: data.checklistId ? data.checklistId : null,
             nextServiceDate: data.nextServiceDate ? data.nextServiceDate : null,
+            photoUrl: data.photoUrl ? data.photoUrl : null,
             status: data.status,
             updatedBy: user.id,
           },
@@ -134,6 +140,7 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
           linkedAssetId: data.linkedAssetId || undefined,
           checklistId: data.checklistId || undefined,
           nextServiceDate: data.nextServiceDate || undefined,
+          photoUrl: data.photoUrl || undefined,
           status: data.status,
           createdBy: user.id,
         })
@@ -174,6 +181,11 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
       }
     >
       <form id={FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <VehiclePhotoField
+          control={control}
+          onChange={(url) => setValue('photoUrl', url, { shouldDirty: true })}
+        />
+
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="Plate Number *"
@@ -276,5 +288,85 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
         </div>
       </form>
     </Modal>
+  )
+}
+
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024
+
+interface VehiclePhotoFieldProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  control: any
+  onChange: (url: string) => void
+}
+
+/**
+ * Vehicle photo input. Accepts either a pasted URL or a small file upload
+ * (PNG / JPG / WEBP, ≤ 2 MB → base64 data URL). Mirrors the DriverPhotoField
+ * shape so users get the same affordances across the app.
+ */
+function VehiclePhotoField({ control, onChange }: VehiclePhotoFieldProps) {
+  const photoUrl = useWatch({ control, name: 'photoUrl' }) as string | undefined
+
+  const handleFile = (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Only PNG, JPG, or WEBP files are accepted')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error('Photo must be under 2 MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onChange(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">Photo</p>
+      <div className="flex items-start gap-4">
+        <VehicleThumbnail size="xl" imageUrl={photoUrl} />
+        <div className="flex-1 space-y-2">
+          <Input
+            placeholder="Paste an image URL — https://…"
+            value={photoUrl ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFile(file)
+                e.target.value = ''
+              }}
+              className="hidden"
+              id="vehicle-photo-upload"
+            />
+            <label
+              htmlFor="vehicle-photo-upload"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-200 bg-white text-[12px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 cursor-pointer transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload file
+            </label>
+            {photoUrl && (
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-zinc-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-zinc-400">PNG, JPG, or WEBP · max 2 MB. Falls back to a Car icon if unset.</p>
+        </div>
+      </div>
+    </div>
   )
 }

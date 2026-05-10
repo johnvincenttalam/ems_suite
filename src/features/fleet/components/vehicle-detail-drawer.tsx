@@ -10,7 +10,6 @@ import {
   MapPin,
   ClipboardList,
   ExternalLink,
-  Truck,
   Wrench,
   Route as RouteIcon,
   Fuel,
@@ -25,6 +24,7 @@ import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useAuditLog } from '@/features/audit-log'
 import { useTrips, useFuelLogs, useRetireVehicle } from '@/features/fleet'
+import { VehicleThumbnail } from '@/features/fleet/components/vehicle-thumbnail'
 import { useWorkOrders } from '@/features/maintenance'
 import { useIssuesForTarget, IssueList, IssueDetailDrawer, ReportIssueModal } from '@/features/issues'
 import type { Issue } from '@/features/issues'
@@ -203,9 +203,7 @@ function DrawerHeader({
   return (
     <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-zinc-100">
       <div className="flex items-start gap-4 min-w-0">
-        <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
-          <Truck className="w-5 h-5 text-zinc-500" />
-        </div>
+        <VehicleThumbnail size="lg" imageUrl={vehicle.photoUrl} alt={vehicle.model} />
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-mono text-[11px] text-zinc-400">{vehicle.id}</span>

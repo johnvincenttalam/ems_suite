@@ -12,6 +12,7 @@ export { FleetTrackingMapPage } from './pages/fleet-tracking-map-page'
 export { FleetTrackingGpsPage } from './pages/fleet-tracking-gps-page'
 export { FleetTrackingTagsPage } from './pages/fleet-tracking-tags-page'
 export { FleetTrackingScansPage } from './pages/fleet-tracking-scans-page'
+export { VehicleThumbnail } from './components/vehicle-thumbnail'
 export {
   useVehicles,
   useTrips,

@@ -18,6 +18,10 @@ export interface Vehicle {
   /** Next scheduled service date (ISO yyyy-mm-dd). Used by the dashboard's
    * "Maintenance Due" panel to flag vehicles approaching or past due. */
   nextServiceDate?: string
+  /** Vehicle photo. May be a hosted URL or a base64 data URL from a small
+   *  upload (≤ 2 MB). The VehicleThumbnail component falls back to a Car
+   *  icon if missing or unreachable. */
+  photoUrl?: string
   createdAt: string
 }
 
