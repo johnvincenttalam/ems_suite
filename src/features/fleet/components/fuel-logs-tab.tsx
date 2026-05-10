@@ -7,7 +7,7 @@ import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useFuelLogs, useVehicles } from '@/features/fleet'
-import { useUsers } from '@/features/users'
+import { useUsers, isDriver } from '@/features/users'
 import type { FuelLog } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { formatCurrency } from '@/shared/utils/format'
@@ -147,7 +147,7 @@ export function FuelLogsTab() {
         <form id="log-fuel-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={vehicles.filter((v) => v.fuelType !== 'electric').map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
-            <Select label="Driver" {...register('driverId')} error={errors.driverId?.message} placeholder="Optional" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
+            <Select label="Driver" {...register('driverId')} error={errors.driverId?.message} placeholder="Optional" options={users.filter(isDriver).map((u) => ({ value: u.id, label: u.name }))} />
           </div>
           <Input label="Date *" type="date" {...register('date')} error={errors.date?.message} />
           <div className="grid grid-cols-3 gap-3">

@@ -8,7 +8,7 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Button } from '@/shared/ui/button'
 import { useAuthStore } from '@/features/auth'
-import { useUsers } from '@/features/users'
+import { useUsers, isDriver } from '@/features/users'
 import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useCreateVehicle, useUpdateVehicle } from '@/features/fleet/hooks/use-fleet'
@@ -147,7 +147,7 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
   }
 
   const driverOptions = users
-    .filter((u) => u.status === 'active')
+    .filter(isDriver)
     .map((u) => ({ value: u.id, label: u.name }))
 
   const assetOptions = assets

@@ -8,7 +8,7 @@ import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTrips, useVehicles } from '@/features/fleet'
-import { useUsers } from '@/features/users'
+import { useUsers, isDriver } from '@/features/users'
 import { ReportIssueModal } from '@/features/issues'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -228,7 +228,7 @@ export function TripsTab() {
       >
         <form id="start-trip-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={activeVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
-          <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
+          <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={users.filter(isDriver).map((u) => ({ value: u.id, label: u.name }))} />
           <Input label="Starting Odometer *" type="number" {...register('startOdometer', { valueAsNumber: true })} error={errors.startOdometer?.message} helperText="km" />
           <Textarea label="Purpose" {...register('purpose')} rows={2} placeholder="e.g. Site Alpha — supply run" />
         </form>
