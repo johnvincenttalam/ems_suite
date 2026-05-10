@@ -5,12 +5,17 @@ import { useTags, useTrackingLogs } from '@/features/tracking'
 import { useVehicles } from '@/features/fleet'
 import { useAssets } from '@/features/assets'
 import { useInventoryItems } from '@/features/inventory'
-import type { TrackingLog } from '@/features/tracking/types'
+import type { TrackingEntityType, TrackingLog } from '@/features/tracking/types'
 import { EmptyState } from '@/shared/ui/empty-state'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { EntityLabel } from './entity-label'
 
-export function GpsTab() {
+interface GpsTabProps {
+  /** When set, show only GPS-tagged entities of this type. */
+  entityFilter?: TrackingEntityType
+}
+
+export function GpsTab({ entityFilter }: GpsTabProps = {}) {
   const { data: tags = [], isLoading: tagsLoading } = useTags()
   const { data: logs = [], isLoading: logsLoading } = useTrackingLogs()
   const { data: vehicles = [] } = useVehicles()
@@ -21,7 +26,16 @@ export function GpsTab() {
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
 
-  const gpsTags = useMemo(() => tags.filter((t) => t.type === 'gps' && t.status === 'active'), [tags])
+  const gpsTags = useMemo(
+    () =>
+      tags.filter(
+        (t) =>
+          t.type === 'gps' &&
+          t.status === 'active' &&
+          (!entityFilter || t.boundEntityType === entityFilter),
+      ),
+    [tags, entityFilter],
+  )
 
   const latestByTag = useMemo(() => {
     const map: Record<string, TrackingLog> = {}
@@ -38,9 +52,15 @@ export function GpsTab() {
   if (tagsLoading || logsLoading) return <TableSkeleton columns={4} rows={4} />
 
   if (gpsTags.length === 0) {
+    const subject =
+      entityFilter === 'vehicle' ? 'vehicles' : entityFilter === 'asset' ? 'assets' : 'entities'
     return (
       <div className="bg-white rounded-xl border border-zinc-200/60">
-        <EmptyState icon={Satellite} title="No GPS-enabled entities" description="Bind a GPS tag to a vehicle or asset to start tracking it here." />
+        <EmptyState
+          icon={Satellite}
+          title={`No GPS-enabled ${subject}`}
+          description={`Bind a GPS tag to a ${subject.replace(/s$/, '')} to start tracking it here.`}
+        />
       </div>
     )
   }

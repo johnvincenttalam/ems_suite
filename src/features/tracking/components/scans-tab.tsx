@@ -7,7 +7,7 @@ import { useVehicles } from '@/features/fleet'
 import { useAssets } from '@/features/assets'
 import { useInventoryItems } from '@/features/inventory'
 import { useUsers } from '@/features/users'
-import type { TrackingLog, TrackingSource } from '@/features/tracking/types'
+import type { TrackingEntityType, TrackingLog, TrackingSource } from '@/features/tracking/types'
 import { exportToCSV } from '@/shared/utils/export-csv'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
@@ -24,7 +24,12 @@ const sourceFilters: { value: TrackingSource | 'all'; label: string }[] = [
   { value: 'scan', label: 'Scans' },
 ]
 
-export function ScansTab() {
+interface ScansTabProps {
+  /** When set, the page shows only scans for this entity type. */
+  entityFilter?: TrackingEntityType
+}
+
+export function ScansTab({ entityFilter }: ScansTabProps = {}) {
   const { data: logs = [], isLoading } = useTrackingLogs()
   const { data: tags = [] } = useTags()
   const { data: vehicles = [] } = useVehicles()
@@ -41,10 +46,12 @@ export function ScansTab() {
   const [globalFilter, setGlobalFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState<TrackingSource | 'all'>('all')
 
-  const filtered = useMemo(
-    () => sourceFilter === 'all' ? logs : logs.filter((l) => l.source === sourceFilter),
-    [logs, sourceFilter],
-  )
+  const filtered = useMemo(() => {
+    let result = logs
+    if (entityFilter) result = result.filter((l) => l.entityType === entityFilter)
+    if (sourceFilter !== 'all') result = result.filter((l) => l.source === sourceFilter)
+    return result
+  }, [logs, sourceFilter, entityFilter])
 
   const columns = useMemo<ColumnDef<TrackingLog>[]>(() => [
     { accessorKey: 'timestamp', header: 'Time', cell: ({ getValue }) => (

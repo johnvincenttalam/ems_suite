@@ -10,7 +10,7 @@ import { useTags } from '@/features/tracking'
 import { useVehicles } from '@/features/fleet'
 import { useAssets } from '@/features/assets'
 import { useInventoryItems } from '@/features/inventory'
-import type { TagType, TrackingTag } from '@/features/tracking/types'
+import type { TagType, TrackingEntityType, TrackingTag } from '@/features/tracking/types'
 import { exportToCSV } from '@/shared/utils/export-csv'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -46,7 +46,13 @@ const typeStyles: Record<TagType, { Icon: typeof Radio; className: string }> = {
   gps:  { Icon: Satellite,  className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 }
 
-export function TagsTab() {
+interface TagsTabProps {
+  /** When set, the page shows only tags bound to this entity type, and the
+   * Add Tag modal locks Bind-To to this type. */
+  entityFilter?: TrackingEntityType
+}
+
+export function TagsTab({ entityFilter }: TagsTabProps = {}) {
   const { data: tags = [], isLoading } = useTags()
   const { data: vehicles = [] } = useVehicles()
   const { data: assets = [] } = useAssets()
@@ -60,10 +66,12 @@ export function TagsTab() {
   const [typeFilter, setTypeFilter] = useState<TagType | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
 
-  const filtered = useMemo(
-    () => typeFilter === 'all' ? tags : tags.filter((t) => t.type === typeFilter),
-    [tags, typeFilter],
-  )
+  const filtered = useMemo(() => {
+    let result = tags
+    if (entityFilter) result = result.filter((t) => t.boundEntityType === entityFilter)
+    if (typeFilter !== 'all') result = result.filter((t) => t.type === typeFilter)
+    return result
+  }, [tags, typeFilter, entityFilter])
 
   const columns = useMemo<ColumnDef<TrackingTag>[]>(() => [
     { accessorKey: 'code', header: 'Tag', cell: ({ row }) => {
@@ -99,9 +107,10 @@ export function TagsTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
+  const defaultBoundType: TrackingEntityType = entityFilter ?? 'item'
   const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<TagForm>({
     resolver: zodResolver(tagSchema),
-    defaultValues: { type: 'qr', boundEntityType: 'item' },
+    defaultValues: { type: 'qr', boundEntityType: defaultBoundType },
   })
 
   const watchedEntityType = watch('boundEntityType')
@@ -113,7 +122,7 @@ export function TagsTab() {
 
   const onSubmit = (_data: TagForm) => {
     setShowAdd(false)
-    reset({ type: 'qr', boundEntityType: 'item' })
+    reset({ type: 'qr', boundEntityType: defaultBoundType })
     toast.success('Tag bound')
   }
 
@@ -145,12 +154,12 @@ export function TagsTab() {
 
       <Modal
         open={showAdd}
-        onClose={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }}
+        onClose={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: defaultBoundType }) }}
         title="Bind Tag"
         size="md"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: defaultBoundType }) }}>Cancel</Button>
             <Button type="submit" form="bind-tag-form">Bind Tag</Button>
           </>
         }
@@ -163,11 +172,17 @@ export function TagsTab() {
               { value: 'qr', label: 'QR Code' },
               { value: 'gps', label: 'GPS' },
             ]} />
-            <Select label="Bind To Type *" {...register('boundEntityType')} error={errors.boundEntityType?.message} options={[
-              { value: 'item', label: 'Inventory Item' },
-              { value: 'asset', label: 'Asset' },
-              { value: 'vehicle', label: 'Vehicle' },
-            ]} />
+            <Select
+              label="Bind To Type *"
+              {...register('boundEntityType')}
+              error={errors.boundEntityType?.message}
+              disabled={!!entityFilter}
+              options={[
+                { value: 'item', label: 'Inventory Item' },
+                { value: 'asset', label: 'Asset' },
+                { value: 'vehicle', label: 'Vehicle' },
+              ]}
+            />
           </div>
           <Select label="Entity *" {...register('boundEntityId')} error={errors.boundEntityId?.message} placeholder="Select entity" options={entityOptions} />
         </form>

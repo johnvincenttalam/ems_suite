@@ -8,7 +8,7 @@ import { useTags, useTrackingLogs } from '@/features/tracking'
 import { useVehicles } from '@/features/fleet'
 import { useAssets } from '@/features/assets'
 import { useInventoryItems } from '@/features/inventory'
-import type { TrackingLog } from '@/features/tracking/types'
+import type { TrackingEntityType, TrackingLog } from '@/features/tracking/types'
 import { EmptyState } from '@/shared/ui/empty-state'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { EntityLabel } from './entity-label'
@@ -43,7 +43,12 @@ function FitToBounds({ pings }: { pings: TrackingLog[] }) {
   return null
 }
 
-export function MapTab() {
+interface MapTabProps {
+  /** When set, the map and live-entities list show only this entity type. */
+  entityFilter?: TrackingEntityType
+}
+
+export function MapTab({ entityFilter }: MapTabProps = {}) {
   const { data: tags = [], isLoading: tagsLoading } = useTags()
   const { data: logs = [], isLoading: logsLoading } = useTrackingLogs()
   const { data: vehicles = [] } = useVehicles()
@@ -59,18 +64,24 @@ export function MapTab() {
     const map = new Map<string, TrackingLog>()
     for (const l of logs) {
       if (l.latitude == null || l.longitude == null) continue
+      if (entityFilter && l.entityType !== entityFilter) continue
       const existing = map.get(l.tagId)
       if (!existing || l.timestamp > existing.timestamp) map.set(l.tagId, l)
     }
     return Array.from(map.values())
-  }, [logs])
+  }, [logs, entityFilter])
 
   if (tagsLoading || logsLoading) return <TableSkeleton columns={2} rows={4} />
 
   if (latestPings.length === 0) {
+    const subject = entityFilter === 'vehicle' ? 'vehicle' : entityFilter === 'asset' ? 'asset' : 'entity'
     return (
       <div className="bg-white rounded-xl border border-zinc-200/60">
-        <EmptyState icon={MapIcon} title="No GPS pings to display" description="Bind a GPS tag and record a ping to see entities on the map." />
+        <EmptyState
+          icon={MapIcon}
+          title={`No ${subject} GPS pings to display`}
+          description={`Bind a GPS tag to a ${subject} and record a ping to see it on the map.`}
+        />
       </div>
     )
   }
