@@ -20,6 +20,10 @@ export {
   useCreateVehicle,
   useUpdateVehicle,
   useRetireVehicle,
+  useCreateTrip,
+  useCompleteTrip,
+  useCancelTrip,
+  useCreateFuelLog,
 } from './hooks/use-fleet'
 export { fleetApi, FleetValidationError } from './api/fleet-api'
 export { mockVehicles, mockTrips, mockFuelLogs } from './data/mock-fleet'

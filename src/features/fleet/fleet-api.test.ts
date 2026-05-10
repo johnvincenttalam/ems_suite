@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { fleetApi, FleetValidationError } from './api/fleet-api'
 import { mockDrivers } from '@/features/drivers'
 import { mockAssets } from '@/features/assets'
-import { mockVehicles } from './data/mock-fleet'
+import { mockVehicles, mockTrips, mockFuelLogs } from './data/mock-fleet'
 import { mockAuditLog } from '@/features/audit-log/data/mock-audit'
 
 describe('fleetApi.listVehicles', () => {
@@ -366,5 +366,224 @@ describe('fleetApi.listFuelLogs', () => {
       const expected = l.liters * l.costPerLiter
       expect(Math.abs(l.totalCost - expected)).toBeLessThan(0.05)
     }
+  })
+})
+
+describe('fleetApi.createTrip', () => {
+  let originalLength: number
+  let originalOdo: Map<string, number>
+  beforeEach(() => {
+    originalLength = mockTrips.length
+    originalOdo = new Map(mockVehicles.map((v) => [v.id, v.currentOdometer]))
+  })
+  function cleanup() {
+    while (mockTrips.length > originalLength) mockTrips.pop()
+    for (const v of mockVehicles) {
+      const orig = originalOdo.get(v.id)
+      if (orig !== undefined) v.currentOdometer = orig
+    }
+  }
+
+  it('creates an in-progress trip and emits a Fleet audit entry', async () => {
+    const vehicle = mockVehicles.find(
+      (v) => v.status === 'active' && !mockTrips.some((t) => t.vehicleId === v.id && t.status === 'in_progress'),
+    )!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    const auditBefore = mockAuditLog.length
+
+    const trip = await fleetApi.createTrip({
+      vehicleId: vehicle.id,
+      driverId: driver.id,
+      startOdometer: vehicle.currentOdometer,
+      purpose: 'API smoke test',
+      createdBy: 'U001',
+    })
+
+    expect(trip.id).toMatch(/^TR-\d{4}-\d{4,}$/)
+    expect(trip.status).toBe('in_progress')
+    expect(trip.distance).toBe(0)
+    expect(trip.endTime).toBeUndefined()
+    expect(mockAuditLog.length).toBe(auditBefore + 1)
+    expect(mockAuditLog[0].module).toBe('Fleet')
+    cleanup()
+  })
+
+  it('refuses a trip on a vehicle that already has an in-progress trip', async () => {
+    const inProgress = mockTrips.find((t) => t.status === 'in_progress')!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    await expect(
+      fleetApi.createTrip({
+        vehicleId: inProgress.vehicleId,
+        driverId: driver.id,
+        startOdometer: 99999,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/already has a trip in progress/i)
+  })
+
+  it('refuses a trip on a non-active vehicle', async () => {
+    const retired = mockVehicles.find((v) => v.status === 'retired')!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    await expect(
+      fleetApi.createTrip({
+        vehicleId: retired.id,
+        driverId: driver.id,
+        startOdometer: retired.currentOdometer,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/only active vehicles/i)
+  })
+
+  it('refuses a starting odometer below the vehicle current', async () => {
+    const vehicle = mockVehicles.find((v) => v.status === 'active' && !mockTrips.some((t) => t.vehicleId === v.id && t.status === 'in_progress'))!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    await expect(
+      fleetApi.createTrip({
+        vehicleId: vehicle.id,
+        driverId: driver.id,
+        startOdometer: vehicle.currentOdometer - 10,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/below the vehicle's current/i)
+  })
+})
+
+describe('fleetApi.completeTrip', () => {
+  it('sets endTime, endOdometer, distance, and bumps vehicle odometer', async () => {
+    const vehicle = mockVehicles.find((v) => v.status === 'active' && !mockTrips.some((t) => t.vehicleId === v.id && t.status === 'in_progress'))!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    const startOdo = vehicle.currentOdometer
+    const trip = await fleetApi.createTrip({
+      vehicleId: vehicle.id,
+      driverId: driver.id,
+      startOdometer: startOdo,
+      createdBy: 'U001',
+    })
+
+    const completed = await fleetApi.completeTrip(trip.id, {
+      endOdometer: startOdo + 200,
+      completedBy: 'U001',
+    })
+    expect(completed.status).toBe('completed')
+    expect(completed.distance).toBe(200)
+    expect(completed.endOdometer).toBe(startOdo + 200)
+    expect(vehicle.currentOdometer).toBe(startOdo + 200)
+
+    // cleanup
+    mockTrips.splice(mockTrips.indexOf(trip), 1)
+    vehicle.currentOdometer = startOdo
+  })
+
+  it('refuses an end odometer below the start', async () => {
+    const inProgress = mockTrips.find((t) => t.status === 'in_progress')!
+    await expect(
+      fleetApi.completeTrip(inProgress.id, {
+        endOdometer: inProgress.startOdometer - 1,
+        completedBy: 'U001',
+      }),
+    ).rejects.toThrow(/below the start/i)
+  })
+
+  it('refuses to complete an already-completed trip', async () => {
+    const done = mockTrips.find((t) => t.status === 'completed')!
+    await expect(
+      fleetApi.completeTrip(done.id, { endOdometer: 999_999, completedBy: 'U001' }),
+    ).rejects.toThrow(/only in-progress trips/i)
+  })
+})
+
+describe('fleetApi.cancelTrip', () => {
+  it('cancels an in-progress trip and clears end fields', async () => {
+    const vehicle = mockVehicles.find((v) => v.status === 'active' && !mockTrips.some((t) => t.vehicleId === v.id && t.status === 'in_progress'))!
+    const driver = mockDrivers.find((d) => d.status === 'active')!
+    const trip = await fleetApi.createTrip({
+      vehicleId: vehicle.id,
+      driverId: driver.id,
+      startOdometer: vehicle.currentOdometer,
+      createdBy: 'U001',
+    })
+
+    const cancelled = await fleetApi.cancelTrip(trip.id, 'U001', 'dispatcher cancelled')
+    expect(cancelled.status).toBe('cancelled')
+    expect(cancelled.endTime).toBeUndefined()
+    expect(cancelled.endOdometer).toBeUndefined()
+    expect(cancelled.distance).toBe(0)
+
+    mockTrips.splice(mockTrips.indexOf(trip), 1)
+  })
+})
+
+describe('fleetApi.createFuelLog', () => {
+  let originalLength: number
+  let originalOdo: Map<string, number>
+  beforeEach(() => {
+    originalLength = mockFuelLogs.length
+    originalOdo = new Map(mockVehicles.map((v) => [v.id, v.currentOdometer]))
+  })
+  function cleanup() {
+    while (mockFuelLogs.length > originalLength) mockFuelLogs.pop()
+    for (const v of mockVehicles) {
+      const orig = originalOdo.get(v.id)
+      if (orig !== undefined) v.currentOdometer = orig
+    }
+  }
+
+  it('creates a fuel log, computes totalCost, and bumps vehicle odometer', async () => {
+    const vehicle = mockVehicles.find((v) => v.fuelType !== 'electric' && v.status === 'active')!
+    const startOdo = vehicle.currentOdometer
+    const log = await fleetApi.createFuelLog({
+      vehicleId: vehicle.id,
+      date: '2026-05-01',
+      liters: 50,
+      costPerLiter: 2.5,
+      odometer: startOdo + 100,
+      createdBy: 'U001',
+    })
+    expect(log.id).toMatch(/^FL-\d{4}-\d{4,}$/)
+    expect(log.totalCost).toBe(125)
+    expect(vehicle.currentOdometer).toBe(startOdo + 100)
+    cleanup()
+  })
+
+  it('refuses fuel logs on electric vehicles', async () => {
+    const ev = mockVehicles.find((v) => v.fuelType === 'electric')!
+    await expect(
+      fleetApi.createFuelLog({
+        vehicleId: ev.id,
+        date: '2026-05-01',
+        liters: 50,
+        costPerLiter: 2.5,
+        odometer: ev.currentOdometer + 100,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/electric/i)
+  })
+
+  it('refuses an odometer below the vehicle current', async () => {
+    const vehicle = mockVehicles.find((v) => v.fuelType !== 'electric' && v.status === 'active')!
+    await expect(
+      fleetApi.createFuelLog({
+        vehicleId: vehicle.id,
+        date: '2026-05-01',
+        liters: 50,
+        costPerLiter: 2.5,
+        odometer: vehicle.currentOdometer - 1,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/below the vehicle's current/i)
+  })
+
+  it('refuses zero or negative liters', async () => {
+    const vehicle = mockVehicles.find((v) => v.fuelType !== 'electric' && v.status === 'active')!
+    await expect(
+      fleetApi.createFuelLog({
+        vehicleId: vehicle.id,
+        date: '2026-05-01',
+        liters: 0,
+        costPerLiter: 2.5,
+        odometer: vehicle.currentOdometer + 1,
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/greater than 0/i)
   })
 })

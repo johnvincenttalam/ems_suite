@@ -1,5 +1,6 @@
 import type { Vehicle, Trip, FuelLog, VehicleStatus } from '@/features/fleet/types'
 import { mockVehicles, mockTrips, mockFuelLogs } from '@/features/fleet/data/mock-fleet'
+import { mockDrivers } from '@/features/drivers'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
 
@@ -18,10 +19,40 @@ function nextVehicleId(): string {
   return `V${String(vehicleCounter).padStart(3, '0')}`
 }
 
+let tripCounter = mockTrips.reduce((max, t) => {
+  const m = t.id.match(/^TR-\d{4}-(\d{4,})$/)
+  if (!m) return max
+  const n = Number(m[1])
+  return Number.isFinite(n) && n > max ? n : max
+}, 0)
+
+function nextTripId(): string {
+  tripCounter += 1
+  return `TR-${new Date().getFullYear()}-${String(tripCounter).padStart(4, '0')}`
+}
+
+let fuelLogCounter = mockFuelLogs.reduce((max, f) => {
+  const m = f.id.match(/^FL-\d{4}-(\d{4,})$/)
+  if (!m) return max
+  const n = Number(m[1])
+  return Number.isFinite(n) && n > max ? n : max
+}, 0)
+
+function nextFuelLogId(): string {
+  fuelLogCounter += 1
+  return `FL-${new Date().getFullYear()}-${String(fuelLogCounter).padStart(4, '0')}`
+}
+
 function findVehicle(id: string): Vehicle {
   const v = mockVehicles.find((x) => x.id === id)
   if (!v) throw new FleetValidationError(`Vehicle ${id} not found`)
   return v
+}
+
+function findTrip(id: string): Trip {
+  const t = mockTrips.find((x) => x.id === id)
+  if (!t) throw new FleetValidationError(`Trip ${id} not found`)
+  return t
 }
 
 export class FleetValidationError extends Error {
@@ -61,6 +92,33 @@ interface UpdateVehicleInput {
   photoUrl?: string | null
   status?: VehicleStatus
   updatedBy: string
+}
+
+interface CreateTripInput {
+  vehicleId: string
+  driverId: string
+  startOdometer: number
+  purpose?: string
+  startTime?: string
+  createdBy: string
+}
+
+interface CompleteTripInput {
+  endOdometer: number
+  endTime?: string
+  completedBy: string
+}
+
+interface CreateFuelLogInput {
+  vehicleId: string
+  driverId?: string
+  date: string
+  liters: number
+  costPerLiter: number
+  odometer: number
+  station?: string
+  notes?: string
+  createdBy: string
 }
 
 /**
@@ -203,5 +261,145 @@ export const fleetApi = {
       detail: `Retired vehicle ${vehicle.plateNumber} (${vehicle.id})${reason ? ` — ${reason}` : ''}`,
     })
     return vehicle
+  },
+
+  createTrip: async (input: CreateTripInput): Promise<Trip> => {
+    await delay(140)
+    const vehicle = findVehicle(input.vehicleId)
+    if (vehicle.status !== 'active') {
+      throw new FleetValidationError(
+        `Vehicle ${vehicle.plateNumber} is ${vehicle.status} — only active vehicles can start trips`,
+      )
+    }
+    if (mockTrips.some((t) => t.vehicleId === input.vehicleId && t.status === 'in_progress')) {
+      throw new FleetValidationError(`${vehicle.plateNumber} already has a trip in progress`)
+    }
+    const driver = mockDrivers.find((d) => d.id === input.driverId)
+    if (!driver) throw new FleetValidationError(`Driver ${input.driverId} not found`)
+    if (driver.status !== 'active') {
+      throw new FleetValidationError(`${driver.name} is not active`)
+    }
+    if (input.startOdometer < vehicle.currentOdometer) {
+      throw new FleetValidationError(
+        `Starting odometer (${input.startOdometer.toLocaleString()}) is below the vehicle's current ${vehicle.currentOdometer.toLocaleString()}`,
+      )
+    }
+
+    const trip: Trip = {
+      id: nextTripId(),
+      vehicleId: vehicle.id,
+      driverId: driver.id,
+      startTime: input.startTime ?? new Date().toISOString(),
+      startOdometer: input.startOdometer,
+      distance: 0,
+      purpose: input.purpose,
+      status: 'in_progress',
+    }
+    mockTrips.push(trip)
+
+    recordAudit({
+      userId: input.createdBy,
+      action: 'create',
+      module: 'Fleet',
+      detail: `Started trip ${trip.id} — ${vehicle.plateNumber} · ${driver.name}${trip.purpose ? ` · ${trip.purpose}` : ''}`,
+    })
+    return trip
+  },
+
+  completeTrip: async (id: string, input: CompleteTripInput): Promise<Trip> => {
+    await delay(140)
+    const trip = findTrip(id)
+    if (trip.status !== 'in_progress') {
+      throw new FleetValidationError(`Trip ${trip.id} is ${trip.status} — only in-progress trips can be completed`)
+    }
+    if (input.endOdometer < trip.startOdometer) {
+      throw new FleetValidationError(
+        `Ending odometer (${input.endOdometer.toLocaleString()}) is below the start ${trip.startOdometer.toLocaleString()}`,
+      )
+    }
+
+    trip.endTime = input.endTime ?? new Date().toISOString()
+    trip.endOdometer = input.endOdometer
+    trip.distance = input.endOdometer - trip.startOdometer
+    trip.status = 'completed'
+
+    // Bump the vehicle's odometer forward (only — never backward).
+    const vehicle = mockVehicles.find((v) => v.id === trip.vehicleId)
+    if (vehicle && input.endOdometer > vehicle.currentOdometer) {
+      vehicle.currentOdometer = input.endOdometer
+    }
+
+    recordAudit({
+      userId: input.completedBy,
+      action: 'update',
+      module: 'Fleet',
+      detail: `Completed trip ${trip.id} — ${trip.distance.toLocaleString()} km`,
+    })
+    return trip
+  },
+
+  cancelTrip: async (id: string, byUserId: string, reason?: string): Promise<Trip> => {
+    await delay(120)
+    const trip = findTrip(id)
+    if (trip.status !== 'in_progress') {
+      throw new FleetValidationError(`Trip ${trip.id} is ${trip.status} — only in-progress trips can be cancelled`)
+    }
+    trip.status = 'cancelled'
+    trip.distance = 0
+    trip.endTime = undefined
+    trip.endOdometer = undefined
+
+    recordAudit({
+      userId: byUserId,
+      action: 'update',
+      module: 'Fleet',
+      detail: `Cancelled trip ${trip.id}${reason ? ` — ${reason}` : ''}`,
+    })
+    return trip
+  },
+
+  createFuelLog: async (input: CreateFuelLogInput): Promise<FuelLog> => {
+    await delay(140)
+    const vehicle = findVehicle(input.vehicleId)
+    if (vehicle.fuelType === 'electric') {
+      throw new FleetValidationError(`${vehicle.plateNumber} is electric — fuel logs don't apply`)
+    }
+    if (input.liters <= 0) throw new FleetValidationError('Liters must be greater than 0')
+    if (input.costPerLiter < 0) throw new FleetValidationError('Cost per liter cannot be negative')
+    if (input.odometer < vehicle.currentOdometer) {
+      throw new FleetValidationError(
+        `Odometer (${input.odometer.toLocaleString()}) is below the vehicle's current ${vehicle.currentOdometer.toLocaleString()}`,
+      )
+    }
+    if (input.driverId) {
+      const driver = mockDrivers.find((d) => d.id === input.driverId)
+      if (!driver) throw new FleetValidationError(`Driver ${input.driverId} not found`)
+    }
+
+    const log: FuelLog = {
+      id: nextFuelLogId(),
+      vehicleId: vehicle.id,
+      driverId: input.driverId,
+      date: input.date,
+      liters: input.liters,
+      costPerLiter: input.costPerLiter,
+      totalCost: Number((input.liters * input.costPerLiter).toFixed(2)),
+      odometer: input.odometer,
+      station: input.station,
+      notes: input.notes,
+    }
+    mockFuelLogs.push(log)
+
+    if (input.odometer > vehicle.currentOdometer) {
+      vehicle.currentOdometer = input.odometer
+    }
+
+    recordAudit({
+      userId: input.createdBy,
+      action: 'create',
+      module: 'Fleet',
+      detail: `Logged fuel ${log.id} — ${vehicle.plateNumber} · ${log.liters} L${log.station ? ` @ ${log.station}` : ''}`,
+    })
+    return log
   },
 }

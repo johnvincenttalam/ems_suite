@@ -74,3 +74,58 @@ export function useRetireVehicle() {
     onSuccess: () => invalidateFleet(qc),
   })
 }
+
+export function useCreateTrip() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      vehicleId: string
+      driverId: string
+      startOdometer: number
+      purpose?: string
+      startTime?: string
+      createdBy: string
+    }) => fleetApi.createTrip(input),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useCompleteTrip() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; endOdometer: number; endTime?: string; completedBy: string }) =>
+      fleetApi.completeTrip(input.id, {
+        endOdometer: input.endOdometer,
+        endTime: input.endTime,
+        completedBy: input.completedBy,
+      }),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useCancelTrip() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; byUserId: string; reason?: string }) =>
+      fleetApi.cancelTrip(input.id, input.byUserId, input.reason),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useCreateFuelLog() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      vehicleId: string
+      driverId?: string
+      date: string
+      liters: number
+      costPerLiter: number
+      odometer: number
+      station?: string
+      notes?: string
+      createdBy: string
+    }) => fleetApi.createFuelLog(input),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
