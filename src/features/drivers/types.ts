@@ -19,6 +19,10 @@ export interface Driver {
    *  manager who occasionally drives). Optional — most drivers don't need
    *  system access. */
   userId?: string
+  /** Driver photo. May be a hosted URL or a base64 data URL from a small
+   *  upload (≤ 2 MB). The Avatar component falls back to initials if missing
+   *  or unreachable. */
+  photoUrl?: string
   createdAt: string
   notes?: string
 }

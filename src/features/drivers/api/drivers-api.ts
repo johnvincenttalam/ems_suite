@@ -17,6 +17,7 @@ interface AddDriverInput {
   departmentId?: string
   status?: DriverStatus
   userId?: string
+  photoUrl?: string
   notes?: string
   createdBy: string
 }
@@ -32,6 +33,7 @@ interface UpdateDriverInput {
   departmentId?: string
   status?: DriverStatus
   userId?: string
+  photoUrl?: string
   notes?: string
   updatedBy: string
 }
@@ -70,6 +72,7 @@ export const driversApi = {
       departmentId: input.departmentId,
       status: input.status ?? 'active',
       userId: input.userId,
+      photoUrl: input.photoUrl,
       notes: input.notes,
       createdAt: new Date().toISOString().slice(0, 10),
     }

@@ -62,6 +62,7 @@ export const mockDrivers: Driver[] = [
     employeeId: 'EMP-104',
     departmentId: 'D001',
     status: 'active',
+    photoUrl: 'https://i.pravatar.cc/160?img=15',
     createdAt: '2024-06-12',
     notes: 'Heavy-vehicle qualified. Preferred for long-haul.',
   },
@@ -87,6 +88,7 @@ export const mockDrivers: Driver[] = [
     employeeId: 'EMP-106',
     departmentId: 'D001',
     status: 'active',
+    photoUrl: 'https://i.pravatar.cc/160?img=33',
     createdAt: '2024-09-19',
   },
   {
@@ -124,6 +126,7 @@ export const mockDrivers: Driver[] = [
     employeeId: 'EMP-109',
     departmentId: 'D001',
     status: 'active',
+    photoUrl: 'https://i.pravatar.cc/160?img=68',
     createdAt: '2025-01-22',
   },
   {

@@ -86,7 +86,7 @@ export function DriversPage() {
   const columns = useMemo<ColumnDef<Driver>[]>(() => [
     { accessorKey: 'name', header: 'Driver', cell: ({ row }) => (
       <div className="flex items-center gap-2.5">
-        <Avatar name={row.original.name} size="sm" />
+        <Avatar name={row.original.name} size="sm" imageUrl={row.original.photoUrl} />
         <div className="min-w-0">
           <p className="font-medium text-zinc-900 truncate">{row.original.name}</p>
           {row.original.employeeId && (

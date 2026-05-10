@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Upload, X } from 'lucide-react'
 import { useAuthStore } from '@/features/auth'
 import { driversApi } from '@/features/drivers/api/drivers-api'
 import { useDepartments } from '@/features/departments'
@@ -14,6 +15,7 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Textarea } from '@/shared/ui/textarea'
 import { Modal } from '@/shared/ui/modal'
+import { Avatar } from '@/shared/ui/avatar'
 
 const driverSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -26,6 +28,7 @@ const driverSchema = z.object({
   departmentId: z.string().optional(),
   status: z.enum(['active', 'inactive']),
   userId: z.string().optional(),
+  photoUrl: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -44,6 +47,7 @@ const formDefaults: DriverForm = {
   departmentId: '',
   status: 'active',
   userId: '',
+  photoUrl: '',
   notes: '',
 }
 
@@ -74,7 +78,7 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
     [users],
   )
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<DriverForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control, setValue } = useForm<DriverForm>({
     resolver: zodResolver(driverSchema),
     defaultValues: formDefaults,
   })
@@ -93,6 +97,7 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
         departmentId: driver.departmentId ?? '',
         status: driver.status,
         userId: driver.userId ?? '',
+        photoUrl: driver.photoUrl ?? '',
         notes: driver.notes ?? '',
       })
     } else {
@@ -114,6 +119,7 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
         departmentId: input.departmentId || undefined,
         status: input.status,
         userId: input.userId || undefined,
+        photoUrl: input.photoUrl || undefined,
         notes: input.notes || undefined,
         createdBy: currentUser.id,
       })
@@ -141,6 +147,7 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
         departmentId: input.departmentId || undefined,
         status: input.status,
         userId: input.userId || undefined,
+        photoUrl: input.photoUrl || undefined,
         notes: input.notes || undefined,
         updatedBy: currentUser.id,
       })
@@ -174,6 +181,12 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
       }
     >
       <form id={FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <DriverPhotoField
+          control={control}
+          name={useWatch({ control, name: 'name' }) ?? ''}
+          onChange={(url) => setValue('photoUrl', url, { shouldDirty: true })}
+        />
+
         <div className="grid grid-cols-2 gap-3">
           <Input label="Name *" placeholder="e.g. Ramon Cruz" {...register('name')} error={errors.name?.message} />
           <Input label="Employee ID" placeholder="e.g. EMP-104 (optional)" {...register('employeeId')} />
@@ -249,5 +262,87 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
         />
       </form>
     </Modal>
+  )
+}
+
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024
+
+interface DriverPhotoFieldProps {
+  // Loose typing intentional — we only need to read photoUrl/name via useWatch.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  control: any
+  name: string
+  onChange: (url: string) => void
+}
+
+/**
+ * Driver photo input. Accepts either a pasted URL or a small file upload
+ * (PNG / JPG / WEBP, ≤ 2 MB, FileReader-based) and previews via Avatar so the
+ * fallback behaviour stays consistent with the rest of the app.
+ */
+function DriverPhotoField({ control, name, onChange }: DriverPhotoFieldProps) {
+  const photoUrl = useWatch({ control, name: 'photoUrl' }) as string | undefined
+
+  const handleFile = (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Only PNG, JPG, or WEBP files are accepted')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error('Photo must be under 2 MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onChange(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">Photo</p>
+      <div className="flex items-start gap-4">
+        <Avatar name={name || 'Driver'} size="xl" imageUrl={photoUrl} />
+        <div className="flex-1 space-y-2">
+          <Input
+            placeholder="Paste an image URL — https://…"
+            value={photoUrl ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFile(file)
+                e.target.value = ''
+              }}
+              className="hidden"
+              id="driver-photo-upload"
+            />
+            <label
+              htmlFor="driver-photo-upload"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-200 bg-white text-[12px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 cursor-pointer transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload file
+            </label>
+            {photoUrl && (
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-zinc-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-zinc-400">PNG, JPG, or WEBP · max 2 MB. Falls back to initials if unset.</p>
+        </div>
+      </div>
+    </div>
   )
 }
