@@ -6,7 +6,7 @@ import { TrackingPanel } from '@/shared/tracking'
 import { ChecklistPanel } from '@/shared/checklists'
 import { format, parseISO } from 'date-fns'
 import { useVehicles } from '@/features/fleet'
-import { useUsers } from '@/features/users'
+import { useDrivers } from '@/features/drivers'
 import type { Vehicle, VehicleStatus, FuelType } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
@@ -34,9 +34,9 @@ const fuelIcon: Record<FuelType, typeof Fuel> = {
 
 export function VehiclesTab() {
   const { data: vehicles = [], isLoading } = useVehicles()
-  const { data: users = [] } = useUsers()
+  const { data: drivers = [] } = useDrivers()
 
-  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d])), [drivers])
 
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedVehicleId = searchParams.get('vehicle')
@@ -103,7 +103,7 @@ export function VehiclesTab() {
     { accessorKey: 'currentOdometer', header: 'Odometer', cell: ({ getValue }) => <span className="tabular-nums text-zinc-700">{(getValue() as number).toLocaleString()} km</span> },
     { accessorKey: 'assignedDriverId', header: 'Driver', cell: ({ getValue }) => {
       const v = getValue() as string | undefined
-      return v ? (userMap[v]?.name ?? '—') : <span className="text-zinc-400">Unassigned</span>
+      return v ? (driverMap[v]?.name ?? '—') : <span className="text-zinc-400">Unassigned</span>
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
     { accessorKey: 'createdAt', header: 'Registered', cell: ({ getValue }) => format(parseISO(getValue() as string), 'MMM yyyy') },
@@ -126,7 +126,7 @@ export function VehiclesTab() {
         </div>
       )
     }},
-  ], [userMap])
+  ], [driverMap])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/features/auth'
 import { useUsers } from '@/features/users'
+import { useDrivers } from '@/features/drivers'
 import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useAuditLog } from '@/features/audit-log'
@@ -242,13 +243,13 @@ function DrawerHeader({
 }
 
 function OverviewTab({ vehicle }: { vehicle: Vehicle }) {
-  const { data: users = [] } = useUsers()
+  const { data: drivers = [] } = useDrivers()
   const { data: assets = [] } = useAssets()
   const { data: templates = [] } = useTemplates()
   const [showLocation, setShowLocation] = useState(false)
   const [showInspection, setShowInspection] = useState(false)
 
-  const driver = users.find((u) => u.id === vehicle.assignedDriverId)
+  const driver = drivers.find((d) => d.id === vehicle.assignedDriverId)
   const linkedAsset = assets.find((a) => a.id === vehicle.linkedAssetId)
   const checklist = templates.find((t) => t.id === vehicle.checklistId)
 
@@ -463,7 +464,7 @@ function MaintenanceTab({ vehicle }: { vehicle: Vehicle }) {
 
 function TripsTab({ vehicle }: { vehicle: Vehicle }) {
   const { data: trips = [] } = useTrips()
-  const { data: users = [] } = useUsers()
+  const { data: drivers = [] } = useDrivers()
 
   const my = trips
     .filter((t) => t.vehicleId === vehicle.id)
@@ -473,7 +474,7 @@ function TripsTab({ vehicle }: { vehicle: Vehicle }) {
     return <EmptyState icon={RouteIcon} title="No trips logged" message="No trips have been recorded for this vehicle yet." />
   }
 
-  const userMap = Object.fromEntries(users.map((u) => [u.id, u]))
+  const driverMap = Object.fromEntries(drivers.map((d) => [d.id, d]))
   const total = my.filter((t) => t.status === 'completed').reduce((s, t) => s + t.distance, 0)
 
   return (
@@ -484,7 +485,7 @@ function TripsTab({ vehicle }: { vehicle: Vehicle }) {
       </div>
       <ul className="space-y-2">
         {my.slice(0, 20).map((t) => {
-          const driver = userMap[t.driverId]
+          const driver = driverMap[t.driverId]
           const status = t.status === 'in_progress' ? 'Running' : t.status === 'cancelled' ? 'Cancelled' : 'Completed'
           const statusStyle =
             t.status === 'in_progress'

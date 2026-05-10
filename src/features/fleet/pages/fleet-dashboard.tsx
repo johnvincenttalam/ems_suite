@@ -37,7 +37,7 @@ import {
   differenceInCalendarDays,
 } from 'date-fns'
 import { useVehicles, useTrips, useFuelLogs } from '@/features/fleet'
-import { useUsers } from '@/features/users'
+import { useDrivers } from '@/features/drivers'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
 import { useIssues, IssueList, IssueDetailDrawer } from '@/features/issues'
@@ -108,7 +108,7 @@ export function FleetDashboard() {
   const { data: vehicles = [], isLoading } = useVehicles()
   const { data: trips = [] } = useTrips()
   const { data: fuelLogs = [] } = useFuelLogs()
-  const { data: users = [] } = useUsers()
+  const { data: drivers = [] } = useDrivers()
   const { data: auditEntries = [] } = useAuditLog()
   const { notifications, unreadCount } = useNotifications()
   const { data: openIssues = [] } = useIssues({ targetKind: 'vehicle', status: 'all-open' })
@@ -213,17 +213,16 @@ export function FleetDashboard() {
 
   const licenseWatch = useMemo(() => {
     const today = new Date()
-    return users
-      .filter((u) => u.licenseExpiry)
-      .map((u) => {
-        const exp = parseISO(u.licenseExpiry!)
+    return drivers
+      .map((d) => {
+        const exp = parseISO(d.licenseExpiry)
         const days = differenceInCalendarDays(exp, today)
-        return { user: u, expDate: exp, days }
+        return { driver: d, expDate: exp, days }
       })
       .filter((x) => x.days <= 90)
       .sort((a, b) => a.days - b.days)
       .slice(0, 5)
-  }, [users])
+  }, [drivers])
 
   const topFuelConsumers = useMemo(() => {
     const today = new Date()
@@ -467,7 +466,7 @@ export function FleetDashboard() {
         <Card>
           <CardHeader className="flex-row items-center justify-between flex">
             <CardTitle>License Expiry</CardTitle>
-            <Link to="users" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
+            <Link to="drivers" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
               View drivers
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -485,14 +484,14 @@ export function FleetDashboard() {
                   const urgent = !expired && row.days <= 30
                   return (
                     <li
-                      key={row.user.id}
+                      key={row.driver.id}
                       className={cn(
                         'px-6 py-3 flex items-center justify-between gap-3',
                         i !== licenseWatch.length - 1 && 'border-b border-zinc-100/60',
                       )}
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-zinc-900 truncate">{row.user.name}</p>
+                        <p className="text-[13px] font-medium text-zinc-900 truncate">{row.driver.name}</p>
                         <p className="text-[11px] text-zinc-400 mt-0.5">
                           {format(row.expDate, 'MMM d, yyyy')}
                         </p>
@@ -539,7 +538,7 @@ export function FleetDashboard() {
               <ul>
                 {recentTrips.map((t, i) => {
                   const v = vehicles.find((x) => x.id === t.vehicleId)
-                  const driver = users.find((u) => u.id === t.driverId)
+                  const driver = drivers.find((d) => d.id === t.driverId)
                   const badgeStyle =
                     t.status === 'in_progress'
                       ? 'bg-blue-50 text-blue-700'

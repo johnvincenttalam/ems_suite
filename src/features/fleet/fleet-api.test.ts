@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fleetApi, FleetValidationError } from './api/fleet-api'
-import { mockUsers } from '@/features/users'
 import { mockDrivers } from '@/features/drivers'
 import { mockAssets } from '@/features/assets'
 import { mockVehicles } from './data/mock-fleet'
@@ -18,10 +17,10 @@ describe('fleetApi.listVehicles', () => {
     expect(new Set(plates).size).toBe(plates.length)
   })
 
-  it('every assignedDriverId, when present, references a known user', async () => {
+  it('every assignedDriverId, when present, references a known driver', async () => {
     const result = await fleetApi.listVehicles()
-    const userIds = new Set(mockUsers.map((u) => u.id))
-    expect(result.every((v) => !v.assignedDriverId || userIds.has(v.assignedDriverId))).toBe(true)
+    const driverIds = new Set(mockDrivers.map((d) => d.id))
+    expect(result.every((v) => !v.assignedDriverId || driverIds.has(v.assignedDriverId))).toBe(true)
   })
 
   it('every linkedAssetId, when present, references a known asset', async () => {
@@ -249,7 +248,7 @@ describe('fleetApi.updateVehicle', () => {
       year: 2026,
       fuelType: 'diesel',
       currentOdometer: 0,
-      assignedDriverId: 'U002',
+      assignedDriverId: 'DRV-002',
       linkedAssetId: 'AST-001',
       createdBy: 'U001',
     })
@@ -319,7 +318,7 @@ describe('fleetApi.retireVehicle', () => {
       year: 2020,
       fuelType: 'diesel',
       currentOdometer: 200_000,
-      assignedDriverId: 'U002',
+      assignedDriverId: 'DRV-002',
       createdBy: 'U001',
     })
     const auditBefore = mockAuditLog.length
