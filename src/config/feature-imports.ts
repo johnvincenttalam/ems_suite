@@ -81,6 +81,7 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   fleetSettings:    () => import('@/features/fleet'),
   fleetReports:     () => import('@/features/fleet'),
   fleetIssues:      () => import('@/features/issues'),
+  fleetDrivers:     () => import('@/features/drivers'),
   fleetTrackingMap:    () => import('@/features/fleet'),
   fleetTrackingGps:    () => import('@/features/fleet'),
   fleetTrackingTags:   () => import('@/features/fleet'),

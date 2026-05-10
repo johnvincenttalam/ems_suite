@@ -82,6 +82,7 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   fleetSettings:       lazy(() => featureImports.fleetSettings().then((m: any) => ({ default: m.FleetSettingsPage }))),
   fleetReports:        lazy(() => featureImports.fleetReports().then((m: any) => ({ default: m.FleetReportsPage }))),
   fleetIssues:         lazy(() => featureImports.fleetIssues().then((m: any) => ({ default: m.FleetIssuesPage }))),
+  fleetDrivers:        lazy(() => featureImports.fleetDrivers().then((m: any) => ({ default: m.DriversPage }))),
   fleetTrackingMap:    lazy(() => featureImports.fleetTrackingMap().then((m: any) => ({ default: m.FleetTrackingMapPage }))),
   fleetTrackingGps:    lazy(() => featureImports.fleetTrackingGps().then((m: any) => ({ default: m.FleetTrackingGpsPage }))),
   fleetTrackingTags:   lazy(() => featureImports.fleetTrackingTags().then((m: any) => ({ default: m.FleetTrackingTagsPage }))),

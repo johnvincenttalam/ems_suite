@@ -1,3 +1,4 @@
+export { DriversPage } from './pages/drivers-page'
 export { useDrivers } from './hooks/use-drivers'
 export { driversApi } from './api/drivers-api'
 export { mockDrivers } from './data/mock-drivers'

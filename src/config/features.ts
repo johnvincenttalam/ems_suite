@@ -71,6 +71,7 @@ export const features = {
   fleetSettings: true,
   fleetReports: true,
   fleetIssues: true,
+  fleetDrivers: true,
   fleetTrackingMap: true,
   fleetTrackingGps: true,
   fleetTrackingTags: true,

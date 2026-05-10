@@ -31,6 +31,7 @@ import {
   Map as MapIcon,
   Satellite,
   ScanLine,
+  IdCard,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureKey } from './features'
@@ -272,6 +273,12 @@ export const modules: EmsModule[] = [
         title: 'Insights',
         items: [
           { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'fleetReports' },
+        ],
+      },
+      {
+        title: 'Master Data',
+        items: [
+          { label: 'Drivers', path: 'drivers', icon: IdCard, feature: 'fleetDrivers' },
         ],
       },
       {
