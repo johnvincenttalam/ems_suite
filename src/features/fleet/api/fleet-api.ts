@@ -1,5 +1,5 @@
-import type { Vehicle, Trip, FuelLog, VehicleStatus } from '@/features/fleet/types'
-import { mockVehicles, mockTrips, mockFuelLogs } from '@/features/fleet/data/mock-fleet'
+import type { Vehicle, Trip, FuelLog, VehicleStatus, VehicleInspection, VehicleInspectionResult } from '@/features/fleet/types'
+import { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections } from '@/features/fleet/data/mock-fleet'
 import { mockDrivers } from '@/features/drivers'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
@@ -41,6 +41,18 @@ let fuelLogCounter = mockFuelLogs.reduce((max, f) => {
 function nextFuelLogId(): string {
   fuelLogCounter += 1
   return `FL-${new Date().getFullYear()}-${String(fuelLogCounter).padStart(4, '0')}`
+}
+
+let inspectionCounter = mockVehicleInspections.reduce((max, i) => {
+  const m = i.id.match(/^VI-\d{4}-(\d{4,})$/)
+  if (!m) return max
+  const n = Number(m[1])
+  return Number.isFinite(n) && n > max ? n : max
+}, 0)
+
+function nextInspectionId(): string {
+  inspectionCounter += 1
+  return `VI-${new Date().getFullYear()}-${String(inspectionCounter).padStart(4, '0')}`
 }
 
 function findVehicle(id: string): Vehicle {
@@ -121,6 +133,18 @@ interface CreateFuelLogInput {
   createdBy: string
 }
 
+interface CreateInspectionInput {
+  vehicleId: string
+  inspectorDriverId?: string
+  date: string
+  result: VehicleInspectionResult
+  itemsTotal?: number
+  itemsPassed?: number
+  tripId?: string
+  notes?: string
+  createdBy: string
+}
+
 /**
  * Fleet API — swap with real HTTP when backend is ready:
  *   listVehicles:    () => http.get<Vehicle[]>('/fleet/vehicles')
@@ -142,6 +166,11 @@ export const fleetApi = {
   listFuelLogs: async (): Promise<FuelLog[]> => {
     await delay()
     return [...mockFuelLogs].sort((a, b) => b.date.localeCompare(a.date))
+  },
+
+  listVehicleInspections: async (): Promise<VehicleInspection[]> => {
+    await delay()
+    return [...mockVehicleInspections].sort((a, b) => b.date.localeCompare(a.date))
   },
 
   createVehicle: async (input: CreateVehicleInput): Promise<Vehicle> => {
@@ -356,6 +385,36 @@ export const fleetApi = {
       detail: `Cancelled trip ${trip.id}${reason ? ` — ${reason}` : ''}`,
     })
     return trip
+  },
+
+  createInspection: async (input: CreateInspectionInput): Promise<VehicleInspection> => {
+    await delay(120)
+    const vehicle = findVehicle(input.vehicleId)
+    if (input.itemsTotal != null && input.itemsPassed != null && input.itemsPassed > input.itemsTotal) {
+      throw new FleetValidationError('Items passed cannot exceed items total')
+    }
+
+    const inspection: VehicleInspection = {
+      id: nextInspectionId(),
+      vehicleId: vehicle.id,
+      inspectorDriverId: input.inspectorDriverId,
+      date: input.date,
+      result: input.result,
+      itemsTotal: input.itemsTotal,
+      itemsPassed: input.itemsPassed,
+      tripId: input.tripId,
+      notes: input.notes,
+      createdAt: new Date().toISOString(),
+    }
+    mockVehicleInspections.push(inspection)
+
+    recordAudit({
+      userId: input.createdBy,
+      action: 'create',
+      module: 'Fleet',
+      detail: `Recorded inspection ${inspection.id} — ${vehicle.plateNumber} · ${inspection.result}`,
+    })
+    return inspection
   },
 
   createFuelLog: async (input: CreateFuelLogInput): Promise<FuelLog> => {

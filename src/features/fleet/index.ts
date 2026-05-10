@@ -8,6 +8,7 @@ export { FleetLogsPage } from './pages/fleet-logs-page'
 export { FleetUsersPage } from './pages/fleet-users-page'
 export { FleetSettingsPage } from './pages/fleet-settings-page'
 export { FleetReportsPage } from './pages/fleet-reports-page'
+export { FleetInspectionsPage } from './pages/fleet-inspections-page'
 export { FleetTrackingMapPage } from './pages/fleet-tracking-map-page'
 export { FleetTrackingGpsPage } from './pages/fleet-tracking-gps-page'
 export { FleetTrackingTagsPage } from './pages/fleet-tracking-tags-page'
@@ -17,6 +18,7 @@ export {
   useVehicles,
   useTrips,
   useFuelLogs,
+  useVehicleInspections,
   useCreateVehicle,
   useUpdateVehicle,
   useRetireVehicle,
@@ -24,7 +26,8 @@ export {
   useCompleteTrip,
   useCancelTrip,
   useCreateFuelLog,
+  useCreateVehicleInspection,
 } from './hooks/use-fleet'
 export { fleetApi, FleetValidationError } from './api/fleet-api'
-export { mockVehicles, mockTrips, mockFuelLogs } from './data/mock-fleet'
-export type { Vehicle, Trip, FuelLog, VehicleStatus, FuelType, TripStatus } from './types'
+export { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections } from './data/mock-fleet'
+export type { Vehicle, Trip, FuelLog, VehicleStatus, FuelType, TripStatus, VehicleInspection, VehicleInspectionResult } from './types'

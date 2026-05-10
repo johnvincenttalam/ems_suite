@@ -261,6 +261,7 @@ export const modules: EmsModule[] = [
           { label: 'Vehicles', path: 'vehicles', icon: Truck, feature: 'fleet' },
           { label: 'Trips', path: 'trips', icon: RouteIcon, feature: 'fleetTrips' },
           { label: 'Fuel Logs', path: 'fuel-logs', icon: Fuel, feature: 'fleetFuelLogs' },
+          { label: 'Inspections', path: 'inspections', icon: ClipboardCheck, feature: 'fleetInspections' },
           { label: 'Issues', path: 'issues', icon: AlertCircle, feature: 'fleetIssues' },
           { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'fleetMaintenance' },
           { label: 'Live Map', path: 'tracking/map', icon: MapIcon, feature: 'fleetTrackingMap' },

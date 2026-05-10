@@ -1,4 +1,4 @@
-import type { Vehicle, Trip, FuelLog } from '@/features/fleet/types'
+import type { Vehicle, Trip, FuelLog, VehicleInspection } from '@/features/fleet/types'
 
 export const mockVehicles: Vehicle[] = [
   { id: 'V001', plateNumber: 'SGX 5482 K', model: 'Toyota Hilux',           year: 2025, status: 'active',      fuelType: 'diesel',   currentOdometer: 18420, fuelCapacityLiters: 80, assignedDriverId: 'DRV-003', linkedAssetId: 'AST-008', checklistId: 'TPL-002', nextServiceDate: '2026-05-18', photoUrl: 'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=400&q=80', createdAt: '2025-01-10' },
@@ -31,4 +31,15 @@ export const mockFuelLogs: FuelLog[] = [
   { id: 'FL-2026-0035', vehicleId: 'V003', driverId: 'DRV-002', date: '2026-04-15', liters: 49.0, costPerLiter: 2.25, totalCost: 110.25, odometer: 91720, station: 'Caltex — Tampines',                                    },
   { id: 'FL-2026-0034', vehicleId: 'V001', driverId: 'DRV-003', date: '2026-04-12', liters: 55.5, costPerLiter: 2.22, totalCost: 123.21, odometer: 17680, station: 'Esso — KM 14 Highway',                                  },
   { id: 'FL-2026-0033', vehicleId: 'V002', driverId: 'DRV-002', date: '2026-04-08', liters: 70.4, costPerLiter: 2.22, totalCost: 156.29, odometer: 64500, station: 'Shell — Marine Pkwy',           notes: 'Pre-service top-up' },
+]
+
+export const mockVehicleInspections: VehicleInspection[] = [
+  { id: 'VI-2026-0012', vehicleId: 'V001', inspectorDriverId: 'DRV-003', date: '2026-04-26', result: 'pass',      itemsTotal: 8, itemsPassed: 8, tripId: 'TR-2026-0089', createdAt: '2026-04-26T07:55:00Z', notes: 'All checks clear before Site Alpha run' },
+  { id: 'VI-2026-0011', vehicleId: 'V003', inspectorDriverId: 'DRV-002', date: '2026-04-26', result: 'pass',      itemsTotal: 8, itemsPassed: 8, tripId: 'TR-2026-0088', createdAt: '2026-04-26T09:08:00Z' },
+  { id: 'VI-2026-0010', vehicleId: 'V001', inspectorDriverId: 'DRV-003', date: '2026-04-24', result: 'attention', itemsTotal: 8, itemsPassed: 7, tripId: 'TR-2026-0086', createdAt: '2026-04-24T07:24:00Z', notes: 'Wiper streak — replacement scheduled' },
+  { id: 'VI-2026-0009', vehicleId: 'V003', inspectorDriverId: 'DRV-002', date: '2026-04-23', result: 'pass',      itemsTotal: 8, itemsPassed: 8, tripId: 'TR-2026-0085', createdAt: '2026-04-23T07:18:00Z' },
+  { id: 'VI-2026-0008', vehicleId: 'V001', inspectorDriverId: 'DRV-006', date: '2026-04-22', result: 'pass',      itemsTotal: 8, itemsPassed: 8, tripId: 'TR-2026-0084', createdAt: '2026-04-22T07:48:00Z' },
+  { id: 'VI-2026-0007', vehicleId: 'V002', inspectorDriverId: 'DRV-004', date: '2026-04-15', result: 'fail',      itemsTotal: 8, itemsPassed: 5, createdAt: '2026-04-15T08:10:00Z', notes: 'Coolant leak + brake pad wear — sent to maintenance' },
+  { id: 'VI-2026-0006', vehicleId: 'V004', inspectorDriverId: 'DRV-001', date: '2026-04-25', result: 'pass',      itemsTotal: 6, itemsPassed: 6, tripId: 'TR-2026-0087', createdAt: '2026-04-25T12:42:00Z' },
+  { id: 'VI-2026-0005', vehicleId: 'V003', inspectorDriverId: 'DRV-002', date: '2026-04-19', result: 'pass',      itemsTotal: 8, itemsPassed: 8, createdAt: '2026-04-19T07:30:00Z' },
 ]

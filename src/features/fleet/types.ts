@@ -50,3 +50,22 @@ export interface FuelLog {
   station?: string
   notes?: string
 }
+
+export type VehicleInspectionResult = 'pass' | 'attention' | 'fail'
+
+export interface VehicleInspection {
+  id: string
+  vehicleId: string
+  /** Driver who performed the inspection (for pre-trip), or fleet ops user. */
+  inspectorDriverId?: string
+  /** ISO yyyy-mm-dd. */
+  date: string
+  result: VehicleInspectionResult
+  /** Optional pass/fail summary so the table can show 7/8 instead of just 'fail'. */
+  itemsTotal?: number
+  itemsPassed?: number
+  /** Optional link back to the trip the inspection was performed for. */
+  tripId?: string
+  notes?: string
+  createdAt: string
+}

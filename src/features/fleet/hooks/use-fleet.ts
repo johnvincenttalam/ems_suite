@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fleetApi } from '@/features/fleet/api/fleet-api'
-import type { Vehicle, VehicleStatus } from '@/features/fleet/types'
+import type { Vehicle, VehicleStatus, VehicleInspectionResult } from '@/features/fleet/types'
 
 export function useVehicles() {
   return useQuery({ queryKey: ['fleet', 'vehicles'], queryFn: fleetApi.listVehicles })
@@ -12,6 +12,10 @@ export function useTrips() {
 
 export function useFuelLogs() {
   return useQuery({ queryKey: ['fleet', 'fuel-logs'], queryFn: fleetApi.listFuelLogs })
+}
+
+export function useVehicleInspections() {
+  return useQuery({ queryKey: ['fleet', 'inspections'], queryFn: fleetApi.listVehicleInspections })
 }
 
 function invalidateFleet(qc: ReturnType<typeof useQueryClient>) {
@@ -108,6 +112,24 @@ export function useCancelTrip() {
   return useMutation({
     mutationFn: (input: { id: string; byUserId: string; reason?: string }) =>
       fleetApi.cancelTrip(input.id, input.byUserId, input.reason),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useCreateVehicleInspection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      vehicleId: string
+      inspectorDriverId?: string
+      date: string
+      result: VehicleInspectionResult
+      itemsTotal?: number
+      itemsPassed?: number
+      tripId?: string
+      notes?: string
+      createdBy: string
+    }) => fleetApi.createInspection(input),
     onSuccess: () => invalidateFleet(qc),
   })
 }
