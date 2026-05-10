@@ -12,6 +12,7 @@ import { useDrivers } from '@/features/drivers'
 import { useAuthStore } from '@/features/auth'
 import { ReportIssueModal } from '@/features/issues'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
+import { TripDetailDrawer } from '@/features/fleet/components/trip-detail-drawer'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
@@ -67,6 +68,7 @@ export function TripsTab() {
   const [completingTrip, setCompletingTrip] = useState<Trip | null>(null)
   const [cancellingTrip, setCancellingTrip] = useState<Trip | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null)
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? trips : trips.filter((t) => t.status === statusFilter),
@@ -250,6 +252,13 @@ export function TripsTab() {
         columns={columns}
         emptyIcon={Route}
         emptyMessage="No trips match your filters"
+        onRowClick={(trip) => setViewingTrip(trip)}
+      />
+
+      <TripDetailDrawer
+        open={!!viewingTrip}
+        trip={viewingTrip}
+        onClose={() => setViewingTrip(null)}
       />
 
       <Modal
