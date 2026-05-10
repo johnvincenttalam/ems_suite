@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { Truck, Zap, Fuel, Plus, MapPin, ClipboardList } from 'lucide-react'
+import { Truck, Zap, Fuel, Plus, ClipboardList } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { TrackingPanel } from '@/shared/tracking'
 import { ChecklistPanel } from '@/shared/checklists'
 import { format, parseISO } from 'date-fns'
 import { useVehicles } from '@/features/fleet'
@@ -46,7 +45,6 @@ export function VehiclesTab() {
   const [statusFilter, setStatusFilter] = useState<VehicleStatus | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
-  const [locationVehicle, setLocationVehicle] = useState<Vehicle | null>(null)
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
 
   const selectedVehicle = useMemo(
@@ -108,20 +106,14 @@ export function VehiclesTab() {
     { accessorKey: 'createdAt', header: 'Registered', cell: ({ getValue }) => format(parseISO(getValue() as string), 'MMM yyyy') },
     { id: 'actions', header: '', cell: ({ row }) => {
       const vehicle = row.original
+      if (!vehicle.checklistId) return null
       return (
         <div className="flex items-center gap-1" onClick={stopRowClick}>
-          {vehicle.checklistId && (
-            <button
-              onClick={() => setInspectionVehicle(vehicle)}
-              title="Pre-trip inspection"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-            ><ClipboardList className="w-4 h-4" /></button>
-          )}
           <button
-            onClick={() => setLocationVehicle(vehicle)}
-            title="View location"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          ><MapPin className="w-4 h-4" /></button>
+            onClick={() => setInspectionVehicle(vehicle)}
+            title="Pre-trip inspection"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+          ><ClipboardList className="w-4 h-4" /></button>
         </div>
       )
     }},
@@ -225,25 +217,6 @@ export function VehiclesTab() {
         )}
       </Modal>
 
-      <Modal
-        open={!!locationVehicle}
-        onClose={() => setLocationVehicle(null)}
-        title={
-          locationVehicle
-            ? `Location · ${locationVehicle.plateNumber}`
-            : 'Location'
-        }
-        size="lg"
-      >
-        {locationVehicle && (
-          <div className="pb-2">
-            <p className="text-[12px] text-zinc-400 mb-4">
-              {locationVehicle.model} · {locationVehicle.year} · {locationVehicle.currentOdometer.toLocaleString()} km
-            </p>
-            <TrackingPanel entityType="vehicle" entityId={locationVehicle.id} />
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }
