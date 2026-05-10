@@ -261,6 +261,10 @@ export const modules: EmsModule[] = [
           { label: 'Fuel Logs', path: 'fuel-logs', icon: Fuel, feature: 'fleetFuelLogs' },
           { label: 'Issues', path: 'issues', icon: AlertCircle, feature: 'fleetIssues' },
           { label: 'Maintenance', path: 'maintenance', icon: Wrench, feature: 'fleetMaintenance' },
+          { label: 'Live Map', path: 'tracking/map', icon: MapIcon, feature: 'fleetTrackingMap' },
+          { label: 'GPS Real-Time', path: 'tracking/gps', icon: Satellite, feature: 'fleetTrackingGps' },
+          { label: 'Tags', path: 'tracking/tags', icon: Tag, feature: 'fleetTrackingTags' },
+          { label: 'Scan History', path: 'tracking/scans', icon: ScanLine, feature: 'fleetTrackingScans' },
         ],
       },
       {

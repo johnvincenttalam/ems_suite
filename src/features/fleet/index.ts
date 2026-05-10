@@ -8,6 +8,10 @@ export { FleetLogsPage } from './pages/fleet-logs-page'
 export { FleetUsersPage } from './pages/fleet-users-page'
 export { FleetSettingsPage } from './pages/fleet-settings-page'
 export { FleetReportsPage } from './pages/fleet-reports-page'
+export { FleetTrackingMapPage } from './pages/fleet-tracking-map-page'
+export { FleetTrackingGpsPage } from './pages/fleet-tracking-gps-page'
+export { FleetTrackingTagsPage } from './pages/fleet-tracking-tags-page'
+export { FleetTrackingScansPage } from './pages/fleet-tracking-scans-page'
 export {
   useVehicles,
   useTrips,
