@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { Route, Plus, MapPin, Loader2, ClipboardList, AlertCircle } from 'lucide-react'
+import { Route, Plus, MapPin, Loader2, ClipboardList, AlertCircle, CheckSquare, Ban } from 'lucide-react'
 import { ChecklistPanel } from '@/shared/checklists'
 import { format, formatDistanceStrict, parseISO } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { useTrips, useVehicles, useCreateTrip } from '@/features/fleet'
+import { useTrips, useVehicles, useCreateTrip, useCompleteTrip, useCancelTrip } from '@/features/fleet'
 import { useDrivers } from '@/features/drivers'
 import { useAuthStore } from '@/features/auth'
 import { ReportIssueModal } from '@/features/issues'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
@@ -33,6 +34,12 @@ const tripSchema = z.object({
 
 type TripForm = z.infer<typeof tripSchema>
 
+const endTripSchema = z.object({
+  endOdometer: z.number().int().min(0, 'Ending odometer is required'),
+})
+
+type EndTripForm = z.infer<typeof endTripSchema>
+
 const statusFilters: { value: TripStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'in_progress', label: 'In Progress' },
@@ -46,6 +53,8 @@ export function TripsTab() {
   const { data: drivers = [] } = useDrivers()
   const currentUser = useAuthStore((s) => s.user)
   const createTrip = useCreateTrip()
+  const completeTrip = useCompleteTrip()
+  const cancelTrip = useCancelTrip()
 
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
   const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d])), [drivers])
@@ -55,6 +64,9 @@ export function TripsTab() {
   const [showNew, setShowNew] = useState(false)
   const [inspectionTrip, setInspectionTrip] = useState<Trip | null>(null)
   const [reportIssueForTrip, setReportIssueForTrip] = useState<Trip | null>(null)
+  const [completingTrip, setCompletingTrip] = useState<Trip | null>(null)
+  const [cancellingTrip, setCancellingTrip] = useState<Trip | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? trips : trips.filter((t) => t.status === statusFilter),
@@ -105,14 +117,32 @@ export function TripsTab() {
     { id: 'actions', header: '', cell: ({ row }) => {
       const trip = row.original
       const vehicle = vehicleMap[trip.vehicleId]
-      if (!vehicle?.checklistId) return null
+      const items: ActionMenuItem[] = []
+      if (trip.status === 'in_progress') {
+        items.push({
+          key: 'end',
+          label: 'End trip',
+          icon: CheckSquare,
+          onClick: () => setCompletingTrip(trip),
+        })
+        items.push({
+          key: 'cancel',
+          label: 'Cancel trip',
+          icon: Ban,
+          danger: true,
+          onClick: () => { setCancelReason(''); setCancellingTrip(trip) },
+        })
+      }
       return (
-        <div onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => setInspectionTrip(trip)}
-            title="Pre-trip inspection"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-          ><ClipboardList className="w-4 h-4" /></button>
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          {vehicle?.checklistId && (
+            <button
+              onClick={() => setInspectionTrip(trip)}
+              title="Pre-trip inspection"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+            ><ClipboardList className="w-4 h-4" /></button>
+          )}
+          {items.length > 0 && <ActionMenu items={items} />}
         </div>
       )
     }},
@@ -124,6 +154,46 @@ export function TripsTab() {
   })
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<TripForm>({ resolver: zodResolver(tripSchema) })
+
+  const endTripForm = useForm<EndTripForm>({ resolver: zodResolver(endTripSchema) })
+
+  const watchedEndOdo = endTripForm.watch('endOdometer')
+  const previewDistance =
+    completingTrip && Number.isFinite(watchedEndOdo) && (watchedEndOdo as number) >= completingTrip.startOdometer
+      ? (watchedEndOdo as number) - completingTrip.startOdometer
+      : null
+
+  const onEndTrip = async (data: EndTripForm) => {
+    if (!currentUser || !completingTrip) return
+    try {
+      await completeTrip.mutateAsync({
+        id: completingTrip.id,
+        endOdometer: data.endOdometer,
+        completedBy: currentUser.id,
+      })
+      toast.success(`Trip ${completingTrip.id} completed`)
+      setCompletingTrip(null)
+      endTripForm.reset()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'End trip failed')
+    }
+  }
+
+  const onCancelTrip = async () => {
+    if (!currentUser || !cancellingTrip) return
+    try {
+      await cancelTrip.mutateAsync({
+        id: cancellingTrip.id,
+        byUserId: currentUser.id,
+        reason: cancelReason.trim() || undefined,
+      })
+      toast.success(`Trip ${cancellingTrip.id} cancelled`)
+      setCancellingTrip(null)
+      setCancelReason('')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Cancel trip failed')
+    }
+  }
 
   const onSubmit = async (data: TripForm) => {
     if (!currentUser) {
@@ -251,6 +321,76 @@ export function TripsTab() {
           <Input label="Starting Odometer *" type="number" {...register('startOdometer', { valueAsNumber: true })} error={errors.startOdometer?.message} helperText="km" />
           <Textarea label="Purpose" {...register('purpose')} rows={2} placeholder="e.g. Site Alpha — supply run" />
         </form>
+      </Modal>
+
+      <Modal
+        open={!!completingTrip}
+        onClose={() => { setCompletingTrip(null); endTripForm.reset() }}
+        title={completingTrip ? `End Trip · ${completingTrip.id}` : 'End Trip'}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={completeTrip.isPending} onClick={() => { setCompletingTrip(null); endTripForm.reset() }}>Cancel</Button>
+            <Button type="submit" form="end-trip-form" loading={completeTrip.isPending}>End Trip</Button>
+          </>
+        }
+      >
+        {completingTrip && (
+          <form id="end-trip-form" onSubmit={endTripForm.handleSubmit(onEndTrip)} className="space-y-4">
+            <div className="rounded-lg border border-zinc-200/60 bg-zinc-50/40 px-4 py-3 text-[12.5px] text-zinc-600">
+              <p>
+                <span className="font-mono text-zinc-700">{vehicleMap[completingTrip.vehicleId]?.plateNumber ?? completingTrip.vehicleId}</span>
+                {' · '}
+                {driverMap[completingTrip.driverId]?.name ?? completingTrip.driverId}
+              </p>
+              <p className="mt-1 text-zinc-500">
+                Started at <strong className="text-zinc-700 tabular-nums">{completingTrip.startOdometer.toLocaleString()} km</strong>
+                {' · '}
+                {format(parseISO(completingTrip.startTime), 'MMM d, HH:mm')}
+              </p>
+            </div>
+            <Input
+              label="Ending Odometer *"
+              type="number"
+              {...endTripForm.register('endOdometer', { valueAsNumber: true })}
+              error={endTripForm.formState.errors.endOdometer?.message}
+              helperText={
+                previewDistance != null
+                  ? `Distance: ${previewDistance.toLocaleString()} km`
+                  : 'Must be ≥ starting odometer'
+              }
+            />
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!cancellingTrip}
+        onClose={() => { setCancellingTrip(null); setCancelReason('') }}
+        title={cancellingTrip ? `Cancel Trip · ${cancellingTrip.id}` : 'Cancel Trip'}
+        size="sm"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={cancelTrip.isPending} onClick={() => { setCancellingTrip(null); setCancelReason('') }}>Keep Trip</Button>
+            <Button type="button" variant="danger" loading={cancelTrip.isPending} onClick={onCancelTrip}>Cancel Trip</Button>
+          </>
+        }
+      >
+        {cancellingTrip && (
+          <div className="space-y-3">
+            <p className="text-[13px] text-zinc-700">
+              Cancel <span className="font-mono">{cancellingTrip.id}</span>? Distance will be set to 0
+              and the trip will be marked cancelled.
+            </p>
+            <Textarea
+              label="Reason (optional)"
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="e.g. Dispatcher cancelled, driver unavailable"
+            />
+          </div>
+        )}
       </Modal>
     </div>
   )
