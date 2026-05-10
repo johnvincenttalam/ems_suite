@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fleetApi, FleetValidationError } from './api/fleet-api'
 import { mockUsers } from '@/features/users'
+import { mockDrivers } from '@/features/drivers'
 import { mockAssets } from '@/features/assets'
 import { mockVehicles } from './data/mock-fleet'
 import { mockAuditLog } from '@/features/audit-log/data/mock-audit'
@@ -58,10 +59,10 @@ describe('fleetApi.listTrips', () => {
     expect(trips.every((t) => ids.has(t.vehicleId))).toBe(true)
   })
 
-  it('every driverId references a known user', async () => {
+  it('every driverId references a known driver', async () => {
     const trips = await fleetApi.listTrips()
-    const userIds = new Set(mockUsers.map((u) => u.id))
-    expect(trips.every((t) => userIds.has(t.driverId))).toBe(true)
+    const driverIds = new Set(mockDrivers.map((d) => d.id))
+    expect(trips.every((t) => driverIds.has(t.driverId))).toBe(true)
   })
 
   it('completed trips have endTime, endOdometer, and endOdometer >= startOdometer', async () => {
@@ -93,12 +94,8 @@ describe('fleetApi.listTrips', () => {
 })
 
 describe('driver license data', () => {
-  it('users referenced as fleet drivers carry a licenseExpiry', async () => {
-    const trips = await fleetApi.listTrips()
-    const driverIds = new Set(trips.map((t) => t.driverId))
-    const drivers = mockUsers.filter((u) => driverIds.has(u.id))
-    expect(drivers.length).toBeGreaterThan(0)
-    expect(drivers.every((u) => !!u.licenseExpiry)).toBe(true)
+  it('every driver carries a licenseExpiry', async () => {
+    expect(mockDrivers.every((d) => !!d.licenseExpiry)).toBe(true)
   })
 })
 

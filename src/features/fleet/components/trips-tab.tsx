@@ -8,7 +8,7 @@ import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTrips, useVehicles } from '@/features/fleet'
-import { useUsers, isDriver } from '@/features/users'
+import { useDrivers } from '@/features/drivers'
 import { ReportIssueModal } from '@/features/issues'
 import type { Trip, TripStatus } from '@/features/fleet/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -42,10 +42,10 @@ const statusFilters: { value: TripStatus | 'all'; label: string }[] = [
 export function TripsTab() {
   const { data: trips = [], isLoading } = useTrips()
   const { data: vehicles = [] } = useVehicles()
-  const { data: users = [] } = useUsers()
+  const { data: drivers = [] } = useDrivers()
 
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
-  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const driverMap = useMemo(() => Object.fromEntries(drivers.map((d) => [d.id, d])), [drivers])
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<TripStatus | 'all'>('all')
@@ -72,11 +72,11 @@ export function TripsTab() {
       ) : <span className="text-zinc-400">{getValue() as string}</span>
     }},
     { accessorKey: 'driverId', header: 'Driver', cell: ({ getValue }) => {
-      const u = userMap[getValue() as string]
-      return u ? (
+      const d = driverMap[getValue() as string]
+      return d ? (
         <div className="flex items-center gap-2">
-          <Avatar name={u.name} size="sm" />
-          <span className="text-[13px] text-zinc-700">{u.name}</span>
+          <Avatar name={d.name} size="sm" />
+          <span className="text-[13px] text-zinc-700">{d.name}</span>
         </div>
       ) : <span className="text-zinc-400">—</span>
     }},
@@ -113,7 +113,7 @@ export function TripsTab() {
         </div>
       )
     }},
-  ], [vehicleMap, userMap])
+  ], [vehicleMap, driverMap])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
@@ -176,6 +176,7 @@ export function TripsTab() {
       >
         {inspectionTrip && (() => {
           const vehicle = vehicleMap[inspectionTrip.vehicleId]
+          const driver = driverMap[inspectionTrip.driverId]
           return (
             <div className="pb-2">
               <p className="text-[12px] text-zinc-400 mb-4">
@@ -183,11 +184,11 @@ export function TripsTab() {
                 {' · '}
                 {vehicle?.model}
                 {' · driver '}
-                {userMap[inspectionTrip.driverId]?.name ?? inspectionTrip.driverId}
+                {driver?.name ?? inspectionTrip.driverId}
               </p>
               <ChecklistPanel
                 templateId={vehicle?.checklistId}
-                assignedToUserId={inspectionTrip.driverId}
+                assignedToUserId={driver?.userId}
                 readOnly={inspectionTrip.status === 'completed'}
               />
               <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between gap-3">
@@ -228,7 +229,7 @@ export function TripsTab() {
       >
         <form id="start-trip-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={activeVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
-          <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={users.filter(isDriver).map((u) => ({ value: u.id, label: u.name }))} />
+          <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={drivers.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name }))} />
           <Input label="Starting Odometer *" type="number" {...register('startOdometer', { valueAsNumber: true })} error={errors.startOdometer?.message} helperText="km" />
           <Textarea label="Purpose" {...register('purpose')} rows={2} placeholder="e.g. Site Alpha — supply run" />
         </form>
