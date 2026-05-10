@@ -42,7 +42,6 @@ import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
 import { useIssues, IssueList, IssueDetailDrawer } from '@/features/issues'
 import type { Issue } from '@/features/issues'
-import { FleetLiveMapWidget } from '@/features/fleet/components/fleet-live-map-widget'
 import { QualityStrip } from '@/shared/qms'
 import { StatCard } from '@/shared/ui/stat-card'
 import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
@@ -350,10 +349,6 @@ export function FleetDashboard() {
           iconColor="text-emerald-600"
           index={5}
         />
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <FleetLiveMapWidget />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
