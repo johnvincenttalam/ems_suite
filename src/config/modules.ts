@@ -28,7 +28,6 @@ import {
   Bookmark,
   Sparkles,
   AlertCircle,
-  Radar,
   Map as MapIcon,
   Satellite,
   ScanLine,
@@ -44,7 +43,6 @@ export type ModuleKey =
   | 'fleet'
   | 'procurement'
   | 'maintenance'
-  | 'tracking'
 
 export interface ModuleNavItem {
   label: string
@@ -354,25 +352,6 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'dashboard' },
           { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'tracking',
-    name: 'Tracking System',
-    shortName: 'Tracking',
-    description: 'Live map, GPS telemetry, RFID/QR tags, and scan history.',
-    icon: Radar,
-    iconColor: 'text-cyan-600',
-    defaultPath: '',
-    nav: [
-      {
-        items: [
-          { label: 'Live Map', path: '', icon: MapIcon, feature: 'tracking' },
-          { label: 'GPS Real-Time', path: 'gps', icon: Satellite, feature: 'trackingGps' },
-          { label: 'Tags', path: 'tags', icon: Tag, feature: 'trackingTags' },
-          { label: 'Scan History', path: 'scans', icon: ScanLine, feature: 'trackingScans' },
         ],
       },
     ],

@@ -3,7 +3,7 @@ import type { ModuleKey } from '@/config/modules'
 
 const ALL_MODULES: ModuleKey[] = [
   'mis', 'sdms', 'inventory', 'assets', 'fleet',
-  'procurement', 'maintenance', 'tracking',
+  'procurement', 'maintenance',
 ]
 
 export const mockUsers: User[] = [
@@ -34,8 +34,8 @@ export const mockUsers: User[] = [
     status: 'active',
     licenseExpiry: '2026-06-04',
     createdAt: '2025-02-01',
-    modules: ['mis', 'sdms', 'inventory', 'assets', 'fleet', 'maintenance', 'tracking'],
-    moduleAdmins: ['inventory', 'fleet', 'maintenance', 'tracking'],
+    modules: ['mis', 'sdms', 'inventory', 'assets', 'fleet', 'maintenance'],
+    moduleAdmins: ['inventory', 'fleet', 'maintenance'],
   },
   {
     id: 'U003',

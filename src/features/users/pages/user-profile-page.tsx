@@ -43,7 +43,6 @@ const AUDIT_MODULE_NAME: Record<ModuleKey, string> = {
   fleet: 'Fleet',
   procurement: 'Procurement',
   maintenance: 'Maintenance',
-  tracking: 'Tracking',
 }
 
 const MODULE_LABEL: Record<ModuleKey, string> = {
@@ -54,7 +53,6 @@ const MODULE_LABEL: Record<ModuleKey, string> = {
   fleet: 'Fleet',
   procurement: 'Procurement',
   maintenance: 'Maintenance',
-  tracking: 'Tracking',
 }
 
 type ProfileTab = 'activity' | 'access'

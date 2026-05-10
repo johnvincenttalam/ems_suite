@@ -17,7 +17,6 @@ const MODULE_LABEL: Record<ModuleKey, string> = {
   fleet: 'Fleet',
   procurement: 'Proc',
   maintenance: 'Maint',
-  tracking: 'Track',
 }
 
 export function UserSwitcher() {

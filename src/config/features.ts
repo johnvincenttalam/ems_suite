@@ -79,10 +79,6 @@ export const features = {
   assetsTrackingMap: true,
   assetsTrackingTags: true,
   assetsTrackingScans: true,
-  tracking: true,
-  trackingGps: true,
-  trackingTags: true,
-  trackingScans: true,
 
   // EMS — administration / master data
   warehouses: true,

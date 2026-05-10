@@ -1,7 +1,3 @@
-export { MapPage } from './pages/map-page'
-export { GpsPage } from './pages/gps-page'
-export { TagsPage } from './pages/tags-page'
-export { ScansPage } from './pages/scans-page'
 export { MapTab } from './components/map-tab'
 export { GpsTab } from './components/gps-tab'
 export { TagsTab } from './components/tags-tab'
