@@ -214,16 +214,23 @@ export function TripsTab() {
         target={reportIssueForTrip ? { kind: 'vehicle', id: reportIssueForTrip.vehicleId } : undefined}
       />
 
-      <Modal open={showNew} onClose={() => { setShowNew(false); reset() }} title="Start Trip" size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showNew}
+        onClose={() => { setShowNew(false); reset() }}
+        title="Start Trip"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="start-trip-form">Start Trip</Button>
+          </>
+        }
+      >
+        <form id="start-trip-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={activeVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
           <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
           <Input label="Starting Odometer *" type="number" {...register('startOdometer', { valueAsNumber: true })} error={errors.startOdometer?.message} helperText="km" />
           <Textarea label="Purpose" {...register('purpose')} rows={2} placeholder="e.g. Site Alpha — supply run" />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
-            <Button type="submit" fullWidth>Start Trip</Button>
-          </div>
         </form>
       </Modal>
     </div>

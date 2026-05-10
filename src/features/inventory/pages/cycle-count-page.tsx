@@ -279,6 +279,14 @@ export function CycleCountPage() {
         onClose={() => setFinalizeTarget(null)}
         title={`Finalize ${finalizeTarget?.id ?? ''}?`}
         size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setFinalizeTarget(null)} disabled={finalizeMutation.isPending}>Cancel</Button>
+            <Button variant="success" loading={finalizeMutation.isPending} onClick={() => finalizeTarget && finalizeMutation.mutate(finalizeTarget.id)}>
+              Finalize &amp; Post Adjustments
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -288,12 +296,6 @@ export function CycleCountPage() {
           {finalizeTarget && (
             <FinalizePreview session={finalizeTarget} itemMap={itemMap} />
           )}
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" fullWidth onClick={() => setFinalizeTarget(null)} disabled={finalizeMutation.isPending}>Cancel</Button>
-            <Button variant="success" fullWidth loading={finalizeMutation.isPending} onClick={() => finalizeTarget && finalizeMutation.mutate(finalizeTarget.id)}>
-              Finalize &amp; Post Adjustments
-            </Button>
-          </div>
         </div>
       </Modal>
 
@@ -302,6 +304,19 @@ export function CycleCountPage() {
         onClose={() => { setCancelTarget(null); setCancelReason('') }}
         title={`Cancel ${cancelTarget?.id ?? ''}?`}
         size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setCancelTarget(null); setCancelReason('') }} disabled={cancelMutation.isPending}>Back</Button>
+            <Button
+              variant="danger"
+              loading={cancelMutation.isPending}
+              disabled={cancelReason.trim().length < 2}
+              onClick={() => cancelTarget && cancelMutation.mutate({ sessionId: cancelTarget.id, reason: cancelReason.trim() })}
+            >
+              Confirm Cancel
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -314,18 +329,6 @@ export function CycleCountPage() {
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="e.g. Counter unavailable — rescheduling"
           />
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" fullWidth onClick={() => { setCancelTarget(null); setCancelReason('') }} disabled={cancelMutation.isPending}>Back</Button>
-            <Button
-              variant="danger"
-              fullWidth
-              loading={cancelMutation.isPending}
-              disabled={cancelReason.trim().length < 2}
-              onClick={() => cancelTarget && cancelMutation.mutate({ sessionId: cancelTarget.id, reason: cancelReason.trim() })}
-            >
-              Confirm Cancel
-            </Button>
-          </div>
         </div>
       </Modal>
     </div>

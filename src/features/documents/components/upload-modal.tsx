@@ -92,8 +92,19 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
   const activeUsers = users.filter((u) => u.status === 'active')
 
   return (
-    <Modal open={open} onClose={close} title="Upload Document" size="lg">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={close}
+      title="Upload Document"
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={close} disabled={uploadMutation.isPending}>Cancel</Button>
+          <Button type="submit" form="upload-document-form" loading={uploadMutation.isPending}>Upload & Start Workflow</Button>
+        </>
+      }
+    >
+      <form id="upload-document-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input label="Title *" {...register('title')} error={errors.title?.message} placeholder="e.g. Q2 Procurement Policy" />
         <Textarea label="Description" {...register('description')} rows={2} />
 
@@ -155,11 +166,6 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
             </div>
           </div>
           {errors.approvers && <p className="text-xs text-red-600 mt-1">{errors.approvers.message}</p>}
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={close} disabled={uploadMutation.isPending}>Cancel</Button>
-          <Button type="submit" fullWidth loading={uploadMutation.isPending}>Upload & Start Workflow</Button>
         </div>
       </form>
     </Modal>

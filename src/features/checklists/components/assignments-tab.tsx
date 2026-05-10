@@ -115,16 +115,23 @@ export function AssignmentsTab() {
         </div>
       )}
 
-      <Modal open={showAssign} onClose={() => { setShowAssign(false); reset() }} title="Assign Checklist" size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showAssign}
+        onClose={() => { setShowAssign(false); reset() }}
+        title="Assign Checklist"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowAssign(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="assign-checklist-form">Assign</Button>
+          </>
+        }
+      >
+        <form id="assign-checklist-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Template *" {...register('templateId')} error={errors.templateId?.message} placeholder="Select template" options={templates.map((t) => ({ value: t.id, label: `${t.name} (${t.items.length} items)` }))} />
           <Select label="Assign To *" {...register('assignedTo')} error={errors.assignedTo?.message} placeholder="Select user" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
           <Input label="Due Date" type="date" {...register('dueDate')} error={errors.dueDate?.message} />
           <Textarea label="Notes" {...register('notes')} rows={2} placeholder="Any context for the assignee..." />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAssign(false); reset() }}>Cancel</Button>
-            <Button type="submit" fullWidth>Assign</Button>
-          </div>
         </form>
       </Modal>
     </div>

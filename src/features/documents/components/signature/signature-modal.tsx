@@ -45,7 +45,22 @@ export function SignatureModal({ open, onClose, onConfirm, title, busy }: Signat
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title={title} size="lg">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={title}
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button type="button" variant="success" loading={busy} disabled={!signatureImage} onClick={handleConfirm}>
+            Confirm Signature
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <div className="flex gap-1 p-1 rounded-lg bg-zinc-100 w-fit">
           <button
@@ -94,15 +109,6 @@ export function SignatureModal({ open, onClose, onConfirm, title, busy }: Signat
           rows={2}
           placeholder="Reviewed and approved..."
         />
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="ghost" fullWidth onClick={handleClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button type="button" variant="success" fullWidth loading={busy} disabled={!signatureImage} onClick={handleConfirm}>
-            Confirm Signature
-          </Button>
-        </div>
       </div>
     </Modal>
   )

@@ -180,16 +180,23 @@ export function ReportsTab() {
         {printTarget && <PrintableReport report={printTarget} />}
       </Modal>
 
-      <Modal open={showNew} onClose={() => { setShowNew(false); reset() }} title="New Report" size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showNew}
+        onClose={() => { setShowNew(false); reset() }}
+        title="New Report"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="qms-new-report-form">Initialize Report</Button>
+          </>
+        }
+      >
+        <form id="qms-new-report-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Template *" {...register('templateId')} error={errors.templateId?.message} placeholder="Select template" options={templates.map((t) => ({ value: t.id, label: t.name }))} />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Period Start *" type="date" {...register('periodStart')} error={errors.periodStart?.message} />
             <Input label="Period End *" type="date" {...register('periodEnd')} error={errors.periodEnd?.message} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowNew(false); reset() }}>Cancel</Button>
-            <Button type="submit" fullWidth>Initialize Report</Button>
           </div>
         </form>
       </Modal>

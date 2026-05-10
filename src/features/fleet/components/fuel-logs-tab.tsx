@@ -61,7 +61,7 @@ export function FuelLogsTab() {
       return v ? (userMap[v]?.name ?? '—') : <span className="text-zinc-400">—</span>
     }},
     { accessorKey: 'liters', header: 'Liters', cell: ({ getValue }) => <span className="tabular-nums text-zinc-700">{(getValue() as number).toFixed(1)} L</span> },
-    { accessorKey: 'costPerLiter', header: '$/L', cell: ({ getValue }) => <span className="tabular-nums text-zinc-500">{formatCurrency(getValue() as number)}</span> },
+    { accessorKey: 'costPerLiter', header: '₱/L', cell: ({ getValue }) => <span className="tabular-nums text-zinc-500">{formatCurrency(getValue() as number)}</span> },
     { accessorKey: 'totalCost', header: 'Total', cell: ({ getValue }) => <span className="tabular-nums font-medium text-zinc-900">{formatCurrency(getValue() as number)}</span> },
     { accessorKey: 'odometer', header: 'Odometer', cell: ({ getValue }) => <span className="tabular-nums text-zinc-500">{(getValue() as number).toLocaleString()} km</span> },
     { accessorKey: 'station', header: 'Station', cell: ({ getValue }) => (getValue() as string) ?? <span className="text-zinc-400">—</span> },
@@ -116,7 +116,7 @@ export function FuelLogsTab() {
             { key: 'vehicleId', label: 'Vehicle' },
             { key: 'driverId', label: 'Driver' },
             { key: 'liters', label: 'Liters' },
-            { key: 'costPerLiter', label: '$/L' },
+            { key: 'costPerLiter', label: '₱/L' },
             { key: 'totalCost', label: 'Total' },
             { key: 'odometer', label: 'Odometer' },
             { key: 'station', label: 'Station' },
@@ -132,8 +132,19 @@ export function FuelLogsTab() {
         emptyMessage="No fuel logs found"
       />
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); reset() }} title="Log Fuel" size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showAdd}
+        onClose={() => { setShowAdd(false); reset() }}
+        title="Log Fuel"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset() }}>Cancel</Button>
+            <Button type="submit" form="log-fuel-form">Log Fuel</Button>
+          </>
+        }
+      >
+        <form id="log-fuel-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={vehicles.filter((v) => v.fuelType !== 'electric').map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
             <Select label="Driver" {...register('driverId')} error={errors.driverId?.message} placeholder="Optional" options={users.filter((u) => u.status === 'active').map((u) => ({ value: u.id, label: u.name }))} />
@@ -141,7 +152,7 @@ export function FuelLogsTab() {
           <Input label="Date *" type="date" {...register('date')} error={errors.date?.message} />
           <div className="grid grid-cols-3 gap-3">
             <Input label="Liters *" type="number" step="0.1" {...register('liters', { valueAsNumber: true })} error={errors.liters?.message} />
-            <Input label="$ / Liter *" type="number" step="0.01" {...register('costPerLiter', { valueAsNumber: true })} error={errors.costPerLiter?.message} />
+            <Input label="₱ / Liter *" type="number" step="0.01" {...register('costPerLiter', { valueAsNumber: true })} error={errors.costPerLiter?.message} />
             <Input label="Odometer *" type="number" {...register('odometer', { valueAsNumber: true })} error={errors.odometer?.message} helperText="km" />
           </div>
           <Input label="Station" {...register('station')} error={errors.station?.message} placeholder="e.g. Shell — Marine Pkwy" />
@@ -150,11 +161,6 @@ export function FuelLogsTab() {
           <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 border border-zinc-200/60">
             <span className="text-[13px] text-zinc-500">Computed total</span>
             <span className="text-base font-semibold tabular-nums text-zinc-900">{formatCurrency(computedTotal)}</span>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); reset() }}>Cancel</Button>
-            <Button type="submit" fullWidth>Log Fuel</Button>
           </div>
         </form>
       </Modal>

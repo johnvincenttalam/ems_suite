@@ -157,8 +157,19 @@ export function TagsTab() {
         <DataTablePagination table={table} />
       </div>
 
-      <Modal open={showAdd} onClose={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }} title="Bind Tag" size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showAdd}
+        onClose={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }}
+        title="Bind Tag"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }}>Cancel</Button>
+            <Button type="submit" form="bind-tag-form">Bind Tag</Button>
+          </>
+        }
+      >
+        <form id="bind-tag-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Tag Code *" {...register('code')} error={errors.code?.message} placeholder="e.g. QR-INV-1234" />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Tag Type *" {...register('type')} error={errors.type?.message} options={[
@@ -173,10 +184,6 @@ export function TagsTab() {
             ]} />
           </div>
           <Select label="Entity *" {...register('boundEntityId')} error={errors.boundEntityId?.message} placeholder="Select entity" options={entityOptions} />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setShowAdd(false); reset({ type: 'qr', boundEntityType: 'item' }) }}>Cancel</Button>
-            <Button type="submit" fullWidth>Bind Tag</Button>
-          </div>
         </form>
       </Modal>
     </div>

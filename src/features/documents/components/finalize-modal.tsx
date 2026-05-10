@@ -53,8 +53,19 @@ export function FinalizeModal({ document, onClose }: FinalizeModalProps) {
   }
 
   return (
-    <Modal open={!!document} onClose={onClose} title={`Finalize ${document?.title ?? ''}`} size="md">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={!!document}
+      onClose={onClose}
+      title={`Finalize ${document?.title ?? ''}`}
+      size="md"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" form="finalize-document-form" loading={mutation.isPending}>Finalize & Lock</Button>
+        </>
+      }
+    >
+      <form id="finalize-document-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
           <Lock className="w-4 h-4 text-amber-700 mt-0.5" />
           <div className="text-[12px] text-amber-900">
@@ -71,11 +82,6 @@ export function FinalizeModal({ document, onClose }: FinalizeModalProps) {
         <p className="text-[11px] text-zinc-400 -mt-2">
           Use this for time-bound documents like policies or certifications. Leave blank for permanent records.
         </p>
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" fullWidth loading={mutation.isPending}>Finalize & Lock</Button>
-        </div>
       </form>
     </Modal>
   )

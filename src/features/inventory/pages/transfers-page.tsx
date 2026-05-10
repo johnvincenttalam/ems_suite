@@ -316,6 +316,19 @@ export function TransfersPage() {
         onClose={() => { setRejectTarget(null); setRejectReason('') }}
         title={`Reject transfer ${rejectTarget?.id ?? ''}?`}
         size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setRejectTarget(null); setRejectReason('') }} disabled={rejectMutation.isPending}>Cancel</Button>
+            <Button
+              variant="danger"
+              loading={rejectMutation.isPending}
+              disabled={rejectReason.trim().length < 2}
+              onClick={() => rejectTarget && rejectMutation.mutate({ m: rejectTarget, reason: rejectReason.trim() })}
+            >
+              Confirm Reject
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -328,18 +341,6 @@ export function TransfersPage() {
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="e.g. Destination warehouse already at capacity"
           />
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" fullWidth onClick={() => { setRejectTarget(null); setRejectReason('') }} disabled={rejectMutation.isPending}>Cancel</Button>
-            <Button
-              variant="danger"
-              fullWidth
-              loading={rejectMutation.isPending}
-              disabled={rejectReason.trim().length < 2}
-              onClick={() => rejectTarget && rejectMutation.mutate({ m: rejectTarget, reason: rejectReason.trim() })}
-            >
-              Confirm Reject
-            </Button>
-          </div>
         </div>
       </Modal>
     </div>

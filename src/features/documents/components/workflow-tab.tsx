@@ -189,16 +189,23 @@ export function WorkflowTab() {
         busy={signMutation.isPending}
       />
 
-      <Modal open={!!rejectTarget} onClose={() => { setRejectTarget(null); rejectForm.reset() }} title={`Disapprove ${rejectTarget?.title ?? ''}`} size="md">
-        <form onSubmit={rejectForm.handleSubmit(onReject)} className="space-y-4">
+      <Modal
+        open={!!rejectTarget}
+        onClose={() => { setRejectTarget(null); rejectForm.reset() }}
+        title={`Disapprove ${rejectTarget?.title ?? ''}`}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setRejectTarget(null); rejectForm.reset() }} disabled={rejectMutation.isPending}>Cancel</Button>
+            <Button type="submit" form="disapprove-document-form" variant="danger" loading={rejectMutation.isPending}>Confirm Disapproval</Button>
+          </>
+        }
+      >
+        <form id="disapprove-document-form" onSubmit={rejectForm.handleSubmit(onReject)} className="space-y-4">
           <p className="text-[13px] text-zinc-500">
             The author will see this in the audit log and may revise and resubmit.
           </p>
           <Textarea label="Reason *" {...rejectForm.register('reason')} rows={3} error={rejectForm.formState.errors.reason?.message} placeholder="e.g. Section 3 contradicts the new policy — please revise" />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setRejectTarget(null); rejectForm.reset() }} disabled={rejectMutation.isPending}>Cancel</Button>
-            <Button type="submit" variant="danger" fullWidth loading={rejectMutation.isPending}>Confirm Disapproval</Button>
-          </div>
         </form>
       </Modal>
     </div>

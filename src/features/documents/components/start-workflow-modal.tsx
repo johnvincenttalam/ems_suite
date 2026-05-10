@@ -77,8 +77,19 @@ export function StartWorkflowModal({ document, onClose }: StartWorkflowModalProp
   const activeUsers = users.filter((u) => u.status === 'active')
 
   return (
-    <Modal open={!!document} onClose={onClose} title={`Start workflow — ${document?.title ?? ''}`} size="lg">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={!!document}
+      onClose={onClose}
+      title={`Start workflow — ${document?.title ?? ''}`}
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" form="start-workflow-form" loading={mutation.isPending}>Start Workflow</Button>
+        </>
+      }
+    >
+      <form id="start-workflow-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
           <GitBranch className="w-4 h-4 text-blue-700 mt-0.5" />
           <div className="text-[12px] text-blue-900">
@@ -131,11 +142,6 @@ export function StartWorkflowModal({ document, onClose }: StartWorkflowModalProp
         </div>
 
         <Input label="Deadline" type="date" {...register('deadline')} />
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" fullWidth loading={mutation.isPending}>Start Workflow</Button>
-        </div>
       </form>
     </Modal>
   )

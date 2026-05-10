@@ -324,6 +324,19 @@ export function AdjustmentsPage() {
         onClose={() => { setRejectTarget(null); setRejectReason('') }}
         title={`Reject adjustment ${rejectTarget?.id ?? ''}?`}
         size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setRejectTarget(null); setRejectReason('') }} disabled={rejectMutation.isPending}>Cancel</Button>
+            <Button
+              variant="danger"
+              loading={rejectMutation.isPending}
+              disabled={rejectReason.trim().length < 2}
+              onClick={() => rejectTarget && rejectMutation.mutate({ m: rejectTarget, reason: rejectReason.trim() })}
+            >
+              Confirm Reject
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-zinc-500">
@@ -336,18 +349,6 @@ export function AdjustmentsPage() {
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="e.g. Variance not consistent with last cycle count"
           />
-          <div className="flex gap-3 pt-2">
-            <Button variant="secondary" fullWidth onClick={() => { setRejectTarget(null); setRejectReason('') }} disabled={rejectMutation.isPending}>Cancel</Button>
-            <Button
-              variant="danger"
-              fullWidth
-              loading={rejectMutation.isPending}
-              disabled={rejectReason.trim().length < 2}
-              onClick={() => rejectTarget && rejectMutation.mutate({ m: rejectTarget, reason: rejectReason.trim() })}
-            >
-              Confirm Reject
-            </Button>
-          </div>
         </div>
       </Modal>
     </div>

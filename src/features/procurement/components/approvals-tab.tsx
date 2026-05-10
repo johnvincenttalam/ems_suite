@@ -209,29 +209,43 @@ export function ApprovalsTab() {
         )
       })}
 
-      <Modal open={!!approveTarget} onClose={() => { setApproveTarget(null); approveForm.reset() }} title={`Approve ${approveTarget?.id ?? ''}`} size="md">
-        <form onSubmit={approveForm.handleSubmit(handleApprove)} className="space-y-4">
+      <Modal
+        open={!!approveTarget}
+        onClose={() => { setApproveTarget(null); approveForm.reset() }}
+        title={`Approve ${approveTarget?.id ?? ''}`}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setApproveTarget(null); approveForm.reset() }} disabled={approveMutation.isPending}>Cancel</Button>
+            <Button type="submit" form="approve-request-form" variant="success" loading={approveMutation.isPending}>Confirm Approval</Button>
+          </>
+        }
+      >
+        <form id="approve-request-form" onSubmit={approveForm.handleSubmit(handleApprove)} className="space-y-4">
           <p className="text-[13px] text-zinc-500">
             Your approval will be timestamped. If you're the final approver, stock-in movements will be created immediately.
           </p>
           <Textarea label="Comment (optional)" {...approveForm.register('comment')} rows={3} placeholder="Reviewed and approved..." />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setApproveTarget(null); approveForm.reset() }} disabled={approveMutation.isPending}>Cancel</Button>
-            <Button type="submit" variant="success" fullWidth loading={approveMutation.isPending}>Confirm Approval</Button>
-          </div>
         </form>
       </Modal>
 
-      <Modal open={!!rejectTarget} onClose={() => { setRejectTarget(null); reset() }} title={`Reject ${rejectTarget?.id ?? 'Request'}`} size="md">
-        <form onSubmit={handleSubmit(handleReject)} className="space-y-4">
+      <Modal
+        open={!!rejectTarget}
+        onClose={() => { setRejectTarget(null); reset() }}
+        title={`Reject ${rejectTarget?.id ?? 'Request'}`}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setRejectTarget(null); reset() }} disabled={rejectMutation.isPending}>Cancel</Button>
+            <Button type="submit" form="reject-request-form" variant="danger" loading={rejectMutation.isPending}>Confirm Rejection</Button>
+          </>
+        }
+      >
+        <form id="reject-request-form" onSubmit={handleSubmit(handleReject)} className="space-y-4">
           <p className="text-[13px] text-zinc-500">
             Provide a reason — the requester will see this in the audit log.
           </p>
           <Textarea label="Reason *" {...register('reason')} rows={3} error={errors.reason?.message} placeholder="e.g. Insufficient budget, defer to next quarter" />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setRejectTarget(null); reset() }} disabled={rejectMutation.isPending}>Cancel</Button>
-            <Button type="submit" variant="danger" fullWidth loading={rejectMutation.isPending}>Confirm Rejection</Button>
-          </div>
         </form>
       </Modal>
 

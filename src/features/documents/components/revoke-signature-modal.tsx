@@ -53,8 +53,19 @@ export function RevokeSignatureModal({ document, onClose }: RevokeSignatureModal
   }
 
   return (
-    <Modal open={!!document} onClose={close} title="Revoke Signature" size="md">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal
+      open={!!document}
+      onClose={close}
+      title="Revoke Signature"
+      size="md"
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={close} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" form="revoke-signature-form" variant="danger" loading={mutation.isPending}>Revoke Signature</Button>
+        </>
+      }
+    >
+      <form id="revoke-signature-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
           <ShieldOff className="w-4 h-4 text-red-700 mt-0.5" />
           <div className="text-[12px] text-red-900">
@@ -70,11 +81,6 @@ export function RevokeSignatureModal({ document, onClose }: RevokeSignatureModal
           error={errors.reason?.message}
           placeholder="e.g. Spotted a numerical error in section 3 — re-signing after correction"
         />
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="secondary" fullWidth onClick={close} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" variant="danger" fullWidth loading={mutation.isPending}>Revoke Signature</Button>
-        </div>
       </form>
     </Modal>
   )

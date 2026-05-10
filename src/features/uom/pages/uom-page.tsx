@@ -170,34 +170,48 @@ export function UomPage() {
         <DataTablePagination table={table} />
       </div>
 
-      <Modal open={modalMode !== 'closed'} onClose={closeModal} title={isEditing ? 'Edit Unit of Measure' : 'Add Unit of Measure'} size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={modalMode !== 'closed'}
+        onClose={closeModal}
+        title={isEditing ? 'Edit Unit of Measure' : 'Add Unit of Measure'}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={submitting} onClick={closeModal}>Cancel</Button>
+            <Button type="submit" form="uom-form" loading={submitting}>{isEditing ? 'Save Changes' : 'Add UOM'}</Button>
+          </>
+        }
+      >
+        <form id="uom-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Name *" {...register('name')} error={errors.name?.message} />
           <Input label="Symbol *" {...register('symbol')} error={errors.symbol?.message} placeholder="e.g. kg, pc, L" />
           <Textarea label="Description" {...register('description')} rows={3} />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth disabled={submitting} onClick={closeModal}>Cancel</Button>
-            <Button type="submit" fullWidth loading={submitting}>{isEditing ? 'Save Changes' : 'Add UOM'}</Button>
-          </div>
         </form>
       </Modal>
 
-      <Modal open={!!deleteCandidate} onClose={() => setDeleteCandidate(null)} title="Delete UOM" size="sm">
+      <Modal
+        open={!!deleteCandidate}
+        onClose={() => setDeleteCandidate(null)}
+        title="Delete UOM"
+        size="sm"
+        footer={
+          deleteCandidate && (
+            <>
+              <Button type="button" variant="secondary" disabled={removeMutation.isPending} onClick={() => setDeleteCandidate(null)}>Cancel</Button>
+              <Button type="button" variant="danger" loading={removeMutation.isPending} onClick={confirmDelete}>Delete</Button>
+            </>
+          )
+        }
+      >
         {deleteCandidate && (
-          <div className="space-y-5">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
-                <Trash2 className="w-5 h-5 text-red-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[14px] font-medium text-zinc-900">Delete {deleteCandidate.name}?</p>
-                <p className="text-[12.5px] text-zinc-500 mt-1">Symbol <span className="font-mono">{deleteCandidate.symbol}</span></p>
-                <p className="text-[12.5px] text-zinc-500 mt-2">This cannot be undone.</p>
-              </div>
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+              <Trash2 className="w-5 h-5 text-red-600" />
             </div>
-            <div className="flex gap-3">
-              <Button type="button" variant="secondary" fullWidth disabled={removeMutation.isPending} onClick={() => setDeleteCandidate(null)}>Cancel</Button>
-              <Button type="button" variant="danger" fullWidth loading={removeMutation.isPending} onClick={confirmDelete}>Delete</Button>
+            <div className="min-w-0">
+              <p className="text-[14px] font-medium text-zinc-900">Delete {deleteCandidate.name}?</p>
+              <p className="text-[12.5px] text-zinc-500 mt-1">Symbol <span className="font-mono">{deleteCandidate.symbol}</span></p>
+              <p className="text-[12.5px] text-zinc-500 mt-2">This cannot be undone.</p>
             </div>
           </div>
         )}

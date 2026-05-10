@@ -98,8 +98,19 @@ export function TemplatesTab() {
         </div>
       )}
 
-      <Modal open={showNew} onClose={close} title="New Checklist Template" size="lg">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showNew}
+        onClose={close}
+        title="New Checklist Template"
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={close}>Cancel</Button>
+            <Button type="submit" form="checklist-template-form">Create Template</Button>
+          </>
+        }
+      >
+        <form id="checklist-template-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Name *" {...register('name')} error={errors.name?.message} placeholder="e.g. Daily forklift safety check" />
           <Textarea label="Description" {...register('description')} rows={2} />
 
@@ -135,11 +146,6 @@ export function TemplatesTab() {
               ))}
             </div>
             {errors.items?.message && <p className="text-xs text-red-600 mt-1">{errors.items.message}</p>}
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={close}>Cancel</Button>
-            <Button type="submit" fullWidth>Create Template</Button>
           </div>
         </form>
       </Modal>

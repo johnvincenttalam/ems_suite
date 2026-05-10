@@ -186,8 +186,19 @@ export function MovementsTab() {
         emptyMessage="No movements match your filters"
       />
 
-      <Modal open={showModal} onClose={() => { setShowModal(false); reset({ type: defaultType, quantity: 1 }) }} title={`Record ${typeStyles[defaultType].label}`} size="md">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Modal
+        open={showModal}
+        onClose={() => { setShowModal(false); reset({ type: defaultType, quantity: 1 }) }}
+        title={`Record ${typeStyles[defaultType].label}`}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={addMovementMutation.isPending} onClick={() => { setShowModal(false); reset({ type: defaultType, quantity: 1 }) }}>Cancel</Button>
+            <Button type="submit" form="record-movement-form" loading={addMovementMutation.isPending}>Record Movement</Button>
+          </>
+        }
+      >
+        <form id="record-movement-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select label="Type *" {...register('type')} error={errors.type?.message} options={[
             { value: 'in', label: 'Stock In' },
             { value: 'out', label: 'Stock Out' },
@@ -203,10 +214,6 @@ export function MovementsTab() {
             <Select label="To Location *" {...register('destinationLocationId')} error={errors.destinationLocationId?.message} placeholder="Select destination" options={warehouses.map((w) => ({ value: w.id, label: w.name }))} />
           )}
           <Textarea label="Reason *" {...register('reason')} rows={2} error={errors.reason?.message} placeholder="e.g. PO-2025-0019 received" />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth disabled={addMovementMutation.isPending} onClick={() => { setShowModal(false); reset({ type: defaultType, quantity: 1 }) }}>Cancel</Button>
-            <Button type="submit" fullWidth loading={addMovementMutation.isPending}>Record Movement</Button>
-          </div>
         </form>
       </Modal>
     </div>
