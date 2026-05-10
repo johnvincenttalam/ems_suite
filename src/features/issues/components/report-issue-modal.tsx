@@ -93,14 +93,14 @@ export function ReportIssueModal({ open, onClose, target, restrictToKind }: Repo
       title="Report Issue"
       size="md"
       footer={
-        <div className="flex gap-3">
-          <Button type="button" variant="secondary" fullWidth onClick={onClose}>
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form={FORM_ID} fullWidth disabled={isSubmitting}>
+          <Button type="submit" form={FORM_ID} disabled={isSubmitting}>
             {isSubmitting ? 'Reporting...' : 'Report Issue'}
           </Button>
-        </div>
+        </>
       }
     >
       <form id={FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-4">

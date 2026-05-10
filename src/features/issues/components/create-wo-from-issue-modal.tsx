@@ -113,24 +113,23 @@ export function CreateWorkOrderFromIssueModal({
       size="md"
       footer={
         resolvedAsset.missingLink ? (
-          <Button variant="secondary" fullWidth onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
         ) : (
-          <div className="flex gap-3">
-            <Button type="button" variant="secondary" fullWidth onClick={onClose}>
+          <>
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
             <Button
               type="submit"
               form={FORM_ID}
-              fullWidth
               disabled={isSubmitting}
               leftIcon={<Wrench className="w-4 h-4" />}
             >
               {isSubmitting ? 'Creating…' : 'Create Work Order'}
             </Button>
-          </div>
+          </>
         )
       }
     >
