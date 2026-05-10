@@ -51,6 +51,18 @@ export interface FuelLog {
   notes?: string
 }
 
+export interface VehicleAssignment {
+  id: string
+  vehicleId: string
+  driverId: string
+  assignedDate: string
+  /** Undefined while the assignment is open. */
+  returnedDate?: string
+  notes?: string
+  assignedByUserId: string
+  returnedByUserId?: string
+}
+
 export type VehicleInspectionResult = 'pass' | 'attention' | 'fail'
 
 export interface VehicleInspection {

@@ -1,5 +1,5 @@
-import type { Vehicle, Trip, FuelLog, VehicleStatus, VehicleInspection, VehicleInspectionResult } from '@/features/fleet/types'
-import { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections } from '@/features/fleet/data/mock-fleet'
+import type { Vehicle, Trip, FuelLog, VehicleStatus, VehicleInspection, VehicleInspectionResult, VehicleAssignment } from '@/features/fleet/types'
+import { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections, mockVehicleAssignments } from '@/features/fleet/data/mock-fleet'
 import { mockDrivers } from '@/features/drivers'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
@@ -41,6 +41,18 @@ let fuelLogCounter = mockFuelLogs.reduce((max, f) => {
 function nextFuelLogId(): string {
   fuelLogCounter += 1
   return `FL-${new Date().getFullYear()}-${String(fuelLogCounter).padStart(4, '0')}`
+}
+
+let assignmentCounter = mockVehicleAssignments.reduce((max, a) => {
+  const m = a.id.match(/^VA-\d{4}-(\d{4,})$/)
+  if (!m) return max
+  const n = Number(m[1])
+  return Number.isFinite(n) && n > max ? n : max
+}, 0)
+
+function nextAssignmentId(): string {
+  assignmentCounter += 1
+  return `VA-${new Date().getFullYear()}-${String(assignmentCounter).padStart(4, '0')}`
 }
 
 let inspectionCounter = mockVehicleInspections.reduce((max, i) => {
@@ -133,6 +145,19 @@ interface CreateFuelLogInput {
   createdBy: string
 }
 
+interface AssignVehicleInput {
+  vehicleId: string
+  driverId: string
+  notes?: string
+  assignedByUserId: string
+}
+
+interface ReturnVehicleInput {
+  vehicleId: string
+  notes?: string
+  returnedByUserId: string
+}
+
 interface CreateInspectionInput {
   vehicleId: string
   inspectorDriverId?: string
@@ -171,6 +196,11 @@ export const fleetApi = {
   listVehicleInspections: async (): Promise<VehicleInspection[]> => {
     await delay()
     return [...mockVehicleInspections].sort((a, b) => b.date.localeCompare(a.date))
+  },
+
+  listVehicleAssignments: async (): Promise<VehicleAssignment[]> => {
+    await delay()
+    return [...mockVehicleAssignments].sort((a, b) => b.assignedDate.localeCompare(a.assignedDate))
   },
 
   createVehicle: async (input: CreateVehicleInput): Promise<Vehicle> => {
@@ -385,6 +415,71 @@ export const fleetApi = {
       detail: `Cancelled trip ${trip.id}${reason ? ` — ${reason}` : ''}`,
     })
     return trip
+  },
+
+  assignVehicle: async (input: AssignVehicleInput): Promise<{ vehicle: Vehicle; assignment: VehicleAssignment }> => {
+    await delay(140)
+    const vehicle = findVehicle(input.vehicleId)
+    if (vehicle.status === 'retired') {
+      throw new FleetValidationError(`Vehicle ${vehicle.plateNumber} is retired — cannot be assigned`)
+    }
+    if (vehicle.assignedDriverId) {
+      throw new FleetValidationError(`Vehicle ${vehicle.plateNumber} is already assigned — return it first`)
+    }
+    const driver = mockDrivers.find((d) => d.id === input.driverId)
+    if (!driver) throw new FleetValidationError(`Driver ${input.driverId} not found`)
+    if (driver.status !== 'active') {
+      throw new FleetValidationError(`${driver.name} is not active`)
+    }
+
+    vehicle.assignedDriverId = driver.id
+
+    const assignment: VehicleAssignment = {
+      id: nextAssignmentId(),
+      vehicleId: vehicle.id,
+      driverId: driver.id,
+      assignedDate: new Date().toISOString().slice(0, 10),
+      notes: input.notes,
+      assignedByUserId: input.assignedByUserId,
+    }
+    mockVehicleAssignments.push(assignment)
+
+    recordAudit({
+      userId: input.assignedByUserId,
+      action: 'update',
+      module: 'Fleet',
+      detail: `Assigned ${vehicle.plateNumber} to ${driver.name}${input.notes ? ` — ${input.notes}` : ''}`,
+    })
+    return { vehicle, assignment }
+  },
+
+  returnVehicle: async (input: ReturnVehicleInput): Promise<Vehicle> => {
+    await delay(140)
+    const vehicle = findVehicle(input.vehicleId)
+    if (!vehicle.assignedDriverId) {
+      throw new FleetValidationError(`Vehicle ${vehicle.plateNumber} is not currently assigned`)
+    }
+    const previousDriverId = vehicle.assignedDriverId
+
+    // Close the open assignment record.
+    const open = [...mockVehicleAssignments]
+      .reverse()
+      .find((a) => a.vehicleId === vehicle.id && !a.returnedDate)
+    if (open) {
+      open.returnedDate = new Date().toISOString().slice(0, 10)
+      open.returnedByUserId = input.returnedByUserId
+      if (input.notes) open.notes = open.notes ? `${open.notes} | ${input.notes}` : input.notes
+    }
+    vehicle.assignedDriverId = undefined
+
+    const previousDriver = mockDrivers.find((d) => d.id === previousDriverId)
+    recordAudit({
+      userId: input.returnedByUserId,
+      action: 'update',
+      module: 'Fleet',
+      detail: `Returned ${vehicle.plateNumber} from ${previousDriver?.name ?? previousDriverId}${input.notes ? ` — ${input.notes}` : ''}`,
+    })
+    return vehicle
   },
 
   createInspection: async (input: CreateInspectionInput): Promise<VehicleInspection> => {

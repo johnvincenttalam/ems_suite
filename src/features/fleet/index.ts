@@ -9,6 +9,7 @@ export { FleetUsersPage } from './pages/fleet-users-page'
 export { FleetSettingsPage } from './pages/fleet-settings-page'
 export { FleetReportsPage } from './pages/fleet-reports-page'
 export { FleetInspectionsPage } from './pages/fleet-inspections-page'
+export { FleetAssignmentsPage } from './pages/fleet-assignments-page'
 export { FleetTrackingMapPage } from './pages/fleet-tracking-map-page'
 export { FleetTrackingGpsPage } from './pages/fleet-tracking-gps-page'
 export { FleetTrackingTagsPage } from './pages/fleet-tracking-tags-page'
@@ -19,6 +20,7 @@ export {
   useTrips,
   useFuelLogs,
   useVehicleInspections,
+  useVehicleAssignments,
   useCreateVehicle,
   useUpdateVehicle,
   useRetireVehicle,
@@ -27,7 +29,9 @@ export {
   useCancelTrip,
   useCreateFuelLog,
   useCreateVehicleInspection,
+  useAssignVehicle,
+  useReturnVehicle,
 } from './hooks/use-fleet'
 export { fleetApi, FleetValidationError } from './api/fleet-api'
-export { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections } from './data/mock-fleet'
-export type { Vehicle, Trip, FuelLog, VehicleStatus, FuelType, TripStatus, VehicleInspection, VehicleInspectionResult } from './types'
+export { mockVehicles, mockTrips, mockFuelLogs, mockVehicleInspections, mockVehicleAssignments } from './data/mock-fleet'
+export type { Vehicle, Trip, FuelLog, VehicleStatus, FuelType, TripStatus, VehicleInspection, VehicleInspectionResult, VehicleAssignment } from './types'

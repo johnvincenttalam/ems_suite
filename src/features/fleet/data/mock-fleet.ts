@@ -1,4 +1,4 @@
-import type { Vehicle, Trip, FuelLog, VehicleInspection } from '@/features/fleet/types'
+import type { Vehicle, Trip, FuelLog, VehicleInspection, VehicleAssignment } from '@/features/fleet/types'
 
 export const mockVehicles: Vehicle[] = [
   { id: 'V001', plateNumber: 'SGX 5482 K', model: 'Toyota Hilux',           year: 2025, status: 'active',      fuelType: 'diesel',   currentOdometer: 18420, fuelCapacityLiters: 80, assignedDriverId: 'DRV-003', linkedAssetId: 'AST-008', checklistId: 'TPL-002', nextServiceDate: '2026-05-18', photoUrl: 'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=400&q=80', createdAt: '2025-01-10' },
@@ -31,6 +31,26 @@ export const mockFuelLogs: FuelLog[] = [
   { id: 'FL-2026-0035', vehicleId: 'V003', driverId: 'DRV-002', date: '2026-04-15', liters: 49.0, costPerLiter: 2.25, totalCost: 110.25, odometer: 91720, station: 'Caltex — Tampines',                                    },
   { id: 'FL-2026-0034', vehicleId: 'V001', driverId: 'DRV-003', date: '2026-04-12', liters: 55.5, costPerLiter: 2.22, totalCost: 123.21, odometer: 17680, station: 'Esso — KM 14 Highway',                                  },
   { id: 'FL-2026-0033', vehicleId: 'V002', driverId: 'DRV-002', date: '2026-04-08', liters: 70.4, costPerLiter: 2.22, totalCost: 156.29, odometer: 64500, station: 'Shell — Marine Pkwy',           notes: 'Pre-service top-up' },
+]
+
+export const mockVehicleAssignments: VehicleAssignment[] = [
+  // V001 history — currently DRV-003
+  { id: 'VA-2026-0008', vehicleId: 'V001', driverId: 'DRV-003', assignedDate: '2026-01-12', assignedByUserId: 'U002', notes: 'Long-term assignment for Site Alpha runs' },
+  { id: 'VA-2026-0007', vehicleId: 'V001', driverId: 'DRV-006', assignedDate: '2025-09-14', returnedDate: '2026-01-11', assignedByUserId: 'U002', returnedByUserId: 'U002', notes: 'Returned when DRV-003 came back from leave' },
+
+  // V003 history — currently DRV-002
+  { id: 'VA-2026-0006', vehicleId: 'V003', driverId: 'DRV-002', assignedDate: '2025-11-04', assignedByUserId: 'U002', notes: 'Permanent shuttle driver' },
+
+  // V002 - in maintenance, no current driver, but had history
+  { id: 'VA-2026-0005', vehicleId: 'V002', driverId: 'DRV-004', assignedDate: '2025-07-22', returnedDate: '2026-04-08', assignedByUserId: 'U002', returnedByUserId: 'U002', notes: 'Returned when vehicle went to maintenance' },
+
+  // V004 (Tesla) — no current assigned driver, used as pool car
+  { id: 'VA-2026-0004', vehicleId: 'V004', driverId: 'DRV-001', assignedDate: '2025-03-04', returnedDate: '2025-09-01', assignedByUserId: 'U001', returnedByUserId: 'U001', notes: 'Investor visit pool — released back to general pool' },
+
+  // V005 — retired vehicle, archived assignments
+  { id: 'VA-2026-0003', vehicleId: 'V005', driverId: 'DRV-005', assignedDate: '2024-08-12', returnedDate: '2025-06-30', assignedByUserId: 'U002', returnedByUserId: 'U002' },
+  { id: 'VA-2026-0002', vehicleId: 'V005', driverId: 'DRV-007', assignedDate: '2023-03-04', returnedDate: '2024-08-12', assignedByUserId: 'U002', returnedByUserId: 'U002' },
+  { id: 'VA-2026-0001', vehicleId: 'V005', driverId: 'DRV-001', assignedDate: '2022-04-19', returnedDate: '2023-03-04', assignedByUserId: 'U001', returnedByUserId: 'U001', notes: 'First driver after registration' },
 ]
 
 export const mockVehicleInspections: VehicleInspection[] = [

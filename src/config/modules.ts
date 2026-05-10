@@ -259,6 +259,7 @@ export const modules: EmsModule[] = [
         title: 'Operations',
         items: [
           { label: 'Vehicles', path: 'vehicles', icon: Truck, feature: 'fleet' },
+          { label: 'Assignments', path: 'assignments', icon: UserCheck, feature: 'fleetAssignments' },
           { label: 'Trips', path: 'trips', icon: RouteIcon, feature: 'fleetTrips' },
           { label: 'Fuel Logs', path: 'fuel-logs', icon: Fuel, feature: 'fleetFuelLogs' },
           { label: 'Inspections', path: 'inspections', icon: ClipboardCheck, feature: 'fleetInspections' },

@@ -18,6 +18,10 @@ export function useVehicleInspections() {
   return useQuery({ queryKey: ['fleet', 'inspections'], queryFn: fleetApi.listVehicleInspections })
 }
 
+export function useVehicleAssignments() {
+  return useQuery({ queryKey: ['fleet', 'assignments'], queryFn: fleetApi.listVehicleAssignments })
+}
+
 function invalidateFleet(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['fleet'] })
   qc.invalidateQueries({ queryKey: ['audit-log'] })
@@ -112,6 +116,24 @@ export function useCancelTrip() {
   return useMutation({
     mutationFn: (input: { id: string; byUserId: string; reason?: string }) =>
       fleetApi.cancelTrip(input.id, input.byUserId, input.reason),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useAssignVehicle() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { vehicleId: string; driverId: string; notes?: string; assignedByUserId: string }) =>
+      fleetApi.assignVehicle(input),
+    onSuccess: () => invalidateFleet(qc),
+  })
+}
+
+export function useReturnVehicle() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { vehicleId: string; notes?: string; returnedByUserId: string }) =>
+      fleetApi.returnVehicle(input),
     onSuccess: () => invalidateFleet(qc),
   })
 }
