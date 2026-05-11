@@ -25,6 +25,7 @@ import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { DataTable } from '@/shared/ui/data-table'
+import { ItemDetailDrawer } from '@/features/inventory/components/item-detail-drawer'
 import { cn } from '@/shared/utils/cn'
 
 const itemSchema = z.object({
@@ -74,6 +75,7 @@ export function ItemsTab() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<InventoryItem | null>(null)
   const [locationItem, setLocationItem] = useState<InventoryItem | null>(null)
+  const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null)
 
   useEffect(() => {
     const itemId = searchParams.get('item')
@@ -254,6 +256,17 @@ export function ItemsTab() {
         emptyIcon={Boxes}
         emptyMessage="No items found"
         emptyDescription="Try adjusting your search or filters"
+        onRowClick={(item) => setViewingItem(item)}
+      />
+
+      <ItemDetailDrawer
+        open={!!viewingItem}
+        item={viewingItem}
+        onClose={() => setViewingItem(null)}
+        onEdit={(item) => {
+          setViewingItem(null)
+          openEdit(item)
+        }}
       />
 
       <Modal
