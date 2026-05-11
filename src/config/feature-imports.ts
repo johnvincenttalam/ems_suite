@@ -47,6 +47,8 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   procurementSettings: () => import('@/features/procurement'),
   maintenance:           () => import('@/features/maintenance'),
   maintenanceSchedule:   () => import('@/features/maintenance'),
+  maintenancePreventive: () => import('@/features/preventive-maintenance'),
+  maintenanceInspections:() => import('@/features/maintenance'),
   maintenanceTechnicians:() => import('@/features/maintenance'),
   maintenanceDashboard:  () => import('@/features/maintenance'),
   maintenanceAlerts:     () => import('@/features/maintenance'),

@@ -15,7 +15,8 @@ import { useAssets } from '@/features/assets'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import { issuesApi } from '@/features/issues'
-import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance/types'
+import type { InspectionResult, WorkOrder, WorkOrderPart, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance/types'
+import { CompleteWorkOrderModal } from './complete-work-order-modal'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
@@ -35,6 +36,7 @@ const workOrderSchema = z.object({
   description: z.string().optional(),
   assetId: z.string().min(1, 'Asset is required'),
   assignedTo: z.string().min(1, 'Technician is required'),
+  type: z.enum(['preventive', 'corrective', 'inspection']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   scheduledDate: z.string().min(1, 'Schedule is required'),
 })
@@ -48,11 +50,30 @@ const statusFilters: { value: WorkOrderStatus | 'all'; label: string }[] = [
   { value: 'completed', label: 'Completed' },
 ]
 
+const typeFilterOptions: { value: WorkOrderType | 'all'; label: string }[] = [
+  { value: 'all', label: 'All types' },
+  { value: 'preventive', label: 'Preventive' },
+  { value: 'corrective', label: 'Corrective' },
+  { value: 'inspection', label: 'Inspection' },
+]
+
 const priorityStyles: Record<WorkOrderPriority, string> = {
   low: 'bg-zinc-100 text-zinc-600 border-zinc-200',
   medium: 'bg-blue-50 text-blue-700 border-blue-200',
   high: 'bg-amber-50 text-amber-700 border-amber-200',
   critical: 'bg-red-50 text-red-700 border-red-200',
+}
+
+const typeStyles: Record<WorkOrderType, string> = {
+  preventive: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  corrective: 'bg-amber-50 text-amber-700 border-amber-200',
+  inspection: 'bg-violet-50 text-violet-700 border-violet-200',
+}
+
+const typeLabel: Record<WorkOrderType, string> = {
+  preventive: 'Preventive',
+  corrective: 'Corrective',
+  inspection: 'Inspection',
 }
 
 export function WorkOrdersTab() {
@@ -68,10 +89,10 @@ export function WorkOrdersTab() {
   const [searchParams] = useSearchParams()
   const [globalFilter, setGlobalFilter] = useState(searchParams.get('wo') ?? '')
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | 'all'>('all')
+  const [typeFilter, setTypeFilter] = useState<WorkOrderType | 'all'>('all')
   const [showNew, setShowNew] = useState(false)
   const [inspectionWO, setInspectionWO] = useState<WorkOrder | null>(null)
   const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null)
-  const [completionNotes, setCompletionNotes] = useState('')
   const [cancellingWO, setCancellingWO] = useState<WorkOrder | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -81,8 +102,12 @@ export function WorkOrdersTab() {
   }, [searchParams])
 
   const filtered = useMemo(
-    () => statusFilter === 'all' ? workOrders : workOrders.filter((w) => w.status === statusFilter),
-    [workOrders, statusFilter],
+    () => workOrders.filter((w) => {
+      if (statusFilter !== 'all' && w.status !== statusFilter) return false
+      if (typeFilter !== 'all' && w.type !== typeFilter) return false
+      return true
+    }),
+    [workOrders, statusFilter, typeFilter],
   )
 
   const invalidate = () => {
@@ -104,18 +129,35 @@ export function WorkOrdersTab() {
   })
 
   const completeMutation = useMutation({
-    mutationFn: ({ wo, notes }: { wo: WorkOrder; notes?: string }) => {
+    mutationFn: ({
+      wo,
+      input,
+    }: {
+      wo: WorkOrder
+      input: {
+        notes?: string
+        laborHours?: number
+        laborCost?: number
+        partsUsed: WorkOrderPart[]
+        inspectionResult?: InspectionResult
+      }
+    }) => {
       if (!currentUser) throw new Error('Not signed in')
-      return maintenanceApi.complete(wo.id, currentUser.id, notes)
+      return maintenanceApi.complete(wo.id, currentUser.id, {
+        completionNotes: input.notes,
+        laborHours: input.laborHours,
+        laborCost: input.laborCost,
+        partsUsed: input.partsUsed,
+        inspectionResult: input.inspectionResult,
+      })
     },
     onSuccess: (wo, vars) => {
       setCompletingWO(null)
-      setCompletionNotes('')
       invalidate()
 
       if (wo.sourceIssueId && currentUser) {
         const issueId = wo.sourceIssueId
-        const notes = vars.notes?.trim() || `Resolved via work order ${wo.id}`
+        const notes = vars.input.notes?.trim() || `Resolved via work order ${wo.id}`
         toast.success(`Completed ${wo.id}`, {
           description: `Linked issue ${issueId} is open — close it out?`,
           action: {
@@ -171,6 +213,7 @@ export function WorkOrdersTab() {
         description: data.description,
         assetId: data.assetId,
         assignedTo: data.assignedTo,
+        type: data.type,
         priority: data.priority,
         scheduledDate: data.scheduledDate,
         createdBy: currentUser.id,
@@ -179,7 +222,7 @@ export function WorkOrdersTab() {
     onSuccess: (wo) => {
       toast.success(`Created ${wo.id}`)
       setShowNew(false)
-      reset({ priority: 'medium' })
+      reset({ type: 'preventive', priority: 'medium' })
       invalidate()
     },
     onError: (err) => toast.error('Create failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
@@ -191,6 +234,9 @@ export function WorkOrdersTab() {
       <div>
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-medium text-zinc-900">{row.original.title}</p>
+          <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10.5px] font-medium', typeStyles[row.original.type])}>
+            {typeLabel[row.original.type]}
+          </span>
           {row.original.sourceIssueId && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 text-[10.5px] font-medium">
               <AlertCircle className="w-2.5 h-2.5" />
@@ -246,7 +292,7 @@ export function WorkOrdersTab() {
           key: 'complete',
           label: 'Mark complete',
           icon: CheckCircle2,
-          onClick: () => { setCompletingWO(wo); setCompletionNotes('') },
+          onClick: () => setCompletingWO(wo),
         }] : []),
         ...(canCancel ? [{
           key: 'cancel',
@@ -271,7 +317,7 @@ export function WorkOrdersTab() {
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<WorkOrderForm>({
     resolver: zodResolver(workOrderSchema),
-    defaultValues: { priority: 'medium' },
+    defaultValues: { type: 'preventive', priority: 'medium' },
   })
 
   const onSubmit = (data: WorkOrderForm) => createMutation.mutate(data)
@@ -285,7 +331,20 @@ export function WorkOrdersTab() {
     <div>
       <ListToolbar
         search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search work orders...' }}
-        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+        filter={
+          <div className="flex items-center gap-2 flex-wrap">
+            <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as WorkOrderType | 'all')}
+              className="h-8 rounded-lg border border-zinc-200 bg-white text-[12.5px] px-2.5 text-zinc-700 hover:border-zinc-400 focus:outline-none focus:border-zinc-900"
+            >
+              {typeFilterOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        }
       >
         <ExportMenu
           rows={workOrders as unknown as Record<string, unknown>[]}
@@ -296,6 +355,7 @@ export function WorkOrdersTab() {
             { key: 'id', label: 'Order' },
             { key: 'title', label: 'Title' },
             { key: 'assetId', label: 'Asset' },
+            { key: 'type', label: 'Type' },
             { key: 'priority', label: 'Priority' },
             { key: 'assignedTo', label: 'Technician' },
             { key: 'status', label: 'Status' },
@@ -341,12 +401,12 @@ export function WorkOrdersTab() {
 
       <Modal
         open={showNew}
-        onClose={() => { setShowNew(false); reset({ priority: 'medium' }) }}
+        onClose={() => { setShowNew(false); reset({ type: 'preventive', priority: 'medium' }) }}
         title="New Work Order"
         size="lg"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset({ priority: 'medium' }) }} disabled={createMutation.isPending}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => { setShowNew(false); reset({ type: 'preventive', priority: 'medium' }) }} disabled={createMutation.isPending}>Cancel</Button>
             <Button type="submit" form="new-work-order-form" loading={createMutation.isPending}>Create Work Order</Button>
           </>
         }
@@ -358,7 +418,12 @@ export function WorkOrdersTab() {
             <Select label="Asset *" {...register('assetId')} error={errors.assetId?.message} placeholder="Select asset" options={activeAssets.map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` }))} />
             <Select label="Technician *" {...register('assignedTo')} error={errors.assignedTo?.message} placeholder="Select technician" options={activeUsers.map((u) => ({ value: u.id, label: u.name }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <Select label="Type *" {...register('type')} error={errors.type?.message} options={[
+              { value: 'preventive', label: 'Preventive' },
+              { value: 'corrective', label: 'Corrective' },
+              { value: 'inspection', label: 'Inspection' },
+            ]} />
             <Select label="Priority *" {...register('priority')} error={errors.priority?.message} options={[
               { value: 'low', label: 'Low' },
               { value: 'medium', label: 'Medium' },
@@ -370,34 +435,14 @@ export function WorkOrdersTab() {
         </form>
       </Modal>
 
-      <Modal open={!!completingWO} onClose={() => { setCompletingWO(null); setCompletionNotes('') }} title={`Complete ${completingWO?.id ?? ''}`} size="md">
-        <div className="space-y-4">
-          <p className="text-[13px] text-zinc-500">
-            Mark this work order as completed. If this is the only open work order for{' '}
-            <span className="font-medium text-zinc-700">{completingWO ? assetMap[completingWO.assetId]?.name ?? completingWO.assetId : ''}</span>,
-            the asset will return to active status.
-          </p>
-          <Textarea
-            label="Completion Notes"
-            rows={3}
-            value={completionNotes}
-            onChange={(e) => setCompletionNotes(e.target.value)}
-            placeholder="e.g. Replaced air filter, topped off coolant — operating within spec"
-          />
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" fullWidth onClick={() => { setCompletingWO(null); setCompletionNotes('') }} disabled={completeMutation.isPending}>Cancel</Button>
-            <Button
-              type="button"
-              variant="success"
-              fullWidth
-              loading={completeMutation.isPending}
-              onClick={() => completingWO && completeMutation.mutate({ wo: completingWO, notes: completionNotes.trim() || undefined })}
-            >
-              Confirm Completion
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <CompleteWorkOrderModal
+        open={!!completingWO}
+        wo={completingWO}
+        assetLabel={completingWO ? assetMap[completingWO.assetId]?.name ?? completingWO.assetId : ''}
+        loading={completeMutation.isPending}
+        onClose={() => setCompletingWO(null)}
+        onConfirm={(input) => completingWO && completeMutation.mutate({ wo: completingWO, input })}
+      />
 
       <Modal open={!!cancellingWO} onClose={() => { setCancellingWO(null); setCancelReason('') }} title={`Cancel ${cancellingWO?.id ?? ''}`} size="md">
         <div className="space-y-4">

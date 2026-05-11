@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { maintenanceApi } from './api/maintenance-api'
+import { workOrderTotalCost } from './types'
 import { assetsApi, mockAssets } from '@/features/assets'
 import { mockUsers } from '@/features/users'
 
@@ -55,6 +56,12 @@ describe('maintenanceApi.list', () => {
     expect(result.every((w) => priorities.has(w.priority))).toBe(true)
   })
 
+  it('every work order has a valid type', async () => {
+    const result = await maintenanceApi.list()
+    const types = new Set(['preventive', 'corrective', 'inspection'])
+    expect(result.every((w) => types.has(w.type))).toBe(true)
+  })
+
   it('completed work orders carry a completedDate', async () => {
     const result = await maintenanceApi.list()
     const completed = result.filter((w) => w.status === 'completed')
@@ -89,6 +96,42 @@ describe('maintenanceApi.create', () => {
     await newWorkOrder(asset.id)
     const list = await assetsApi.list()
     expect(list.find((a) => a.id === asset.id)!.status).toBe('active')
+  })
+
+  it('defaults type to preventive when not supplied and not from an issue', async () => {
+    const asset = await newAsset('TYPE_DEFAULT')
+    const wo = await newWorkOrder(asset.id)
+    expect(wo.type).toBe('preventive')
+  })
+
+  it('defaults type to corrective when spawned from a source issue', async () => {
+    const asset = await newAsset('TYPE_ISSUE')
+    const wo = await maintenanceApi.create({
+      title: 'From issue',
+      assetId: asset.id,
+      assignedTo: 'U002',
+      priority: 'high',
+      scheduledDate: '2026-06-01',
+      sourceIssueId: 'ISS-2025-0001',
+      createdBy: 'U001',
+    })
+    expect(wo.type).toBe('corrective')
+  })
+
+  it('persists the supplied type', async () => {
+    const asset = await newAsset('TYPE_EXPLICIT')
+    const wo = await maintenanceApi.create({
+      title: 'Quarterly inspection',
+      assetId: asset.id,
+      assignedTo: 'U002',
+      type: 'inspection',
+      priority: 'medium',
+      scheduledDate: '2026-06-01',
+      createdBy: 'U001',
+    })
+    expect(wo.type).toBe('inspection')
+    const persisted = (await maintenanceApi.list()).find((w) => w.id === wo.id)!
+    expect(persisted.type).toBe('inspection')
   })
 })
 
@@ -143,10 +186,72 @@ describe('maintenanceApi.complete', () => {
     const asset = await newAsset('COMP')
     const wo = await newWorkOrder(asset.id)
     await maintenanceApi.start(wo.id, 'U001')
-    const done = await maintenanceApi.complete(wo.id, 'U001', 'Replaced part X')
+    const done = await maintenanceApi.complete(wo.id, 'U001', { completionNotes: 'Replaced part X' })
     expect(done.status).toBe('completed')
     expect(done.completedDate).toBeTruthy()
     expect(done.completionNotes).toBe('Replaced part X')
+  })
+
+  it('persists labor hours, labor cost, and parts at completion', async () => {
+    const asset = await newAsset('COMP_COST')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    const done = await maintenanceApi.complete(wo.id, 'U001', {
+      laborHours: 2.5,
+      laborCost: 112.5,
+      partsUsed: [
+        { itemId: 'INV-1006', quantity: 2, unitCost: 6.75 },
+        { itemId: 'INV-1003', quantity: 1, unitCost: 65 },
+      ],
+    })
+    expect(done.laborHours).toBe(2.5)
+    expect(done.laborCost).toBe(112.5)
+    expect(done.partsUsed).toHaveLength(2)
+    expect(done.partsUsed![0].itemId).toBe('INV-1006')
+  })
+
+  it('persists inspectionResult on inspection-type WOs', async () => {
+    const asset = await newAsset('COMP_INSP')
+    const wo = await maintenanceApi.create({
+      title: 'Safety inspection',
+      assetId: asset.id,
+      assignedTo: 'U002',
+      type: 'inspection',
+      priority: 'medium',
+      scheduledDate: '2026-06-01',
+      createdBy: 'U001',
+    })
+    await maintenanceApi.start(wo.id, 'U001')
+    const done = await maintenanceApi.complete(wo.id, 'U001', { inspectionResult: 'fail' })
+    expect(done.inspectionResult).toBe('fail')
+  })
+
+  it('refuses inspectionResult on non-inspection WOs', async () => {
+    const asset = await newAsset('COMP_INSP_BAD')
+    const wo = await newWorkOrder(asset.id) // defaults to preventive
+    await maintenanceApi.start(wo.id, 'U001')
+    await expect(
+      maintenanceApi.complete(wo.id, 'U001', { inspectionResult: 'pass' }),
+    ).rejects.toThrow(/inspection-type/i)
+  })
+
+  it('rejects negative labor hours, negative labor cost, or invalid parts', async () => {
+    const asset = await newAsset('COMP_NEG')
+    const wo1 = await newWorkOrder(asset.id, { title: 'a' })
+    await maintenanceApi.start(wo1.id, 'U001')
+    await expect(maintenanceApi.complete(wo1.id, 'U001', { laborHours: -1 })).rejects.toThrow(/labor hours/i)
+
+    const asset2 = await newAsset('COMP_NEG2')
+    const wo2 = await newWorkOrder(asset2.id, { title: 'b' })
+    await maintenanceApi.start(wo2.id, 'U001')
+    await expect(maintenanceApi.complete(wo2.id, 'U001', { laborCost: -5 })).rejects.toThrow(/labor cost/i)
+
+    const asset3 = await newAsset('COMP_NEG3')
+    const wo3 = await newWorkOrder(asset3.id, { title: 'c' })
+    await maintenanceApi.start(wo3.id, 'U001')
+    await expect(
+      maintenanceApi.complete(wo3.id, 'U001', { partsUsed: [{ itemId: 'INV-1006', quantity: 0, unitCost: 5 }] }),
+    ).rejects.toThrow(/quantity/i)
   })
 
   it('flips asset back to active when this is the last open WO', async () => {
@@ -241,6 +346,23 @@ describe('maintenanceApi.reassign / reschedule', () => {
     const wo = await newWorkOrder(asset.id)
     await maintenanceApi.cancel(wo.id, 'U001', 'no longer needed')
     await expect(maintenanceApi.reschedule(wo.id, '2026-06-15', 'U001')).rejects.toThrow(/cancelled/i)
+  })
+})
+
+describe('workOrderTotalCost', () => {
+  it('returns 0 when neither labor nor parts are set', () => {
+    expect(workOrderTotalCost({})).toBe(0)
+  })
+
+  it('sums labor cost and parts subtotals', () => {
+    const total = workOrderTotalCost({
+      laborCost: 100,
+      partsUsed: [
+        { itemId: 'INV-1', quantity: 2, unitCost: 5 },
+        { itemId: 'INV-2', quantity: 1, unitCost: 25 },
+      ],
+    })
+    expect(total).toBe(100 + 10 + 25)
   })
 })
 

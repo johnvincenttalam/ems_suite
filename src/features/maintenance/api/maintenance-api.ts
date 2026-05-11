@@ -1,4 +1,4 @@
-import type { WorkOrder, WorkOrderPriority } from '@/features/maintenance/types'
+import type { InspectionResult, WorkOrder, WorkOrderPart, WorkOrderPriority, WorkOrderType } from '@/features/maintenance/types'
 import { mockWorkOrders } from '@/features/maintenance/data/mock-maintenance'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 import { mockUsers } from '@/features/users/data/mock-users'
@@ -52,6 +52,7 @@ interface CreateWorkOrderInput {
   description?: string
   assetId: string
   assignedTo: string
+  type?: WorkOrderType
   priority: WorkOrderPriority
   scheduledDate: string
   checklistId?: string
@@ -84,6 +85,7 @@ export const maintenanceApi = {
       assetId: input.assetId,
       title: input.title,
       description: input.description,
+      type: input.type ?? (input.sourceIssueId ? 'corrective' : 'preventive'),
       priority: input.priority,
       assignedTo: input.assignedTo,
       status: 'pending',
@@ -126,16 +128,46 @@ export const maintenanceApi = {
     return wo
   },
 
-  complete: async (id: string, byUserId: string, completionNotes?: string): Promise<WorkOrder> => {
+  complete: async (
+    id: string,
+    byUserId: string,
+    options: {
+      completionNotes?: string
+      laborHours?: number
+      laborCost?: number
+      partsUsed?: WorkOrderPart[]
+      inspectionResult?: InspectionResult
+    } = {},
+  ): Promise<WorkOrder> => {
     await delay(120)
     const wo = mockWorkOrders.find((w) => w.id === id)
     if (!wo) throw new Error(`Work order ${id} not found`)
     if (wo.status !== 'ongoing') throw new Error(`Work order ${id} is not in progress`)
 
+    if (options.laborHours !== undefined && options.laborHours < 0) {
+      throw new Error('Labor hours cannot be negative')
+    }
+    if (options.laborCost !== undefined && options.laborCost < 0) {
+      throw new Error('Labor cost cannot be negative')
+    }
+    if (options.partsUsed) {
+      for (const p of options.partsUsed) {
+        if (p.quantity <= 0) throw new Error('Part quantity must be > 0')
+        if (p.unitCost < 0) throw new Error('Part unit cost cannot be negative')
+      }
+    }
+    if (options.inspectionResult && wo.type !== 'inspection') {
+      throw new Error('inspectionResult is only valid for inspection-type work orders')
+    }
+
     const actor = userName(byUserId)
     wo.status = 'completed'
     wo.completedDate = new Date().toISOString()
-    if (completionNotes) wo.completionNotes = completionNotes
+    if (options.completionNotes) wo.completionNotes = options.completionNotes
+    if (options.laborHours !== undefined) wo.laborHours = options.laborHours
+    if (options.laborCost !== undefined) wo.laborCost = options.laborCost
+    if (options.partsUsed) wo.partsUsed = options.partsUsed
+    if (options.inspectionResult) wo.inspectionResult = options.inspectionResult
 
     if (!hasOtherOpenWorkOrders(wo.assetId, wo.id)) {
       try {
@@ -146,11 +178,14 @@ export const maintenanceApi = {
       }
     }
 
+    const partsTotal = (wo.partsUsed ?? []).reduce((s, p) => s + p.quantity * p.unitCost, 0)
+    const total = (wo.laborCost ?? 0) + partsTotal
+    const costSuffix = total > 0 ? ` (cost ${total.toFixed(2)})` : ''
     recordAudit({
       userId: actor,
       action: 'update',
       module: 'Maintenance',
-      detail: `Completed ${wo.id}${completionNotes ? ` — ${completionNotes}` : ''}`,
+      detail: `Completed ${wo.id}${costSuffix}${options.completionNotes ? ` — ${options.completionNotes}` : ''}`,
     })
     return wo
   },

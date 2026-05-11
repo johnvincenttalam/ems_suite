@@ -1,5 +1,6 @@
 export { WorkOrdersPage } from './pages/work-orders-page'
 export { SchedulePage } from './pages/schedule-page'
+export { InspectionsPage } from './pages/inspections-page'
 export { TechniciansPage } from './pages/technicians-page'
 export { MaintenanceDashboard } from './pages/maintenance-dashboard'
 export { MaintenanceAlertsPage } from './pages/maintenance-alerts-page'
@@ -12,4 +13,5 @@ export { maintenanceApi } from './api/maintenance-api'
 export { WorkOrdersTab } from './components/work-orders-tab'
 
 export { mockWorkOrders } from './data/mock-maintenance'
-export type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from './types'
+export type { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType, WorkOrderPart, InspectionResult } from './types'
+export { workOrderTotalCost } from './types'

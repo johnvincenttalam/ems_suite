@@ -48,6 +48,8 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   procurementSettings: lazy(() => featureImports.procurementSettings().then((m: any) => ({ default: m.ProcurementSettingsPage }))),
   maintenance:           lazy(() => featureImports.maintenance().then((m: any) => ({ default: m.WorkOrdersPage }))),
   maintenanceSchedule:   lazy(() => featureImports.maintenanceSchedule().then((m: any) => ({ default: m.SchedulePage }))),
+  maintenancePreventive: lazy(() => featureImports.maintenancePreventive().then((m: any) => ({ default: m.PreventiveMaintenancePage }))),
+  maintenanceInspections:lazy(() => featureImports.maintenanceInspections().then((m: any) => ({ default: m.InspectionsPage }))),
   maintenanceTechnicians:lazy(() => featureImports.maintenanceTechnicians().then((m: any) => ({ default: m.TechniciansPage }))),
   maintenanceDashboard:  lazy(() => featureImports.maintenanceDashboard().then((m: any) => ({ default: m.MaintenanceDashboard }))),
   maintenanceAlerts:     lazy(() => featureImports.maintenanceAlerts().then((m: any) => ({ default: m.MaintenanceAlertsPage }))),

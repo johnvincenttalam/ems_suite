@@ -37,6 +37,8 @@ export const features = {
   procurementSettings: true,
   maintenance: true,
   maintenanceSchedule: true,
+  maintenancePreventive: true,
+  maintenanceInspections: true,
   maintenanceTechnicians: true,
   maintenanceDashboard: true,
   maintenanceAlerts: true,

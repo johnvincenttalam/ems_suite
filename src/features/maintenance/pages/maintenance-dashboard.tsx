@@ -11,6 +11,7 @@ import {
   Calendar,
   Inbox,
   Users,
+  DollarSign,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -34,7 +35,8 @@ import {
   isAfter,
 } from 'date-fns'
 import { useAuthStore } from '@/features/auth/store/auth-store'
-import { useWorkOrders } from '@/features/maintenance'
+import { useWorkOrders, workOrderTotalCost } from '@/features/maintenance'
+import { formatCurrency } from '@/shared/utils/format'
 import { useUsers } from '@/features/users'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
@@ -43,7 +45,7 @@ import { StatCard } from '@/shared/ui/stat-card'
 import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
-import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance'
+import type { WorkOrder, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance'
 import { cn } from '@/shared/utils/cn'
 
 const containerVariants = {
@@ -90,6 +92,18 @@ const PRIORITY_RANK: Record<WorkOrderPriority, number> = {
   low: 3,
 }
 
+const TYPE_LABEL: Record<WorkOrderType, string> = {
+  preventive: 'Preventive',
+  corrective: 'Corrective',
+  inspection: 'Inspection',
+}
+
+const TYPE_COLORS: Record<WorkOrderType, string> = {
+  preventive: '#10b981',
+  corrective: '#f59e0b',
+  inspection: '#8b5cf6',
+}
+
 const tooltipStyle = {
   borderRadius: '8px',
   border: '1px solid #e4e4e7',
@@ -121,7 +135,12 @@ export function MaintenanceDashboard() {
     const myOpen = user
       ? open.filter((w) => w.assignedTo === user.id).length
       : 0
-    return { open: open.length, overdue, dueSoon, completedThisMonth, myOpen }
+    const costMTD = workOrders.reduce((sum, w) => {
+      if (w.status !== 'completed' || !w.completedDate) return sum
+      if (!isAfter(parseISO(w.completedDate), startOfMonth(today))) return sum
+      return sum + workOrderTotalCost(w)
+    }, 0)
+    return { open: open.length, overdue, dueSoon, completedThisMonth, myOpen, costMTD }
   }, [workOrders, user])
 
   const statusBreakdown = useMemo(() => {
@@ -130,6 +149,15 @@ export function MaintenanceDashboard() {
     return Array.from(counts.entries())
       .map(([status, value]) => ({ status, name: STATUS_LABEL[status], value }))
       .sort((a, b) => b.value - a.value)
+  }, [workOrders])
+
+  const typeBreakdown = useMemo(() => {
+    const counts = new Map<WorkOrderType, number>()
+    for (const w of workOrders) counts.set(w.type, (counts.get(w.type) ?? 0) + 1)
+    const order: WorkOrderType[] = ['preventive', 'corrective', 'inspection']
+    return order
+      .map((type) => ({ type, name: TYPE_LABEL[type], value: counts.get(type) ?? 0 }))
+      .filter((t) => t.value > 0)
   }, [workOrders])
 
   const priorityBreakdown = useMemo(() => {
@@ -237,7 +265,7 @@ export function MaintenanceDashboard() {
         />
       </motion.div>
 
-      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Open Work Orders"
           value={stats.open}
@@ -274,10 +302,19 @@ export function MaintenanceDashboard() {
           iconColor="text-emerald-600"
           index={3}
         />
+        <StatCard
+          title="Cost (MTD)"
+          value={formatCurrency(stats.costMTD)}
+          subtitle="Labor + parts"
+          icon={DollarSign}
+          iconBg="bg-violet-50"
+          iconColor="text-violet-600"
+          index={4}
+        />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader className="flex-row items-center justify-between flex">
             <CardTitle>Open by Priority</CardTitle>
             <Link to="work-orders" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
@@ -299,6 +336,33 @@ export function MaintenanceDashboard() {
                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                       {priorityBreakdown.map((entry) => (
                         <Cell key={entry.priority} fill={PRIORITY_COLORS[entry.priority]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>By Type</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div style={{ width: '100%', height: 240 }}>
+              {typeBreakdown.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-[13px] text-zinc-400">No work orders</div>
+              ) : (
+                <ResponsiveContainer>
+                  <BarChart data={typeBreakdown} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                      {typeBreakdown.map((entry) => (
+                        <Cell key={entry.type} fill={TYPE_COLORS[entry.type]} />
                       ))}
                     </Bar>
                   </BarChart>

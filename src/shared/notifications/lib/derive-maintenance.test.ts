@@ -9,6 +9,7 @@ function wo(p: Partial<WorkOrder>): WorkOrder {
     id: 'WO-X',
     assetId: 'AST-001',
     title: 'Inspect',
+    type: 'preventive',
     priority: 'medium',
     assignedTo: 'U999',
     status: 'pending',

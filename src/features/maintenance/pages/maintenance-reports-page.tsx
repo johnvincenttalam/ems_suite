@@ -8,6 +8,7 @@ import {
   Package,
   TrendingUp,
   Calendar,
+  DollarSign,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -18,11 +19,12 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import { differenceInCalendarDays, parseISO, format, subMonths, isAfter } from 'date-fns'
-import { useWorkOrders } from '@/features/maintenance'
+import { differenceInCalendarDays, parseISO, format, subMonths, isAfter, startOfMonth } from 'date-fns'
+import { useWorkOrders, workOrderTotalCost } from '@/features/maintenance'
+import { formatCurrency } from '@/shared/utils/format'
 import { useUsers } from '@/features/users'
 import { useAssets } from '@/features/assets'
-import type { WorkOrder, WorkOrderPriority, WorkOrderStatus } from '@/features/maintenance'
+import type { WorkOrder, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance'
 import { ExportMenu, StatCard, StatCardSkeleton } from '@/shared/ui/index'
 import { PageHeader } from '@/shared/ui/page-header'
 import type { ExportColumn } from '@/shared/utils/export-prep'
@@ -49,6 +51,12 @@ const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
   critical: 'Critical',
 }
 
+const TYPE_LABEL: Record<WorkOrderType, string> = {
+  preventive: 'Preventive',
+  corrective: 'Corrective',
+  inspection: 'Inspection',
+}
+
 const tooltipStyle = {
   borderRadius: '8px',
   border: '1px solid #e4e4e7',
@@ -63,9 +71,17 @@ export function MaintenanceReportsPage() {
   const stats = useMemo(() => {
     const today = new Date()
     const total = workOrders.length
-    const open = workOrders.filter((w) => w.status !== 'completed')
+    const open = workOrders.filter((w) => w.status === 'pending' || w.status === 'ongoing')
     const completed = workOrders.filter((w) => w.status === 'completed')
     const overdue = open.filter((w) => differenceInCalendarDays(parseISO(w.scheduledDate), today) < 0).length
+    const monthStart = startOfMonth(today)
+    const totalCost = completed.reduce((s, w) => s + workOrderTotalCost(w), 0)
+    const costMTD = completed.reduce((s, w) => {
+      if (!w.completedDate || !isAfter(parseISO(w.completedDate), monthStart)) return s
+      return s + workOrderTotalCost(w)
+    }, 0)
+    const costedCount = completed.filter((w) => workOrderTotalCost(w) > 0).length
+    const avgCost = costedCount === 0 ? 0 : totalCost / costedCount
     const onTimeCompleted = completed.filter(
       (w) =>
         w.completedDate &&
@@ -79,15 +95,15 @@ export function MaintenanceReportsPage() {
           (s, w) => s + differenceInCalendarDays(parseISO(w.completedDate as string), parseISO(w.createdAt)),
           0,
         ) / mttrSamples.length
-    const critical = open.filter((w) => w.priority === 'critical').length
     return {
       total,
-      open: open.length,
       completed: completed.length,
       overdue,
       pmRate,
       mttrDays: Math.round(mttrDays * 10) / 10,
-      critical,
+      totalCost,
+      costMTD,
+      avgCost,
     }
   }, [workOrders])
 
@@ -124,6 +140,24 @@ export function MaintenanceReportsPage() {
         percent: total === 0 ? 0 : Math.round((count / total) * 100),
       }))
       .sort((a, b) => b.count - a.count)
+  }, [workOrders])
+
+  const byType = useMemo<BreakdownRow[]>(() => {
+    const counts = new Map<WorkOrderType, number>()
+    for (const w of workOrders) counts.set(w.type, (counts.get(w.type) ?? 0) + 1)
+    const total = workOrders.length
+    const order: WorkOrderType[] = ['preventive', 'corrective', 'inspection']
+    return order
+      .map((k) => {
+        const count = counts.get(k) ?? 0
+        return {
+          key: k,
+          label: TYPE_LABEL[k],
+          count,
+          percent: total === 0 ? 0 : Math.round((count / total) * 100),
+        }
+      })
+      .filter((r) => r.count > 0)
   }, [workOrders])
 
   const byPriority = useMemo<BreakdownRow[]>(() => {
@@ -176,6 +210,38 @@ export function MaintenanceReportsPage() {
       .slice(0, 6)
   }, [workOrders, assets])
 
+  const costByType = useMemo(() => {
+    const sums = new Map<WorkOrderType, number>()
+    for (const w of workOrders) {
+      if (w.status !== 'completed') continue
+      const cost = workOrderTotalCost(w)
+      if (cost === 0) continue
+      sums.set(w.type, (sums.get(w.type) ?? 0) + cost)
+    }
+    const order: WorkOrderType[] = ['preventive', 'corrective', 'inspection']
+    return order
+      .map((k) => ({ key: k, label: TYPE_LABEL[k], cost: sums.get(k) ?? 0 }))
+      .filter((r) => r.cost > 0)
+  }, [workOrders])
+
+  const costByAsset = useMemo(() => {
+    const sums = new Map<string, number>()
+    for (const w of workOrders) {
+      if (w.status !== 'completed') continue
+      const cost = workOrderTotalCost(w)
+      if (cost === 0) continue
+      sums.set(w.assetId, (sums.get(w.assetId) ?? 0) + cost)
+    }
+    return Array.from(sums.entries())
+      .map(([id, cost]) => ({
+        key: id,
+        label: assets.find((a) => a.id === id)?.name ?? id,
+        cost,
+      }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 6)
+  }, [workOrders, assets])
+
   const overdueList = useMemo(() => {
     const today = new Date()
     return workOrders
@@ -194,6 +260,7 @@ export function MaintenanceReportsPage() {
         id: w.id,
         title: w.title,
         asset: assets.find((a) => a.id === w.assetId)?.name ?? w.assetId,
+        type: TYPE_LABEL[w.type],
         priority: PRIORITY_LABEL[w.priority],
         technician: users.find((u) => u.id === w.assignedTo)?.name ?? w.assignedTo,
         status: STATUS_LABEL[w.status],
@@ -203,6 +270,10 @@ export function MaintenanceReportsPage() {
           w.completedDate
             ? differenceInCalendarDays(parseISO(w.completedDate), parseISO(w.createdAt))
             : '',
+        laborHours: w.laborHours ?? '',
+        laborCost: w.laborCost ?? '',
+        partsCount: (w.partsUsed ?? []).length,
+        totalCost: w.status === 'completed' ? workOrderTotalCost(w) : '',
       })),
     [workOrders, assets, users],
   )
@@ -211,18 +282,23 @@ export function MaintenanceReportsPage() {
     { key: 'id', label: 'Order' },
     { key: 'title', label: 'Title' },
     { key: 'asset', label: 'Asset' },
+    { key: 'type', label: 'Type' },
     { key: 'priority', label: 'Priority' },
     { key: 'technician', label: 'Technician' },
     { key: 'status', label: 'Status' },
     { key: 'scheduledDate', label: 'Scheduled' },
     { key: 'completedDate', label: 'Completed' },
     { key: 'cycleDays', label: 'Cycle (days)' },
+    { key: 'laborHours', label: 'Labor Hours' },
+    { key: 'laborCost', label: 'Labor Cost' },
+    { key: 'partsCount', label: '# Parts' },
+    { key: 'totalCost', label: 'Total Cost' },
   ]
 
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Reports" subtitle="PM compliance, MTTR, and per-technician load" />
+        <PageHeader title="Reports" subtitle="PM compliance, MTTR, cost, and per-technician load" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
         </div>
@@ -234,7 +310,7 @@ export function MaintenanceReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        subtitle="PM compliance, MTTR, and per-technician load"
+        subtitle="PM compliance, MTTR, cost, and per-technician load"
         actions={
           <ExportMenu
             rows={exportRows}
@@ -251,11 +327,11 @@ export function MaintenanceReportsPage() {
         <StatCard title="Total Work Orders" value={stats.total} icon={Wrench} iconBg="bg-zinc-100" iconColor="text-zinc-600" index={0} />
         <StatCard title="PM On-time Rate" value={`${stats.pmRate}%`} subtitle={`${stats.completed} completed`} icon={TrendingUp} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={1} />
         <StatCard title="MTTR" value={stats.mttrDays > 0 ? `${stats.mttrDays} d` : '—'} subtitle="Mean time to resolution" icon={Clock} iconBg="bg-blue-50" iconColor="text-blue-600" index={2} />
-        <StatCard title="Open" value={stats.open} icon={Wrench} iconBg="bg-amber-50" iconColor="text-amber-600" index={3} />
-        <StatCard title="Overdue" value={stats.overdue} icon={TriangleAlert} iconBg="bg-red-50" iconColor="text-red-600" index={4} />
-        <StatCard title="Critical Open" value={stats.critical} icon={TriangleAlert} iconBg="bg-red-50" iconColor="text-red-600" index={5} />
-        <StatCard title="Completed" value={stats.completed} icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={6} />
-        <StatCard title="Technicians" value={byTechnician.length} icon={Users} iconBg="bg-violet-50" iconColor="text-violet-600" index={7} />
+        <StatCard title="Total Cost" value={formatCurrency(stats.totalCost)} subtitle="All completed WOs" icon={DollarSign} iconBg="bg-violet-50" iconColor="text-violet-600" index={3} />
+        <StatCard title="Cost (MTD)" value={formatCurrency(stats.costMTD)} subtitle="Labor + parts" icon={DollarSign} iconBg="bg-violet-50" iconColor="text-violet-600" index={4} />
+        <StatCard title="Avg Cost / WO" value={formatCurrency(stats.avgCost)} subtitle="With costed WOs" icon={DollarSign} iconBg="bg-violet-50" iconColor="text-violet-600" index={5} />
+        <StatCard title="Overdue" value={stats.overdue} icon={TriangleAlert} iconBg="bg-red-50" iconColor="text-red-600" index={6} />
+        <StatCard title="Completed" value={stats.completed} icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={7} />
       </div>
 
       <div className="bg-white rounded-xl border border-zinc-200/60 p-5 mb-6">
@@ -279,6 +355,9 @@ export function MaintenanceReportsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TechnicianCard rows={byTechnician} />
+        <BreakdownCard title="By Type" rows={byType} icon={Wrench} barColor="bg-violet-500" />
+        <CostByCard title="Cost by Type" rows={costByType} icon={DollarSign} barColor="bg-violet-500" />
+        <CostByCard title="Cost by Asset" rows={costByAsset} icon={DollarSign} barColor="bg-blue-500" />
         <BreakdownCard title="By Priority" rows={byPriority} icon={TriangleAlert} barColor="bg-amber-500" />
         <BreakdownCard title="By Status" rows={byStatus} icon={CheckCircle2} barColor="bg-emerald-500" />
         <TopAssetsCard rows={byAsset} />
@@ -390,6 +469,51 @@ function TopAssetsCard({ rows }: { rows: { key: string; label: string; count: nu
             <li key={r.key} className="flex items-center justify-between py-1.5 border-b border-zinc-100/60 last:border-0">
               <p className="text-[13px] text-zinc-700 truncate flex-1 mr-3">{r.label}</p>
               <span className="text-[12px] text-zinc-700 tabular-nums whitespace-nowrap">{r.count}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function CostByCard({
+  title,
+  rows,
+  icon: Icon,
+  barColor,
+}: {
+  title: string
+  rows: { key: string; label: string; cost: number }[]
+  icon: typeof Users
+  barColor: string
+}) {
+  const max = Math.max(1, ...rows.map((r) => r.cost))
+  const total = rows.reduce((s, r) => s + r.cost, 0)
+  return (
+    <div className="bg-white rounded-xl border border-zinc-200/60 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Icon className="w-3.5 h-3.5 text-zinc-400" />
+          <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+        </div>
+        <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+          {formatCurrency(total)}
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-zinc-400">No cost data yet.</p>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((r) => (
+            <li key={r.key}>
+              <div className="flex items-center justify-between text-[12px] mb-1">
+                <span className="text-zinc-700 truncate flex-1 mr-3">{r.label}</span>
+                <span className="text-zinc-700 tabular-nums flex-shrink-0">{formatCurrency(r.cost)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${(r.cost / max) * 100}%` }} />
+              </div>
             </li>
           ))}
         </ul>

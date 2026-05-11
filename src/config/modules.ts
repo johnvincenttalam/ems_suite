@@ -15,6 +15,7 @@ import {
   Settings,
   Activity,
   Calendar,
+  CalendarClock,
   ArrowLeftRight,
   ArrowDownUp,
   Edit3,
@@ -386,6 +387,8 @@ export const modules: EmsModule[] = [
         title: 'Operations',
         items: [
           { label: 'Work Orders', path: 'work-orders', icon: Wrench, feature: 'maintenance' },
+          { label: 'Preventive', path: 'preventive', icon: CalendarClock, feature: 'maintenancePreventive' },
+          { label: 'Inspections', path: 'inspections', icon: ClipboardCheck, feature: 'maintenanceInspections' },
           { label: 'Schedule', path: 'schedule', icon: Calendar, feature: 'maintenanceSchedule' },
           { label: 'Technicians', path: 'technicians', icon: Users, feature: 'maintenanceTechnicians' },
         ],
