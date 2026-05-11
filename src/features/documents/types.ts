@@ -262,16 +262,48 @@ export function getLifecyclePhase(doc: AppDocument): LifecyclePhase {
 export type SourceModule = 'sdms'
 
 /**
- * Reference-based storage record. Holds a pointer to the original document
- * (`documentId`) plus a per-user metadata snapshot (title, description,
- * tags). The document content lives elsewhere — Storage never duplicates files.
+ * Folder inside a user's Storage vault. Folders form a tree rooted at
+ * `parentId: null`. Owner-scoped — every operation filters by `ownerName`.
+ * Hard-deleted on removal (items inside fall back to root rather than being
+ * recursively trashed).
+ */
+export interface StorageFolder {
+  id: string
+  ownerName: string
+  parentId: string | null
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * File payload carried by directly-uploaded storage items. Items with `file`
+ * set have no backing SDMS document — they live entirely inside the vault.
+ * `assetUrl` is a data URL or blob URL in the Phase 1 mock layer.
+ */
+export interface StorageUploadedFile {
+  name: string
+  type: DocumentFileType
+  sizeBytes: number
+  assetUrl: string
+}
+
+/**
+ * A storage record. Discriminated by `documentId` vs `file`:
+ * - `documentId` set → a bookmarked SDMS reference; content lives in the SDMS
+ *   document store.
+ * - `file` set → a direct upload; content travels with the storage item.
  *
- * Per-user: `ownerName` scopes every list query so users only see their own
- * vault.
+ * Per-user: `ownerName` scopes every query. `folderId: null` puts the item at
+ * the vault root. `deletedAt` is a soft-delete marker — items in trash are
+ * excluded from default queries.
  */
 export interface StorageItem {
   id: string
-  documentId: string
+  /** Set for SDMS-reference items. Mutually exclusive with `file`. */
+  documentId?: string
+  /** Set for direct uploads. Mutually exclusive with `documentId`. */
+  file?: StorageUploadedFile
   /** Display name of the user who saved this item (owner). */
   ownerName: string
   /** Per-user title — defaults to the document's title at add-time. Can be
@@ -283,6 +315,18 @@ export interface StorageItem {
   tags: string[]
   /** Always 'sdms' in Phase 1; reserved field for future cross-module storage. */
   sourceModule: SourceModule
+  /** Parent folder. null = vault root. */
+  folderId: string | null
+  /** User-pinned flag. Surfaces in the "Starred" virtual view. */
+  starred?: boolean
+  /** Soft-delete marker. null/undefined = active, ISO string = in trash. */
+  deletedAt?: string | null
   createdAt: string
   updatedAt: string
+}
+
+export function isStorageItemUploaded(
+  item: StorageItem,
+): item is StorageItem & { file: StorageUploadedFile } {
+  return !!item.file
 }

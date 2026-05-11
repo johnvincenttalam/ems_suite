@@ -19,7 +19,20 @@ export { SdmsTasksBadge } from './components/sdms-tasks-badge'
 export { AddToStorageModal } from './components/add-to-storage-modal'
 export { useDocuments } from './hooks/use-documents'
 export { useWorkflowTemplates } from './hooks/use-workflow-templates'
-export { useMyStorage } from './hooks/use-storage'
+export {
+  useMyStorage,
+  useStorageFolders,
+  useCreateStorageFolder,
+  useRenameStorageFolder,
+  useMoveStorageFolder,
+  useDeleteStorageFolder,
+  useMoveStorageItem,
+  useToggleStorageStar,
+  useMoveStorageItemToTrash,
+  useRestoreStorageItem,
+  useEmptyStorageTrash,
+  useUploadToStorage,
+} from './hooks/use-storage'
 export { useSmartSearch } from './hooks/use-smart-search'
 export { workflowTemplatesApi } from './api/workflow-templates-api'
 export { mockWorkflowTemplates } from './data/mock-workflow-templates'
@@ -29,6 +42,7 @@ export { searchAdapter } from './adapters'
 export type { SearchAdapter, SmartSearchResult, SmartSearchOpts } from './adapters'
 export { mockDocuments } from './data/mock-documents'
 export { mockStorageItems } from './data/mock-storage-items'
+export { mockStorageFolders } from './data/mock-storage-folders'
 export { mockDocumentBodies, getDocumentBody } from './data/mock-document-bodies'
 export type {
   AppDocument,
@@ -51,6 +65,8 @@ export type {
   SignatureReason,
   WorkflowTemplate,
   StorageItem,
+  StorageFolder,
+  StorageUploadedFile,
   SourceModule,
 } from './types'
 export {
@@ -62,4 +78,5 @@ export {
   SIGNATURE_METHOD_LABEL,
   SIGNATURE_REASON_LABEL,
   getLifecyclePhase,
+  isStorageItemUploaded,
 } from './types'

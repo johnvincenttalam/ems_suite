@@ -153,3 +153,191 @@ describe('storageApi — sourceModule field', () => {
     expect(item.sourceModule).toBe('sdms')
   })
 })
+
+describe('storageApi — folders', () => {
+  it('createFolder + listFolders are owner-scoped', async () => {
+    const ownerA = `FolderOwnerA-${Date.now()}`
+    const ownerB = `FolderOwnerB-${Date.now()}`
+    await storageApi.createFolder({ name: 'A-Root', parentId: null, ownerName: ownerA })
+    await storageApi.createFolder({ name: 'B-Root', parentId: null, ownerName: ownerB })
+
+    const aFolders = await storageApi.listFolders(ownerA)
+    const bFolders = await storageApi.listFolders(ownerB)
+    expect(aFolders.every((f) => f.ownerName === ownerA)).toBe(true)
+    expect(bFolders.every((f) => f.ownerName === ownerB)).toBe(true)
+    expect(aFolders.find((f) => f.name === 'B-Root')).toBeUndefined()
+  })
+
+  it('createFolder rejects an empty name', async () => {
+    await expect(
+      storageApi.createFolder({ name: '   ', parentId: null, ownerName: 'Admin User' }),
+    ).rejects.toThrow(/name is required/i)
+  })
+
+  it('createFolder under a parent the user does not own throws', async () => {
+    const owner = `FolderOwner-${Date.now()}`
+    const intruder = `Intruder-${Date.now()}`
+    const parent = await storageApi.createFolder({ name: 'Owned', parentId: null, ownerName: owner })
+    await expect(
+      storageApi.createFolder({ name: 'Sneaky', parentId: parent.id, ownerName: intruder }),
+    ).rejects.toThrow(/your own/i)
+  })
+
+  it('renameFolder updates the name + updatedAt', async () => {
+    const owner = `Renamer-${Date.now()}`
+    const folder = await storageApi.createFolder({ name: 'Old', parentId: null, ownerName: owner })
+    const renamed = await storageApi.renameFolder(folder.id, 'New', owner)
+    expect(renamed.name).toBe('New')
+    expect(renamed.updatedAt >= folder.createdAt).toBe(true)
+  })
+
+  it('moveFolder rejects a cycle (folder into itself or descendant)', async () => {
+    const owner = `Cycler-${Date.now()}`
+    const root = await storageApi.createFolder({ name: 'Root', parentId: null, ownerName: owner })
+    const child = await storageApi.createFolder({ name: 'Child', parentId: root.id, ownerName: owner })
+
+    await expect(storageApi.moveFolder(root.id, root.id, owner)).rejects.toThrow(/itself/i)
+    await expect(storageApi.moveFolder(root.id, child.id, owner)).rejects.toThrow(/itself/i)
+  })
+
+  it('deleteFolder reparents children + moves items inside to root', async () => {
+    const owner = `Deleter-${Date.now()}`
+    const root = await storageApi.createFolder({ name: 'Doomed', parentId: null, ownerName: owner })
+    const child = await storageApi.createFolder({ name: 'Survivor', parentId: root.id, ownerName: owner })
+    const { item } = await storageApi.add({
+      documentId: A_DOC.id, ownerName: owner, title: 'Inside doomed', folderId: root.id,
+    })
+
+    await storageApi.deleteFolder(root.id, owner)
+
+    const folders = await storageApi.listFolders(owner)
+    const survivor = folders.find((f) => f.id === child.id)
+    expect(survivor).toBeDefined()
+    expect(survivor!.parentId).toBe(null)
+
+    const items = await storageApi.list(owner, { view: 'folder', folderId: null })
+    expect(items.find((i) => i.id === item.id)).toBeDefined()
+  })
+})
+
+describe('storageApi — views', () => {
+  it('view=folder + folderId filters to that folder only', async () => {
+    const owner = `Viewer-${Date.now()}`
+    const f1 = await storageApi.createFolder({ name: 'Bin1', parentId: null, ownerName: owner })
+    await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'In folder', folderId: f1.id })
+    await storageApi.add({ documentId: B_DOC.id, ownerName: owner, title: 'At root' })
+
+    const inFolder = await storageApi.list(owner, { view: 'folder', folderId: f1.id })
+    const atRoot = await storageApi.list(owner, { view: 'folder', folderId: null })
+    expect(inFolder.every((i) => i.folderId === f1.id)).toBe(true)
+    expect(atRoot.every((i) => i.folderId === null)).toBe(true)
+  })
+
+  it('view=starred returns only starred items', async () => {
+    const owner = `Starrer-${Date.now()}`
+    const { item: a } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Starred' })
+    await storageApi.add({ documentId: B_DOC.id, ownerName: owner, title: 'Plain' })
+    await storageApi.toggleStar(a.id, owner)
+
+    const starred = await storageApi.list(owner, { view: 'starred' })
+    expect(starred.length).toBe(1)
+    expect(starred[0].id).toBe(a.id)
+  })
+
+  it('view=trash returns only trashed items; default excludes them', async () => {
+    const owner = `Trasher-${Date.now()}`
+    const { item } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Doomed' })
+    await storageApi.moveToTrash(item.id, owner)
+
+    const trash = await storageApi.list(owner, { view: 'trash' })
+    const def = await storageApi.list(owner)
+    expect(trash.find((i) => i.id === item.id)).toBeDefined()
+    expect(def.find((i) => i.id === item.id)).toBeUndefined()
+  })
+})
+
+describe('storageApi — moveItem + toggleStar + trash lifecycle', () => {
+  it('moveItem updates folderId', async () => {
+    const owner = `Mover-${Date.now()}`
+    const f1 = await storageApi.createFolder({ name: 'Origin', parentId: null, ownerName: owner })
+    const f2 = await storageApi.createFolder({ name: 'Destination', parentId: null, ownerName: owner })
+    const { item } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Wandering', folderId: f1.id })
+
+    const moved = await storageApi.moveItem(item.id, f2.id, owner)
+    expect(moved.folderId).toBe(f2.id)
+  })
+
+  it('toggleStar flips the starred flag', async () => {
+    const owner = `Toggler-${Date.now()}`
+    const { item } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Toggle me' })
+    expect(item.starred).toBeFalsy()
+
+    const on = await storageApi.toggleStar(item.id, owner)
+    expect(on.starred).toBe(true)
+
+    const off = await storageApi.toggleStar(item.id, owner)
+    expect(off.starred).toBe(false)
+  })
+
+  it('moveToTrash → restoreItem round-trip', async () => {
+    const owner = `Rounder-${Date.now()}`
+    const { item } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Round trip' })
+
+    await storageApi.moveToTrash(item.id, owner)
+    expect((await storageApi.list(owner, { view: 'trash' })).find((i) => i.id === item.id)).toBeDefined()
+    expect((await storageApi.list(owner)).find((i) => i.id === item.id)).toBeUndefined()
+
+    await storageApi.restoreItem(item.id, owner)
+    expect((await storageApi.list(owner, { view: 'trash' })).find((i) => i.id === item.id)).toBeUndefined()
+    expect((await storageApi.list(owner)).find((i) => i.id === item.id)).toBeDefined()
+  })
+
+  it('emptyTrash hard-deletes only the requesting user’s trashed items', async () => {
+    const owner = `Emptier-${Date.now()}`
+    const other = `Bystander-${Date.now()}`
+    const { item: mine } = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Mine to lose' })
+    const { item: theirs } = await storageApi.add({ documentId: A_DOC.id, ownerName: other, title: 'Theirs, safe' })
+    await storageApi.moveToTrash(mine.id, owner)
+    await storageApi.moveToTrash(theirs.id, other)
+
+    const removed = await storageApi.emptyTrash(owner)
+    expect(removed).toBeGreaterThan(0)
+
+    expect((await storageApi.list(owner, { view: 'trash' })).find((i) => i.id === mine.id)).toBeUndefined()
+    expect((await storageApi.list(other, { view: 'trash' })).find((i) => i.id === theirs.id)).toBeDefined()
+  })
+
+  it('add after trash creates a fresh row (tombstone behavior)', async () => {
+    const owner = `Resurrector-${Date.now()}`
+    const first = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'First' })
+    await storageApi.moveToTrash(first.item.id, owner)
+
+    const second = await storageApi.add({ documentId: A_DOC.id, ownerName: owner, title: 'Second' })
+    expect(second.alreadyExisted).toBe(false)
+    expect(second.item.id).not.toBe(first.item.id)
+  })
+})
+
+describe('storageApi.upload', () => {
+  it('creates a storage item with a file payload and no documentId', async () => {
+    const owner = `Uploader-${Date.now()}`
+    const item = await storageApi.upload({
+      ownerName: owner,
+      title: 'My PDF',
+      file: { name: 'my.pdf', type: 'pdf', sizeBytes: 1024, assetUrl: 'blob:fake' },
+    })
+    expect(item.documentId).toBeUndefined()
+    expect(item.file?.name).toBe('my.pdf')
+    expect(item.id).toMatch(/^STG-\d{4}$/)
+  })
+
+  it('falls back to the file name when title is empty', async () => {
+    const owner = `UploadDefaulter-${Date.now()}`
+    const item = await storageApi.upload({
+      ownerName: owner,
+      title: '   ',
+      file: { name: 'fallback.png', type: 'png', sizeBytes: 512, assetUrl: 'blob:fake' },
+    })
+    expect(item.title).toBe('fallback.png')
+  })
+})

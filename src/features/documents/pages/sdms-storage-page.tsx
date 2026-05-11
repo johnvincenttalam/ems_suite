@@ -72,8 +72,8 @@ export function SdmsStoragePage() {
       accessorKey: 'title',
       header: 'Title',
       cell: ({ row }) => {
-        const doc = docMap[row.original.documentId]
-        const unavailable = !doc
+        const doc = row.original.documentId ? docMap[row.original.documentId] : undefined
+        const unavailable = !doc && !row.original.file
         return (
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -135,9 +135,9 @@ export function SdmsStoragePage() {
       header: '',
       cell: ({ row }) => {
         const item = row.original
-        const doc = docMap[item.documentId]
+        const doc = item.documentId ? docMap[item.documentId] : undefined
         const menuItems: ActionMenuItem[] = [
-          ...(doc ? [{
+          ...(doc && item.documentId ? [{
             key: 'view',
             label: 'View document',
             icon: Eye,
