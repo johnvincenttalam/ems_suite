@@ -413,6 +413,7 @@ export function SdmsCreateDocumentPage() {
 
   const busy = draftMutation.isPending || submitMutation.isPending || updateDraftMutation.isPending || updateAndStartMutation.isPending
   const activeUsers = users.filter((u) => u.status === 'active' && u.id !== user?.id)
+  const departmentNameById = new Map(departments.map((d) => [d.id, d.name]))
 
   if (editLoading) {
     return <div className="py-16 text-center text-[13px] text-zinc-500">Loading draft…</div>
@@ -688,6 +689,8 @@ export function SdmsCreateDocumentPage() {
             <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
               {activeUsers.map((u) => {
                 const selected = approvers.includes(u.id)
+                const deptName = u.departmentId ? departmentNameById.get(u.departmentId) : undefined
+                const positionLine = u.position ?? u.email
                 return (
                   <button
                     key={u.id}
@@ -699,9 +702,12 @@ export function SdmsCreateDocumentPage() {
                     )}
                   >
                     <Avatar name={u.name} size="sm" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[12px] font-medium text-zinc-900 truncate">{u.name}</p>
-                      <p className="text-[11px] text-zinc-400 truncate">{u.position ?? u.email}</p>
+                      <p className="text-[11px] text-zinc-400 truncate">
+                        {positionLine}
+                        {deptName && <span className="text-zinc-300"> · {deptName}</span>}
+                      </p>
                     </div>
                   </button>
                 )
