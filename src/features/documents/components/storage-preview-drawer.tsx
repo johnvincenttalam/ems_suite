@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -12,6 +12,8 @@ import {
   FolderInput,
   Download,
   Eye,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -26,11 +28,15 @@ import {
   useStorageFolders,
 } from '@/features/documents/hooks/use-storage'
 import { useAuditLog, type AuditEntry } from '@/features/audit-log'
+import { safeAssetUrl } from '@/features/documents/lib/safe-asset-url'
 import { Tabs } from '@/shared/ui/tabs'
 import { Button } from '@/shared/ui/button'
+import { Spinner } from '@/shared/ui/spinner'
 import { formatFileSize } from '@/features/documents/components/file-icon'
 import { getModulePath } from '@/config/modules'
 import { cn } from '@/shared/utils/cn'
+
+const PdfViewer = lazy(() => import('@/features/documents/components/pdf-viewer'))
 
 const FILE_CONFIG: Record<DocumentFileType, { icon: LucideIcon; bg: string; fg: string }> = {
   pdf:  { icon: FileText,        bg: 'bg-red-50',     fg: 'text-red-500' },
@@ -251,46 +257,125 @@ function DrawerHeader({
   )
 }
 
+function buildPreviewDoc(item: StorageItem, doc: AppDocument | undefined): AppDocument | null {
+  if (doc) return doc
+  if (item.file) {
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      fileName: item.file.name,
+      fileType: item.file.type,
+      fileSizeBytes: item.file.sizeBytes,
+      status: 'draft',
+      version: 1,
+      approvers: [],
+      signatures: [],
+      signatureSlots: [],
+      createdBy: item.ownerName,
+      createdAt: item.createdAt,
+      assetUrl: item.file.assetUrl,
+    }
+  }
+  return null
+}
+
 function PreviewTab({ item }: { item: StorageItem }) {
   const { data: documents = [] } = useDocuments()
+  const [fullscreen, setFullscreen] = useState(false)
   const doc = item.documentId ? documents.find((d) => d.id === item.documentId) : undefined
-  const fileType: DocumentFileType | null = item.file?.type ?? doc?.fileType ?? null
-  const assetUrl = item.file?.assetUrl ?? doc?.assetUrl
-  const fileName = item.file?.name ?? doc?.fileName ?? item.title
+  const previewDoc = buildPreviewDoc(item, doc)
+  const fileType: DocumentFileType | null = previewDoc?.fileType ?? null
+  const assetUrl = safeAssetUrl(previewDoc?.assetUrl)
+  const fileName = previewDoc?.fileName ?? item.title
 
+  const canRender =
+    !!assetUrl && (fileType === 'pdf' || fileType === 'png' || fileType === 'jpg')
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold truncate">{fileName}</p>
+        {canRender && (
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100/80"
+            aria-label="Open fullscreen preview"
+          >
+            <Maximize2 className="w-3 h-3" />
+            Fullscreen
+          </button>
+        )}
+      </div>
+      <PreviewContent doc={previewDoc} assetUrl={assetUrl} fileType={fileType} fileName={fileName} compact />
+
+      <FullscreenPreview
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        doc={previewDoc}
+        assetUrl={assetUrl}
+        fileType={fileType}
+        fileName={fileName}
+      />
+    </>
+  )
+}
+
+interface PreviewContentProps {
+  doc: AppDocument | null
+  assetUrl: string | undefined
+  fileType: DocumentFileType | null
+  fileName: string
+  /** When true, caps height to fit the drawer body. When false, fills the container. */
+  compact?: boolean
+}
+
+function PreviewContent({ doc, assetUrl, fileType, fileName, compact }: PreviewContentProps) {
   if (!assetUrl) {
     return (
       <EmptyPreview
         title="No preview available"
-        message="This item doesn't have a renderable file attached yet."
+        message="The source file isn't attached or its URL is unreachable. Use Details to confirm where the file lives."
       />
     )
   }
 
   if (fileType === 'png' || fileType === 'jpg') {
     return (
-      <div className="flex items-center justify-center bg-zinc-50 rounded-lg border border-zinc-100 p-5">
-        <img src={assetUrl} alt={fileName} className="max-w-full max-h-[70vh] rounded shadow-sm" />
+      <div className={cn('flex items-center justify-center rounded-lg border border-zinc-200/60 bg-zinc-100/50 p-4', compact ? 'min-h-[300px]' : 'min-h-0 flex-1')}>
+        <img
+          src={assetUrl}
+          alt={fileName}
+          className={cn('rounded shadow-sm select-none', compact ? 'max-w-full max-h-[60vh]' : 'max-w-full max-h-full')}
+          draggable={false}
+        />
       </div>
     )
   }
 
-  if (fileType === 'pdf') {
+  if (fileType === 'pdf' && doc) {
     return (
-      <iframe
-        src={assetUrl}
-        title={fileName}
-        className="w-full h-[70vh] rounded-lg border border-zinc-200 bg-white"
-      />
+      <Suspense
+        fallback={
+          <div className={cn('rounded-lg border border-zinc-200/60 bg-zinc-50/50 flex items-center justify-center', compact ? 'min-h-[480px]' : 'min-h-0 flex-1')}>
+            <Spinner size="lg" />
+          </div>
+        }
+      >
+        <PdfViewer doc={doc} url={assetUrl} userMap={{}} />
+      </Suspense>
     )
   }
 
   return (
-    <div className="py-12 text-center">
-      <FileIconGeneric className="w-7 h-7 text-zinc-300 mx-auto mb-3" />
-      <p className="text-[14px] font-medium text-zinc-700">In-browser preview not supported</p>
-      <p className="text-[12.5px] text-zinc-500 mt-1 max-w-sm mx-auto">
-        {fileType?.toUpperCase() ?? 'This file type'} requires the original application.
+    <div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[300px] flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-14 h-14 rounded-xl bg-white border border-zinc-200 flex items-center justify-center mb-3 shadow-sm">
+        <FileIconGeneric className="w-7 h-7 text-zinc-400" />
+      </div>
+      <p className="text-[13px] font-medium text-zinc-900">{fileName}</p>
+      <p className="text-[12px] text-zinc-500 mt-1">
+        {fileType ? `${fileType.toUpperCase()} · ` : ''}In-browser preview not supported.
       </p>
       <a
         href={assetUrl}
@@ -301,6 +386,62 @@ function PreviewTab({ item }: { item: StorageItem }) {
         Download
       </a>
     </div>
+  )
+}
+
+interface FullscreenPreviewProps {
+  open: boolean
+  onClose: () => void
+  doc: AppDocument | null
+  assetUrl: string | undefined
+  fileType: DocumentFileType | null
+  fileName: string
+}
+
+function FullscreenPreview({ open, onClose, doc, assetUrl, fileType, fileName }: FullscreenPreviewProps) {
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] bg-zinc-900/85 backdrop-blur-sm flex flex-col"
+        >
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 text-white">
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium truncate">{fileName}</p>
+              <p className="text-[11px] text-white/60 mt-0.5">
+                {fileType ? fileType.toUpperCase() : 'File'} · Fullscreen preview
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white text-[12px] hover:bg-white/20"
+              aria-label="Exit fullscreen"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              Exit
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-5xl mx-auto">
+              <PreviewContent doc={doc} assetUrl={assetUrl} fileType={fileType} fileName={fileName} />
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

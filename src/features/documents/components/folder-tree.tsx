@@ -115,10 +115,10 @@ function RootRow({ active, onClick }: { active: boolean; onClick: () => void }) 
       onClick={onClick}
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left',
-        active ? 'bg-accent/10 text-accent-fg font-medium' : 'hover:bg-zinc-100/80',
+        active ? 'bg-zinc-200/70 text-zinc-900 font-semibold' : 'hover:bg-zinc-100/80',
       )}
     >
-      <HardDrive className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
+      <HardDrive className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-zinc-700' : 'text-zinc-400')} />
       <span className="truncate">Storage</span>
     </button>
   )
@@ -161,7 +161,7 @@ function TreeRow({ node, depth, expanded, onToggle, selection, onSelect, onFolde
         }}
         className={cn(
           'group flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer',
-          active ? 'bg-accent/10 text-accent-fg font-medium' : 'hover:bg-zinc-100/80',
+          active ? 'bg-zinc-200/70 text-zinc-900 font-semibold' : 'hover:bg-zinc-100/80',
         )}
         style={{ paddingLeft: `${depth * 12}px` }}
       >
@@ -181,9 +181,9 @@ function TreeRow({ node, depth, expanded, onToggle, selection, onSelect, onFolde
           <span className="w-4 h-4 flex-shrink-0" />
         )}
         {isOpen && hasChildren ? (
-          <FolderOpen className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
+          <FolderOpen className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-zinc-700' : 'text-zinc-400')} />
         ) : (
-          <Folder className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
+          <Folder className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-zinc-700' : 'text-zinc-400')} />
         )}
         <span className="truncate flex-1">{node.folder.name}</span>
         {menuItems.length > 0 && (
@@ -227,10 +227,10 @@ function VirtualRow({ icon: Icon, label, count, active, onClick }: VirtualRowPro
       onClick={onClick}
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left',
-        active ? 'bg-accent/10 text-accent-fg font-medium' : 'hover:bg-zinc-100/80',
+        active ? 'bg-zinc-200/70 text-zinc-900 font-semibold' : 'hover:bg-zinc-100/80',
       )}
     >
-      <Icon className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
+      <Icon className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-zinc-700' : 'text-zinc-400')} />
       <span className="truncate flex-1">{label}</span>
       {typeof count === 'number' && count > 0 && (
         <span className="text-[10.5px] text-zinc-400">{count}</span>

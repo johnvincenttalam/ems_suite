@@ -125,19 +125,19 @@ export function MoveStorageFolderModal({ open, folder, onClose }: MoveStorageFol
                 onClick={() => setSelected(row.id)}
                 className={cn(
                   'w-full flex items-center gap-2 px-2 py-2 text-left text-[13px] border-b border-zinc-100 last:border-b-0',
-                  isSelected ? 'bg-accent/10 text-accent-fg font-medium' : 'hover:bg-zinc-50/60',
+                  isSelected ? 'bg-zinc-200/70 text-zinc-900 font-semibold' : 'hover:bg-zinc-50/60',
                 )}
                 style={{ paddingLeft: `${8 + row.depth * 16}px` }}
               >
                 {row.id === null ? (
-                  <HardDrive className={cn('w-3.5 h-3.5 flex-shrink-0', isSelected ? 'text-accent' : 'text-zinc-400')} />
+                  <HardDrive className={cn('w-3.5 h-3.5 flex-shrink-0', isSelected ? 'text-zinc-700' : 'text-zinc-400')} />
                 ) : isSelected ? (
-                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
+                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0 text-zinc-700" />
                 ) : (
                   <Folder className="w-3.5 h-3.5 flex-shrink-0 text-zinc-400" />
                 )}
                 <span className="truncate flex-1">{row.name}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-zinc-700 flex-shrink-0" />}
               </button>
             )
           })}
