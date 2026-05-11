@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -23,10 +22,9 @@ import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { PageHeader } from '@/shared/ui/page-header'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { StatCard } from '@/shared/ui/stat-card'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
@@ -215,7 +213,7 @@ export function SdmsUsersPage() {
               }
             }
             return (
-              <div className="flex justify-end">
+              <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
                 <ActionMenu items={items} />
               </div>
             )
@@ -251,31 +249,6 @@ export function SdmsUsersPage() {
       <PageHeader
         title="SDMS Users"
         subtitle={`${sdmsUsers.length} user${sdmsUsers.length === 1 ? '' : 's'} with SDMS access`}
-        actions={
-          <div className="flex items-center gap-2">
-            <ExportMenu
-              rows={sdmsUsers as unknown as Record<string, unknown>[]}
-              baseFilename="sdms-users"
-              sheetName="SDMS Users"
-              pdfTitle="SDMS Users"
-              pdfSubtitle={`${sdmsUsers.length} user${sdmsUsers.length === 1 ? '' : 's'} with SDMS access`}
-              columns={[
-                { key: 'name', label: 'Name' },
-                { key: 'email', label: 'Email' },
-                { key: 'role', label: 'Role' },
-                { key: 'authoredCount', label: 'Authored' },
-                { key: 'pendingSignatures', label: 'Pending Signatures' },
-                { key: 'status', label: 'Status' },
-                { key: 'createdAt', label: 'Created' },
-              ]}
-            />
-            {canManage && (
-              <Button leftIcon={<UserPlus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
-                Create User
-              </Button>
-            )}
-          </div>
-        }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -306,49 +279,39 @@ export function SdmsUsersPage() {
         />
       </div>
 
-      <div className="mb-4 max-w-sm">
-        <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search SDMS users..." />
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search SDMS users...' }}
+      >
+        <ExportMenu
+          rows={sdmsUsers as unknown as Record<string, unknown>[]}
+          baseFilename="sdms-users"
+          sheetName="SDMS Users"
+          pdfTitle="SDMS Users"
+          pdfSubtitle={`${sdmsUsers.length} user${sdmsUsers.length === 1 ? '' : 's'} with SDMS access`}
+          columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'email', label: 'Email' },
+            { key: 'role', label: 'Role' },
+            { key: 'authoredCount', label: 'Authored' },
+            { key: 'pendingSignatures', label: 'Pending Signatures' },
+            { key: 'status', label: 'Status' },
+            { key: 'createdAt', label: 'Created' },
+          ]}
+        />
+        {canManage && (
+          <Button leftIcon={<UserPlus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
+            Create User
+          </Button>
+        )}
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-zinc-50/50">
-                {table.getHeaderGroups().map((hg) =>
-                  hg.headers.map((h) => (
-                    <th
-                      key={h.id}
-                      className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider"
-                    >
-                      {flexRender(h.column.columnDef.header, h.getContext())}
-                    </th>
-                  )),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => navigate(getModulePath('sdms', `users/${row.original.id}`))}
-                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Users} message="No SDMS users found" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Users}
+        emptyMessage="No SDMS users found"
+        onRowClick={(row) => navigate(getModulePath('sdms', `users/${row.id}`))}
+      />
 
       <p className="text-[12px] text-zinc-400 mt-3">
         {canManage

@@ -4,20 +4,19 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
 import { Archive, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { getModulePath } from '@/config/modules'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
 import { useDocuments } from '@/features/documents'
 import { useUsers } from '@/features/users'
 import type { AppDocument } from '@/features/documents/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { EmptyState } from '@/shared/ui/empty-state'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FileIcon, formatFileSize } from './file-icon'
 import { TrackingBadge } from './document-meta'
@@ -119,10 +118,9 @@ export function ArchiveTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="max-w-sm flex-1">
-          <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search archive..." />
-        </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search archive...' }}
+      >
         <ExportMenu
           rows={archived as unknown as Record<string, unknown>[]}
           baseFilename="archived-documents"
@@ -139,41 +137,15 @@ export function ArchiveTab() {
             { key: 'createdAt', label: 'Created' },
           ]}
         />
-      </div>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-zinc-50/50">
-                {table.getHeaderGroups().map((hg) =>
-                  hg.headers.map((h) => (
-                    <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                      {flexRender(h.column.columnDef.header, h.getContext())}
-                    </th>
-                  )),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => navigate(getModulePath('sdms', `documents/${row.original.id}`))}
-                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Archive}
+        emptyMessage="No archived documents"
+        onRowClick={(row) => navigate(getModulePath('sdms', `documents/${row.id}`))}
+      />
     </div>
   )
 }

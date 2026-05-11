@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Warehouse as WarehouseIcon, Building, MapPin, Download, Plus, Trash2, Eye, Pencil } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,7 +18,8 @@ import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
 
@@ -176,42 +175,30 @@ export function WarehousesPage() {
       <PageHeader
         title="Warehouses & Locations"
         subtitle={`${warehouses.length} locations across the organization`}
-        actions={
-          <>
-            <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(warehouses, 'warehouses', [
-              { key: 'name', label: 'Name' },
-              { key: 'type', label: 'Type' },
-              { key: 'address', label: 'Address' },
-              { key: 'contact', label: 'Contact' },
-              { key: 'capacity', label: 'Capacity' },
-              { key: 'createdAt', label: 'Created' },
-            ])}>Export</Button>
-            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add Location</Button>
-          </>
-        }
       />
 
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center">
-        <div className="max-w-sm flex-1">
-          <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search locations..." />
-        </div>
-        <FilterChips options={filterOptions} value={typeFilter} onChange={(v) => setTypeFilter(v as WarehouseType | 'all')} />
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search locations...' }}
+        filter={<FilterChips options={filterOptions} value={typeFilter} onChange={(v) => setTypeFilter(v as WarehouseType | 'all')} />}
+      >
+        <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(warehouses, 'warehouses', [
+          { key: 'name', label: 'Name' },
+          { key: 'type', label: 'Type' },
+          { key: 'address', label: 'Address' },
+          { key: 'contact', label: 'Contact' },
+          { key: 'capacity', label: 'Capacity' },
+          { key: 'createdAt', label: 'Created' },
+        ])}>Export</Button>
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add Location</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={WarehouseIcon} message="No locations found" description="Try adjusting your search or filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={WarehouseIcon}
+        emptyMessage="No locations found"
+        emptyDescription="Try adjusting your search or filters"
+      />
 
       <Modal
         open={modalMode !== 'closed'}

@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ruler, Download, Plus, Trash2, Pencil } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,7 +18,8 @@ import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 
 const uomSchema = z.object({
@@ -138,37 +137,26 @@ export function UomPage() {
       <PageHeader
         title="Units of Measure"
         subtitle={`${uom.length} UOM definitions`}
-        actions={
-          <>
-            <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(uom, 'uom', [
-              { key: 'name', label: 'Name' },
-              { key: 'symbol', label: 'Symbol' },
-              { key: 'description', label: 'Description' },
-              { key: 'createdAt', label: 'Created' },
-            ])}>Export</Button>
-            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add UOM</Button>
-          </>
-        }
       />
 
-      <div className="mb-4 max-w-sm">
-        <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search units..." />
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search units...' }}
+      >
+        <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(uom, 'uom', [
+          { key: 'name', label: 'Name' },
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'description', label: 'Description' },
+          { key: 'createdAt', label: 'Created' },
+        ])}>Export</Button>
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add UOM</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Ruler} message="No units found" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Ruler}
+        emptyMessage="No units found"
+      />
 
       <Modal
         open={modalMode !== 'closed'}

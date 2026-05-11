@@ -10,7 +10,7 @@ import type { ChecklistAssignment } from '@/features/checklists/types'
 import { exportToCSV } from '@/shared/utils/export-csv'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 
 export function ResultsTab() {
@@ -73,19 +73,16 @@ export function ResultsTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search results..." />
-          </div>
-        </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search results...' }}
+      >
         <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(completed, 'checklist-results', [
           { key: 'completedAt', label: 'Completed' },
           { key: 'templateId', label: 'Template' },
           { key: 'assignedTo', label: 'Assignee' },
           { key: 'completedBy', label: 'Completed By' },
         ])}>Export</Button>
-      </div>
+      </ListToolbar>
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
         <div className="overflow-x-auto">

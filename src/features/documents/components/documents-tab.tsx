@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
   type ColumnDef,
 } from '@tanstack/react-table'
 import { Archive, BookmarkPlus, ChevronRight, FileText, GitBranch, Lock, Pencil, Plus, Upload } from 'lucide-react'
@@ -13,8 +12,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getModulePath } from '@/config/modules'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useDepartments } from '@/features/departments'
@@ -34,10 +31,11 @@ import {
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { SearchInput } from '@/shared/ui/search-input'
 import { Select } from '@/shared/ui/select'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { FileIcon, formatFileSize } from './file-icon'
 import { CategoryBadge, ConfidentialityBadge, PriorityBadge, TrackingBadge } from './document-meta'
 import { UploadModal } from './upload-modal'
@@ -273,121 +271,89 @@ export function DocumentsTab() {
 
   return (
     <div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search documents...' }}
+        className="mb-3"
+      >
+        <ExportMenu
+          rows={documents as unknown as Record<string, unknown>[]}
+          baseFilename="documents"
+          sheetName="Documents"
+          pdfTitle="Documents"
+          columns={[
+            { key: 'trackingNumber', label: 'Tracking #' },
+            { key: 'id', label: 'ID' },
+            { key: 'title', label: 'Title' },
+            { key: 'fileName', label: 'File' },
+            { key: 'version', label: 'Version' },
+            { key: 'category', label: 'Category' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'confidentiality', label: 'Confidentiality' },
+            { key: 'status', label: 'Status' },
+            { key: 'createdBy', label: 'Created By' },
+            { key: 'createdAt', label: 'Created' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => navigate(getModulePath('sdms', 'create-document'))}>Create Document</Button>
+        <Button variant="ghost" leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
+      </ListToolbar>
+
       <div className="mb-4 flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search documents..." />
-          </div>
-          <div className="flex gap-2">
-            <ExportMenu
-              rows={documents as unknown as Record<string, unknown>[]}
-              baseFilename="documents"
-              sheetName="Documents"
-              pdfTitle="Documents"
-              columns={[
-                { key: 'trackingNumber', label: 'Tracking #' },
-                { key: 'id', label: 'ID' },
-                { key: 'title', label: 'Title' },
-                { key: 'fileName', label: 'File' },
-                { key: 'version', label: 'Version' },
-                { key: 'category', label: 'Category' },
-                { key: 'priority', label: 'Priority' },
-                { key: 'confidentiality', label: 'Confidentiality' },
-                { key: 'status', label: 'Status' },
-                { key: 'createdBy', label: 'Created By' },
-                { key: 'createdAt', label: 'Created' },
-              ]}
-            />
-            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => navigate(getModulePath('sdms', 'create-document'))}>Create Document</Button>
-            <Button variant="ghost" leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <FilterChips
-            options={statusFilters.map((f) => ({
-              ...f,
-              count: f.value === 'all' ? documents.length : statusCounts[f.value],
-            }))}
-            value={statusFilter}
-            onChange={handleStatusChange}
+        <FilterChips
+          options={statusFilters.map((f) => ({
+            ...f,
+            count: f.value === 'all' ? documents.length : statusCounts[f.value],
+          }))}
+          value={statusFilter}
+          onChange={handleStatusChange}
+        />
+        <div className="flex gap-2 flex-wrap">
+          <Select
+            className="h-9 text-[13px]"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as DocumentCategory | 'all')}
+            options={[
+              { value: 'all', label: 'All categories' },
+              ...(Object.keys(CATEGORY_LABEL) as DocumentCategory[]).map((k) => ({ value: k, label: CATEGORY_LABEL[k] })),
+            ]}
           />
-          <div className="flex gap-2 flex-wrap">
-            <Select
-              className="h-9 text-[13px]"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as DocumentCategory | 'all')}
-              options={[
-                { value: 'all', label: 'All categories' },
-                ...(Object.keys(CATEGORY_LABEL) as DocumentCategory[]).map((k) => ({ value: k, label: CATEGORY_LABEL[k] })),
-              ]}
-            />
-            <Select
-              className="h-9 text-[13px]"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value as DocumentPriority | 'all')}
-              options={[
-                { value: 'all', label: 'All priorities' },
-                ...(Object.keys(PRIORITY_LABEL) as DocumentPriority[]).map((k) => ({ value: k, label: PRIORITY_LABEL[k] })),
-              ]}
-            />
-            <Select
-              className="h-9 text-[13px]"
-              value={confidentialityFilter}
-              onChange={(e) => setConfidentialityFilter(e.target.value as DocumentConfidentiality | 'all')}
-              options={[
-                { value: 'all', label: 'All confidentiality' },
-                ...(Object.keys(CONFIDENTIALITY_LABEL) as DocumentConfidentiality[]).map((k) => ({ value: k, label: CONFIDENTIALITY_LABEL[k] })),
-              ]}
-            />
-            <Select
-              className="h-9 text-[13px]"
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              options={[
-                { value: 'all', label: 'All departments' },
-                ...departments.map((d) => ({ value: d.id, label: d.name })),
-              ]}
-            />
-          </div>
+          <Select
+            className="h-9 text-[13px]"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as DocumentPriority | 'all')}
+            options={[
+              { value: 'all', label: 'All priorities' },
+              ...(Object.keys(PRIORITY_LABEL) as DocumentPriority[]).map((k) => ({ value: k, label: PRIORITY_LABEL[k] })),
+            ]}
+          />
+          <Select
+            className="h-9 text-[13px]"
+            value={confidentialityFilter}
+            onChange={(e) => setConfidentialityFilter(e.target.value as DocumentConfidentiality | 'all')}
+            options={[
+              { value: 'all', label: 'All confidentiality' },
+              ...(Object.keys(CONFIDENTIALITY_LABEL) as DocumentConfidentiality[]).map((k) => ({ value: k, label: CONFIDENTIALITY_LABEL[k] })),
+            ]}
+          />
+          <Select
+            className="h-9 text-[13px]"
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            options={[
+              { value: 'all', label: 'All departments' },
+              ...departments.map((d) => ({ value: d.id, label: d.name })),
+            ]}
+          />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-zinc-50/50">
-                {table.getHeaderGroups().map((hg) =>
-                  hg.headers.map((h) => (
-                    <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                      {flexRender(h.column.columnDef.header, h.getContext())}
-                    </th>
-                  )),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => navigate(getModulePath('sdms', `documents/${row.original.id}`))}
-                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={FileText} message="No documents match your filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={FileText}
+        emptyMessage="No documents match your filters"
+        onRowClick={(row) => navigate(getModulePath('sdms', `documents/${row.id}`))}
+      />
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} />
       <ClassifyModal document={classifyTarget} onClose={() => setClassifyTarget(null)} />

@@ -17,7 +17,7 @@ import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { MetricRow } from './metric-row'
@@ -121,26 +121,21 @@ export function ReportsTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search reports..." />
-          </div>
-          <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(reports, 'qms-reports', [
-            { key: 'id', label: 'Report' },
-            { key: 'templateId', label: 'Template' },
-            { key: 'periodStart', label: 'Period Start' },
-            { key: 'periodEnd', label: 'Period End' },
-            { key: 'status', label: 'Status' },
-            { key: 'preparedBy', label: 'Prepared By' },
-            { key: 'preparedAt', label: 'Prepared At' },
-          ])}>Export</Button>
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>New Report</Button>
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search reports...' }}
+        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+      >
+        <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(reports, 'qms-reports', [
+          { key: 'id', label: 'Report' },
+          { key: 'templateId', label: 'Template' },
+          { key: 'periodStart', label: 'Period Start' },
+          { key: 'periodEnd', label: 'Period End' },
+          { key: 'status', label: 'Status' },
+          { key: 'preparedBy', label: 'Prepared By' },
+          { key: 'preparedAt', label: 'Prepared At' },
+        ])}>Export</Button>
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>New Report</Button>
+      </ListToolbar>
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
         <div className="overflow-x-auto">
