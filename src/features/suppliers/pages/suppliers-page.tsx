@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Truck, Download, Plus, Mail, Phone, Trash2, Eye, Pencil } from 'lucide-react'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
+import { Truck, Plus, Mail, Phone, Trash2, Eye, Pencil } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,7 +11,6 @@ import { useSuppliers } from '@/features/suppliers'
 import { suppliersApi } from '@/features/suppliers/api/suppliers-api'
 import { useAuthStore } from '@/features/auth'
 import type { Supplier } from '@/features/suppliers/types'
-import { exportToCSV } from '@/shared/utils/export-csv'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
@@ -21,9 +18,13 @@ import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
-import { SearchInput } from '@/shared/ui/search-input'
+import { ExportMenu } from '@/shared/ui/export-menu'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { StatusBadge } from '@/shared/ui/status-badge'
+import { FilterChips } from '@/shared/ui/filter-chips'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
+import { SupplierDetailDrawer } from '@/features/suppliers/components/supplier-detail-drawer'
 
 const supplierSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -36,6 +37,13 @@ const supplierSchema = z.object({
 
 type SupplierForm = z.infer<typeof supplierSchema>
 type ModalMode = 'closed' | 'add' | 'edit'
+type StatusFilter = 'all' | 'active' | 'inactive'
+
+const statusFilters: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+]
 
 const formDefaults: SupplierForm = {
   name: '', contactPerson: '', contactNumber: '', email: '', address: '', status: 'active',
@@ -47,9 +55,11 @@ export function SuppliersPage() {
   const currentUser = useAuthStore((s) => s.user)
 
   const [globalFilter, setGlobalFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [modalMode, setModalMode] = useState<ModalMode>('closed')
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<Supplier | null>(null)
+  const [drawerSupplier, setDrawerSupplier] = useState<Supplier | null>(null)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['suppliers'] })
@@ -107,6 +117,11 @@ export function SuppliersPage() {
     }
   }
 
+  const filtered = useMemo(
+    () => (statusFilter === 'all' ? suppliers : suppliers.filter((s) => s.status === statusFilter)),
+    [suppliers, statusFilter],
+  )
+
   const columns = useMemo<ColumnDef<Supplier>[]>(() => [
     { accessorKey: 'name', header: 'Supplier', cell: ({ row }) => (
       <div className="flex items-center gap-3">
@@ -123,24 +138,26 @@ export function SuppliersPage() {
     { accessorKey: 'contactNumber', header: 'Phone', cell: ({ getValue }) => (
       <span className="inline-flex items-center gap-1.5 text-zinc-600"><Phone className="w-3.5 h-3.5 text-zinc-400" />{getValue() as string}</span>
     )},
-    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
-    { accessorKey: 'createdAt', header: 'Created', cell: ({ getValue }) => format(new Date(getValue() as string), 'MMM dd, yyyy') },
+    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} size="sm" /> },
+    { accessorKey: 'createdAt', header: 'Created', cell: ({ getValue }) => (
+      <span className="whitespace-nowrap">{format(new Date(getValue() as string), 'MMM dd, yyyy')}</span>
+    )},
     {
       id: 'actions',
       header: '',
       cell: ({ row }) => {
         const items: ActionMenuItem[] = [
-          { key: 'view', label: 'View', icon: Eye, onClick: () => toast.info('View details coming soon') },
+          { key: 'view', label: 'View', icon: Eye, onClick: () => setDrawerSupplier(row.original) },
           { key: 'edit', label: 'Edit', icon: Pencil, onClick: () => openEdit(row.original) },
           { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteCandidate(row.original) },
         ]
-        return <div className="flex justify-end"><ActionMenu items={items} /></div>
+        return <div className="flex justify-end" onClick={(e) => e.stopPropagation()}><ActionMenu items={items} /></div>
       },
     },
   ], [openEdit])
 
   const table = useReactTable({
-    data: suppliers, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
+    data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
@@ -158,41 +175,48 @@ export function SuppliersPage() {
     <div>
       <PageHeader
         title="Suppliers"
-        subtitle={`${suppliers.length} supplier records`}
-        actions={
-          <>
-            <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => exportToCSV(suppliers, 'suppliers', [
-              { key: 'name', label: 'Name' },
-              { key: 'contactPerson', label: 'Contact Person' },
-              { key: 'contactNumber', label: 'Phone' },
-              { key: 'email', label: 'Email' },
-              { key: 'address', label: 'Address' },
-              { key: 'status', label: 'Status' },
-              { key: 'createdAt', label: 'Created' },
-            ])}>Export</Button>
-            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add Supplier</Button>
-          </>
-        }
+        subtitle={`${suppliers.length} supplier record${suppliers.length === 1 ? '' : 's'}`}
       />
 
-      <div className="mb-4 max-w-sm">
-        <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search suppliers..." />
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search suppliers...' }}
+        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+      >
+        <ExportMenu
+          rows={suppliers as unknown as Record<string, unknown>[]}
+          baseFilename="suppliers"
+          sheetName="Suppliers"
+          pdfTitle="Suppliers"
+          pdfSubtitle={`${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}`}
+          columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'contactPerson', label: 'Contact Person' },
+            { key: 'contactNumber', label: 'Phone' },
+            { key: 'email', label: 'Email' },
+            { key: 'address', label: 'Address' },
+            { key: 'status', label: 'Status' },
+            { key: 'createdAt', label: 'Created' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAdd}>Add Supplier</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => <tr key={row.id} className="border-b border-zinc-100/60 hover:bg-zinc-50/50">{row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={Truck} message="No suppliers found" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={Truck}
+        emptyMessage="No suppliers found"
+        onRowClick={(s) => setDrawerSupplier(s)}
+      />
+
+      <SupplierDetailDrawer
+        supplier={drawerSupplier}
+        onClose={() => setDrawerSupplier(null)}
+        onEdit={(s) => {
+          setDrawerSupplier(null)
+          openEdit(s)
+        }}
+      />
 
       <Modal
         open={modalMode !== 'closed'}

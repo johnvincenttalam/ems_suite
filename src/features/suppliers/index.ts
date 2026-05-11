@@ -1,4 +1,5 @@
 export { SuppliersPage } from './pages/suppliers-page'
+export { SupplierDetailDrawer } from './components/supplier-detail-drawer'
 export { useSuppliers } from './hooks/use-suppliers'
 export { suppliersApi } from './api/suppliers-api'
 export { mockSuppliers } from './data/mock-suppliers'
