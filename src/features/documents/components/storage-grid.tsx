@@ -1,10 +1,12 @@
-import { Folder, FileText, FileSpreadsheet, FileImage, File, Star, Pencil, FolderInput, Trash2 } from 'lucide-react'
+import { Folder, FileText, FileSpreadsheet, FileImage, File, Star, Pencil, FolderInput, Trash2, Eye, RotateCcw } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import type { LucideIcon } from 'lucide-react'
 import type { StorageFolder, StorageItem, DocumentFileType, AppDocument } from '@/features/documents/types'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { cn } from '@/shared/utils/cn'
 import type { FolderAction } from '@/features/documents/components/folder-tree'
+
+export type ItemAction = 'view' | 'star' | 'move' | 'trash' | 'restore'
 
 interface StorageGridProps {
   folders: StorageFolder[]
@@ -19,6 +21,8 @@ interface StorageGridProps {
   hideFolders?: boolean
   /** When set, renders a kebab on each folder card with Rename / Move / Delete. */
   onFolderAction?: (folder: StorageFolder, action: FolderAction) => void
+  /** When set, renders a kebab on each file card. */
+  onItemAction?: (item: StorageItem, action: ItemAction) => void
 }
 
 const FILE_ICON: Record<DocumentFileType, { icon: LucideIcon; bg: string; fg: string }> = {
@@ -38,7 +42,7 @@ function resolveFileType(item: StorageItem, documentMap: Record<string, AppDocum
   return null
 }
 
-export function StorageGrid({ folders, items, documentMap, onFolderClick, onItemClick, hideFolders, onFolderAction }: StorageGridProps) {
+export function StorageGrid({ folders, items, documentMap, onFolderClick, onItemClick, hideFolders, onFolderAction, onItemAction }: StorageGridProps) {
   const showFolders = !hideFolders && folders.length > 0
 
   return (
@@ -70,7 +74,9 @@ export function StorageGrid({ folders, items, documentMap, onFolderClick, onItem
                 key={item.id}
                 item={item}
                 fileType={resolveFileType(item, documentMap)}
+                hasDocument={!!(item.documentId && documentMap[item.documentId])}
                 onClick={() => onItemClick(item)}
+                onItemAction={onItemAction}
               />
             ))}
           </div>
@@ -108,7 +114,7 @@ function FolderCard({
           onClick()
         }
       }}
-      className="group flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-zinc-200/60 hover:border-zinc-300 hover:shadow-sm transition text-left cursor-pointer"
+      className="group flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-zinc-100/80 transition-colors text-left cursor-pointer"
     >
       <div className="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center flex-shrink-0">
         <Folder className="w-4 h-4 text-amber-500" />
@@ -126,28 +132,74 @@ function FolderCard({
 function ItemCard({
   item,
   fileType,
+  hasDocument,
   onClick,
+  onItemAction,
 }: {
   item: StorageItem
   fileType: DocumentFileType | null
+  hasDocument: boolean
   onClick: () => void
+  onItemAction?: (item: StorageItem, action: ItemAction) => void
 }) {
   const cfg = fileType ? FILE_ICON[fileType] : { icon: File, bg: 'bg-zinc-100', fg: 'text-zinc-400' }
   const Icon = cfg.icon
+  const isTrashed = !!item.deletedAt
+
+  const menuItems: ActionMenuItem[] = onItemAction
+    ? isTrashed
+      ? [
+          { key: 'restore', label: 'Restore', icon: RotateCcw, onClick: () => onItemAction(item, 'restore') },
+        ]
+      : [
+          ...(hasDocument
+            ? [{ key: 'view', label: 'View document', icon: Eye, onClick: () => onItemAction(item, 'view') }]
+            : []),
+          {
+            key: 'star',
+            label: item.starred ? 'Unstar' : 'Star',
+            icon: Star,
+            onClick: () => onItemAction(item, 'star'),
+          },
+          { key: 'move', label: 'Move to folder…', icon: FolderInput, onClick: () => onItemAction(item, 'move') },
+          {
+            key: 'trash',
+            label: 'Move to Trash',
+            icon: Trash2,
+            danger: true,
+            onClick: () => onItemAction(item, 'trash'),
+          },
+        ]
+    : []
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group flex flex-col rounded-lg bg-white border border-zinc-200/60 hover:border-zinc-300 hover:shadow-sm transition overflow-hidden text-left"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="group relative flex flex-col rounded-lg hover:bg-zinc-100/80 transition-colors overflow-hidden text-left cursor-pointer"
     >
-      <div className={cn('aspect-[4/3] flex items-center justify-center relative', cfg.bg)}>
+      <div className={cn('aspect-[4/3] flex items-center justify-center relative rounded-lg', cfg.bg)}>
         <Icon className={cn('w-10 h-10', cfg.fg)} />
         {item.starred && (
-          <Star className="absolute top-2 right-2 w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <Star className="absolute top-2 left-2 w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+        )}
+        {menuItems.length > 0 && (
+          <span
+            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ActionMenu items={menuItems} triggerLabel={`${item.title} actions`} />
+          </span>
         )}
       </div>
-      <div className="p-2.5 min-w-0">
+      <div className="px-2 py-2 min-w-0">
         <p className="text-[13px] font-medium text-zinc-800 truncate">{item.title}</p>
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="text-[10.5px] text-zinc-400 truncate">
@@ -161,6 +213,6 @@ function ItemCard({
           )}
         </div>
       </div>
-    </button>
+    </div>
   )
 }

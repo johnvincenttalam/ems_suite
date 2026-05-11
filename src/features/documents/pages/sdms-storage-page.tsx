@@ -156,6 +156,32 @@ export function SdmsStoragePage() {
   const emptyTrash = useEmptyStorageTrash()
   const toggleStar = useToggleStorageStar()
 
+  function handleItemAction(item: StorageItem, action: 'view' | 'star' | 'move' | 'trash' | 'restore') {
+    switch (action) {
+      case 'view':
+        if (item.documentId) navigate(getModulePath('sdms', `documents/${item.documentId}`))
+        return
+      case 'star':
+        toggleStar.mutate(item.id)
+        return
+      case 'move':
+        setMoveItemTarget(item)
+        return
+      case 'trash':
+        setTrashTarget(item)
+        return
+      case 'restore':
+        restoreItem.mutate(item.id, {
+          onSuccess: () => toast.success('Restored from trash'),
+          onError: (err) =>
+            toast.error('Restore failed', {
+              description: err instanceof Error ? err.message : 'Unknown error',
+            }),
+        })
+        return
+    }
+  }
+
   function handleCreateFolder(e: React.FormEvent) {
     e.preventDefault()
     if (!newFolderName.trim()) return
@@ -437,6 +463,7 @@ export function SdmsStoragePage() {
                 onItemClick={handleItemClick}
                 hideFolders={selection.view !== 'folder'}
                 onFolderAction={handleFolderAction}
+                onItemAction={handleItemAction}
               />
             )
           ) : childFolders.length === 0 && items.length === 0 ? (
