@@ -319,6 +319,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Requests', path: 'requests', icon: ShoppingCart, feature: 'procurement' },
           { label: 'Approvals', path: 'approvals', icon: ListChecks, feature: 'procurementApprovals' },
+          { label: 'Purchase Orders', path: 'purchase-orders', icon: ClipboardCheck, feature: 'procurementPurchaseOrders' },
         ],
       },
       {

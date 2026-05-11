@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { ChevronRight, ClipboardList, Plus } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { DataTablePagination } from '@/shared/ui/data-table-pagination'
-import { DataTableEmpty } from '@/shared/ui/data-table-empty'
 import { useRequests } from '@/features/procurement'
 import { useDepartments } from '@/features/departments'
 import { useSuppliers } from '@/features/suppliers'
@@ -18,9 +16,10 @@ import {
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { SearchInput } from '@/shared/ui/search-input'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
+import { ListToolbar } from '@/shared/ui/list-toolbar'
+import { DataTable } from '@/shared/ui/data-table'
 import { formatCurrency } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
 import { NewRequestModal } from './new-request-modal'
@@ -30,7 +29,8 @@ const statusFilters: { value: RequestStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'rejected', label: 'Declined' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 const priorityChip: Record<RequestPriority, string> = {
@@ -101,7 +101,10 @@ export function RequestsTab() {
       const idx = r.currentApproverIndex ?? 0
       return <span className="font-mono text-[11px] text-zinc-500">{Math.min(idx, r.approvers.length)}/{r.approvers.length}</span>
     }},
-    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} size="sm" /> },
+    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => {
+      const s = getValue() as string
+      return <StatusBadge status={s} label={s === 'rejected' ? 'Declined' : undefined} size="sm" />
+    }},
     { accessorKey: 'createdAt', header: 'Created', cell: ({ getValue }) => <span className="whitespace-nowrap">{format(new Date(getValue() as string), 'MMM dd, yyyy')}</span> },
     { id: 'chev', header: '', cell: () => <ChevronRight className="w-4 h-4 text-zinc-300" /> },
   ], [userMap, deptMap, supplierMap])
@@ -115,57 +118,37 @@ export function RequestsTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-          <div className="max-w-sm flex-1">
-            <SearchInput value={globalFilter} onChange={setGlobalFilter} placeholder="Search requests..." />
-          </div>
-          <FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />
-        </div>
-        <div className="flex gap-2">
-          <ExportMenu
-            rows={requests as unknown as Record<string, unknown>[]}
-            baseFilename="procurement-requests"
-            sheetName="Requests"
-            pdfTitle="Procurement Requests"
-            pdfSubtitle={`${requests.length} request${requests.length === 1 ? '' : 's'}`}
-            columns={[
-              { key: 'id', label: 'Request' },
-              { key: 'requesterId', label: 'Requester' },
-              { key: 'departmentId', label: 'Department' },
-              { key: 'supplierId', label: 'Supplier' },
-              { key: 'priority', label: 'Priority' },
-              { key: 'totalAmount', label: 'Total' },
-              { key: 'status', label: 'Status' },
-              { key: 'createdAt', label: 'Created' },
-            ]}
-          />
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>New Request</Button>
-        </div>
-      </div>
+      <ListToolbar
+        search={{ value: globalFilter, onChange: setGlobalFilter, placeholder: 'Search requests...' }}
+        filter={<FilterChips options={statusFilters} value={statusFilter} onChange={setStatusFilter} />}
+      >
+        <ExportMenu
+          rows={requests as unknown as Record<string, unknown>[]}
+          baseFilename="procurement-requests"
+          sheetName="Requests"
+          pdfTitle="Procurement Requests"
+          pdfSubtitle={`${requests.length} request${requests.length === 1 ? '' : 's'}`}
+          columns={[
+            { key: 'id', label: 'Request' },
+            { key: 'requesterId', label: 'Requester' },
+            { key: 'departmentId', label: 'Department' },
+            { key: 'supplierId', label: 'Supplier' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'totalAmount', label: 'Total' },
+            { key: 'status', label: 'Status' },
+            { key: 'createdAt', label: 'Created' },
+          ]}
+        />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowNew(true)}>New Request</Button>
+      </ListToolbar>
 
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="bg-zinc-50/50">{table.getHeaderGroups().map(hg => hg.headers.map(h => <th key={h.id} className="px-4 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">{flexRender(h.column.columnDef.header, h.getContext())}</th>))}</tr></thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => setDrawerReq(row.original)}
-                  className="border-b border-zinc-100/60 hover:bg-zinc-50/50 cursor-pointer"
-                >
-                  {row.getVisibleCells().map(cell => <td key={cell.id} className="px-4 py-3 text-sm text-zinc-600">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
-                </tr>
-              ))}
-              {table.getRowModel().rows.length === 0 && (
-                <DataTableEmpty colSpan={columns.length} icon={ClipboardList} message="No requests match your filters" />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <DataTablePagination table={table} />
-      </div>
+      <DataTable
+        table={table}
+        columns={columns}
+        emptyIcon={ClipboardList}
+        emptyMessage="No requests match your filters"
+        onRowClick={(req) => setDrawerReq(req)}
+      />
 
       <NewRequestModal open={showNew} onClose={() => setShowNew(false)} />
       <RequestDetailDrawer request={drawerReq} onClose={closeDrawer} />

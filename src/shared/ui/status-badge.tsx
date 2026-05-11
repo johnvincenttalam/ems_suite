@@ -21,6 +21,8 @@ const statusMap: Record<string, StatusConfig> = {
   ongoing: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Loader2 },
   paid: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Check },
   shipped: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: ArrowRight },
+  ordered: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: ArrowRight },
+  partially_received: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Loader2 },
   completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Check },
   in_progress: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: Loader2 },
   draft: { bg: 'bg-zinc-50', text: 'text-zinc-600', border: 'border-zinc-200', icon: Circle },

@@ -177,6 +177,87 @@ describe('procurementApi.approve — chain mode', () => {
   })
 })
 
+describe('procurementApi.updateMeta', () => {
+  it('updates notes and needed-by on a pending request', async () => {
+    const req = await chainFixture()
+    const result = await procurementApi.updateMeta(
+      req.id,
+      { notes: 'Updated notes', neededBy: '2026-12-31' },
+      req.requesterId,
+    )
+    expect(result.notes).toBe('Updated notes')
+    expect(result.neededBy).toBe('2026-12-31')
+  })
+
+  it('clears neededBy when patched with empty string', async () => {
+    const req = await chainFixture()
+    await procurementApi.updateMeta(req.id, { neededBy: '2026-12-31' }, req.requesterId)
+    const result = await procurementApi.updateMeta(req.id, { neededBy: '' }, req.requesterId)
+    expect(result.neededBy).toBeUndefined()
+  })
+
+  it('throws when caller is not the requester', async () => {
+    const req = await chainFixture()
+    await expect(
+      procurementApi.updateMeta(req.id, { notes: 'no' }, 'U999'),
+    ).rejects.toThrow(/only the requester/i)
+  })
+
+  it('throws when request is not pending', async () => {
+    const req = await chainFixture(['U002'])
+    await procurementApi.approve(req.id, 'U002')
+    await expect(
+      procurementApi.updateMeta(req.id, { notes: 'too late' }, req.requesterId),
+    ).rejects.toThrow(/not pending/i)
+  })
+
+  it('does NOT record an audit entry when nothing actually changed', async () => {
+    const req = await chainFixture()
+    await procurementApi.updateMeta(req.id, { notes: 'initial' }, req.requesterId)
+    const beforeLen = mockAuditLog.length
+    await procurementApi.updateMeta(req.id, { notes: 'initial' }, req.requesterId)
+    expect(mockAuditLog.length).toBe(beforeLen)
+  })
+})
+
+describe('procurementApi.cancel', () => {
+  it('flips status to cancelled and stamps reason/by/at', async () => {
+    const req = await chainFixture()
+    const result = await procurementApi.cancel(req.id, 'requirements changed', req.requesterId)
+    expect(result.status).toBe('cancelled')
+    expect(result.cancelReason).toBe('requirements changed')
+    expect(result.cancelledBy).toBe(req.requesterId)
+    expect(result.cancelledAt).toBeTruthy()
+  })
+
+  it('throws when caller is not the requester (and not admin)', async () => {
+    const req = await chainFixture()
+    await expect(procurementApi.cancel(req.id, 'no', 'U999')).rejects.toThrow(/only the requester/i)
+  })
+
+  it('allows an admin override to cancel a request not their own', async () => {
+    const req = await chainFixture()
+    const result = await procurementApi.cancel(req.id, 'admin override', 'U001', { actorIsAdmin: true })
+    expect(result.status).toBe('cancelled')
+    expect(result.cancelledBy).toBe('U001')
+  })
+
+  it('throws when the request is not pending', async () => {
+    const req = await chainFixture(['U002'])
+    await procurementApi.approve(req.id, 'U002')
+    await expect(procurementApi.cancel(req.id, 'too late', req.requesterId)).rejects.toThrow(/not pending/i)
+  })
+
+  it('records an audit entry with the reason in detail', async () => {
+    const req = await chainFixture()
+    const beforeLen = mockAuditLog.length
+    await procurementApi.cancel(req.id, 'changed mind', req.requesterId)
+    expect(mockAuditLog.length).toBe(beforeLen + 1)
+    expect(mockAuditLog[0].detail).toContain('Cancelled')
+    expect(mockAuditLog[0].detail).toContain('changed mind')
+  })
+})
+
 describe('procurementApi.reject', () => {
   it('flips status to rejected and stamps reason/by/at', async () => {
     const req = await chainFixture()

@@ -203,6 +203,77 @@ export const procurementApi = {
   },
 
   /**
+   * Edit non-binding metadata on a pending request — only `notes` and
+   * `neededBy` can be changed. Line items, supplier, department, priority,
+   * and the approver chain are immutable once submitted: changing them would
+   * break the audit trail since approvers may have already seen prior values.
+   * Cancel + resubmit for any harder change.
+   */
+  updateMeta: async (
+    requestId: string,
+    patch: { notes?: string; neededBy?: string },
+    editorId: string,
+  ): Promise<ProcurementRequest> => {
+    await delay(120)
+    const req = findOrThrow(requestId)
+    if (req.status !== 'pending') throw new Error(`Request ${requestId} is not pending`)
+    if (req.requesterId !== editorId) throw new Error('Only the requester can edit this request')
+
+    const changes: string[] = []
+    if (patch.notes !== undefined && patch.notes !== req.notes) {
+      req.notes = patch.notes
+      changes.push('notes')
+    }
+    if (patch.neededBy !== undefined && patch.neededBy !== req.neededBy) {
+      req.neededBy = patch.neededBy || undefined
+      changes.push('needed-by')
+    }
+    if (changes.length > 0) {
+      recordAudit({
+        userId: editorId,
+        action: 'update',
+        module: 'Procurement',
+        detail: `Updated ${req.id} (${changes.join(', ')})`,
+      })
+    }
+    return req
+  },
+
+  /**
+   * Withdraw a pending request. Only the original requester (or an admin)
+   * should call this from the UI — the API enforces that the request is
+   * still pending and that the caller matches the requester unless
+   * `actorIsAdmin` is true.
+   */
+  cancel: async (
+    requestId: string,
+    reason: string,
+    cancellerId: string,
+    options?: { actorIsAdmin?: boolean },
+  ): Promise<ProcurementRequest> => {
+    await delay(150)
+    const req = findOrThrow(requestId)
+    if (req.status !== 'pending') throw new Error(`Request ${requestId} is not pending`)
+    if (!options?.actorIsAdmin && req.requesterId !== cancellerId) {
+      throw new Error('Only the requester can cancel this request')
+    }
+
+    req.status = 'cancelled'
+    req.cancelledBy = cancellerId
+    req.cancelledAt = new Date().toISOString()
+    req.cancelReason = reason
+
+    recordAudit({
+      userId: cancellerId,
+      action: 'update',
+      module: 'Procurement',
+      detail: `Cancelled ${req.id} — ${reason}`,
+    })
+
+    return req
+  },
+
+  /**
    * Reject a pending request with a reason — works in both chain and legacy
    * modes. The currentApproverIndex is preserved so the audit trail shows
    * where the chain stopped.

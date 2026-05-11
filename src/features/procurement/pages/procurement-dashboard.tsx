@@ -34,6 +34,7 @@ import {
 } from 'date-fns'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useRequests } from '@/features/procurement'
+import { usePurchaseOrders } from '@/features/purchase-orders'
 import { useSuppliers } from '@/features/suppliers'
 import { useAuditLog } from '@/features/audit-log'
 import { useNotifications } from '@/shared/notifications'
@@ -59,12 +60,14 @@ const STATUS_COLORS: Record<RequestStatus, string> = {
   pending: '#f59e0b',
   approved: '#10b981',
   rejected: '#ef4444',
+  cancelled: '#a1a1aa',
 }
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
-  rejected: 'Rejected',
+  rejected: 'Declined',
+  cancelled: 'Cancelled',
 }
 
 const tooltipStyle = {
@@ -83,6 +86,7 @@ const PROC_KINDS = new Set([
 export function ProcurementDashboard() {
   const { user } = useAuthStore()
   const { data: requests = [], isLoading } = useRequests()
+  const { data: purchaseOrders = [] } = usePurchaseOrders()
   const { data: suppliers = [] } = useSuppliers()
   const { data: auditEntries = [] } = useAuditLog()
   const { notifications, unreadCount } = useNotifications()
@@ -110,8 +114,11 @@ export function ProcurementDashboard() {
       })
       .reduce((s, r) => s + r.totalAmount, 0)
     const pendingValue = pending.reduce((s, r) => s + r.totalAmount, 0)
-    return { total, pending: pending.length, approved: approved.length, overdue, myApprovals, monthSpend, pendingValue }
-  }, [requests, user])
+    const activePOs = purchaseOrders.filter(
+      (p) => p.status === 'ordered' || p.status === 'partially_received',
+    ).length
+    return { total, pending: pending.length, approved: approved.length, overdue, myApprovals, monthSpend, pendingValue, activePOs }
+  }, [requests, purchaseOrders, user])
 
   const statusBreakdown = useMemo(() => {
     const counts = new Map<RequestStatus, number>()
@@ -237,7 +244,7 @@ export function ProcurementDashboard() {
         />
       </motion.div>
 
-      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Pending Requests"
           value={stats.pending}
@@ -257,13 +264,22 @@ export function ProcurementDashboard() {
           index={1}
         />
         <StatCard
+          title="Active POs"
+          value={stats.activePOs}
+          subtitle={stats.activePOs > 0 ? 'Ordered / partial' : 'No open POs'}
+          icon={ShoppingCart}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
+          index={2}
+        />
+        <StatCard
           title="Approved Spend"
           value={formatCompactCurrency(stats.monthSpend)}
           subtitle="This month"
           icon={CheckCircle2}
           iconBg="bg-emerald-50"
           iconColor="text-emerald-600"
-          index={2}
+          index={3}
         />
         <StatCard
           title="Pending Value"
@@ -272,7 +288,7 @@ export function ProcurementDashboard() {
           icon={ShoppingCart}
           iconBg="bg-blue-50"
           iconColor="text-blue-600"
-          index={3}
+          index={4}
         />
       </motion.div>
 

@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, ClipboardList, GitBranch, ListChecks, Shield, X } from 'lucide-react'
+import { Ban, CheckCircle2, ClipboardCheck, ClipboardList, GitBranch, ListChecks, Pencil, Shield, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
+import { toast } from 'sonner'
 import { useUsers } from '@/features/users'
 import { useDepartments } from '@/features/departments'
 import { useSuppliers } from '@/features/suppliers'
 import { useInventoryItems } from '@/features/inventory'
 import { useUom } from '@/features/uom'
 import { PRIORITY_LABEL, type RequestPriority, type RequestWithItems } from '@/features/procurement/types'
+import { useCancelRequest, useUpdateRequestMeta } from '@/features/procurement'
+import { useAuthStore } from '@/features/auth'
+import { CreatePOModal, usePurchaseOrdersForRequisition } from '@/features/purchase-orders'
 import { Avatar } from '@/shared/ui/avatar'
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
+import { Modal } from '@/shared/ui/modal'
+import { Textarea } from '@/shared/ui/textarea'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { Tabs } from '@/shared/ui/tabs'
 import { formatCurrency } from '@/shared/utils/format'
@@ -33,7 +42,28 @@ export function RequestDetailDrawer({ request, onClose }: RequestDetailDrawerPro
   const { data: suppliers = [] } = useSuppliers()
   const { data: items = [] } = useInventoryItems()
   const { data: uom = [] } = useUom()
+  const { data: relatedPos = [] } = usePurchaseOrdersForRequisition(request?.id)
+  const currentUser = useAuthStore((s) => s.user)
+  const cancelMutation = useCancelRequest()
+  const updateMetaMutation = useUpdateRequestMeta()
   const [tab, setTab] = useState<DrawerTab>('overview')
+  const [showCreatePo, setShowCreatePo] = useState(false)
+  const [showCancel, setShowCancel] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [showEdit, setShowEdit] = useState(false)
+  const [editNotes, setEditNotes] = useState('')
+  const [editNeededBy, setEditNeededBy] = useState('')
+
+  useEffect(() => {
+    if (!request) {
+      setShowCancel(false)
+      setCancelReason('')
+      setShowEdit(false)
+    } else {
+      setEditNotes(request.notes ?? '')
+      setEditNeededBy(request.neededBy ?? '')
+    }
+  }, [request?.id])
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
@@ -89,7 +119,7 @@ export function RequestDetailDrawer({ request, onClose }: RequestDetailDrawerPro
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-mono text-[11px] text-zinc-400">{request.id}</span>
-                  <StatusBadge status={request.status} size="sm" />
+                  <StatusBadge status={request.status} label={request.status === 'rejected' ? 'Declined' : undefined} size="sm" />
                   {request.priority && (
                     <span className={cn(
                       'inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium',
@@ -133,17 +163,74 @@ export function RequestDetailDrawer({ request, onClose }: RequestDetailDrawerPro
                     {request.approvedAt && <Field label="Approved">{format(parseISO(request.approvedAt), 'MMM dd, yyyy HH:mm')}</Field>}
                   </div>
 
+                  {request.status === 'pending' && currentUser?.id === request.requesterId && (
+                    <Section title="Manage Request">
+                      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md bg-zinc-50/80 border border-zinc-200/60">
+                        <p className="text-[13px] text-zinc-600">Edit notes &amp; need-by, or withdraw the request.</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button size="sm" variant="outline" leftIcon={<Pencil className="w-3.5 h-3.5" />} onClick={() => setShowEdit(true)}>
+                            Edit Notes
+                          </Button>
+                          <Button size="sm" variant="outline" leftIcon={<Ban className="w-3.5 h-3.5" />} onClick={() => setShowCancel(true)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </Section>
+                  )}
+
+                  {request.status === 'approved' && (
+                    <Section title="Purchase Order">
+                      {relatedPos.length === 0 ? (
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md bg-blue-50/50 border border-blue-200/60">
+                          <p className="text-[13px] text-blue-900">No PO yet — ready to issue one to the supplier.</p>
+                          <Button size="sm" leftIcon={<ClipboardCheck className="w-3.5 h-3.5" />} onClick={() => setShowCreatePo(true)}>
+                            Issue PO
+                          </Button>
+                        </div>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {relatedPos.map((po) => (
+                            <li key={po.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-zinc-50/60 border border-zinc-200/60">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono text-[12px] text-zinc-700">{po.id}</span>
+                                <StatusBadge status={po.status} size="sm" />
+                              </div>
+                              <Link to={`../purchase-orders?po=${po.id}`} className="text-[12px] text-zinc-500 hover:text-zinc-900">
+                                Open
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </Section>
+                  )}
+
                   {request.notes && (
                     <Section title="Notes">
                       <p className="text-[13px] text-zinc-700">{request.notes}</p>
                     </Section>
                   )}
 
+                  {request.status === 'cancelled' && (
+                    <Section title="Cancelled">
+                      <div className="px-3 py-2 rounded-md bg-zinc-100/80 border border-zinc-200/60">
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                          Cancelled by {userMap[request.cancelledBy ?? '']?.name ?? '—'}
+                          {request.cancelledAt && ` · ${format(parseISO(request.cancelledAt), 'MMM dd, HH:mm')}`}
+                        </p>
+                        {request.cancelReason && (
+                          <p className="text-[13px] text-zinc-700 mt-0.5">{request.cancelReason}</p>
+                        )}
+                      </div>
+                    </Section>
+                  )}
+
                   {request.rejectedReason && (
-                    <Section title="Rejection">
+                    <Section title="Declined">
                       <div className="px-3 py-2 rounded-md bg-red-50 border border-red-200">
                         <p className="text-[11px] uppercase tracking-wider text-red-600 font-semibold">
-                          Rejected by {userMap[request.rejectedBy ?? '']?.name ?? '—'}
+                          Declined by {userMap[request.rejectedBy ?? '']?.name ?? '—'}
                           {request.rejectedAt && ` · ${format(parseISO(request.rejectedAt), 'MMM dd, HH:mm')}`}
                         </p>
                         <p className="text-[13px] text-red-700 mt-0.5">{request.rejectedReason}</p>
@@ -183,7 +270,7 @@ export function RequestDetailDrawer({ request, onClose }: RequestDetailDrawerPro
                                 <p className="text-[11px] text-zinc-400">
                                   {approval
                                     ? `Approved ${format(parseISO(approval.approvedAt), 'MMM dd, HH:mm')}`
-                                    : isRejectedHere ? 'Rejected here'
+                                    : isRejectedHere ? 'Declined here'
                                     : isCurrent ? 'Pending — your turn'
                                     : 'Waiting'}
                                 </p>
@@ -249,6 +336,111 @@ export function RequestDetailDrawer({ request, onClose }: RequestDetailDrawerPro
               )}
             </div>
           </motion.aside>
+          <CreatePOModal open={showCreatePo} onClose={() => setShowCreatePo(false)} requisitionId={request.id} />
+          <Modal
+            open={showEdit}
+            onClose={() => setShowEdit(false)}
+            title={`Edit ${request.id}`}
+            size="md"
+            footer={
+              <>
+                <Button type="button" variant="secondary" disabled={updateMetaMutation.isPending} onClick={() => setShowEdit(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  loading={updateMetaMutation.isPending}
+                  onClick={() => {
+                    if (!currentUser) return
+                    updateMetaMutation.mutate(
+                      {
+                        requestId: request.id,
+                        patch: { notes: editNotes, neededBy: editNeededBy },
+                        editorId: currentUser.id,
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success(`${request.id} updated`)
+                          setShowEdit(false)
+                        },
+                        onError: (err) => toast.error('Update failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+                      },
+                    )
+                  }}
+                >
+                  Save Changes
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <p className="text-[13px] text-zinc-500">
+                Only notes and the need-by date can be changed. Line items, supplier, department, and priority are locked once submitted — cancel and resubmit if you need to change those.
+              </p>
+              <Textarea
+                label="Notes"
+                rows={3}
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="What's this request for?"
+              />
+              <Input
+                label="Needed By"
+                type="date"
+                value={editNeededBy}
+                onChange={(e) => setEditNeededBy(e.target.value)}
+              />
+            </div>
+          </Modal>
+          <Modal
+            open={showCancel}
+            onClose={() => { setShowCancel(false); setCancelReason('') }}
+            title={`Cancel ${request.id}`}
+            size="md"
+            footer={
+              <>
+                <Button type="button" variant="secondary" disabled={cancelMutation.isPending} onClick={() => { setShowCancel(false); setCancelReason('') }}>
+                  Keep Request
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  loading={cancelMutation.isPending}
+                  disabled={cancelReason.trim().length < 2}
+                  onClick={() => {
+                    if (!currentUser) return
+                    cancelMutation.mutate(
+                      { requestId: request.id, reason: cancelReason.trim(), cancellerId: currentUser.id },
+                      {
+                        onSuccess: () => {
+                          toast.success(`${request.id} cancelled`)
+                          setShowCancel(false)
+                          setCancelReason('')
+                          onClose()
+                        },
+                        onError: (err) => toast.error('Cancel failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+                      },
+                    )
+                  }}
+                >
+                  Confirm Cancel
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <p className="text-[13px] text-zinc-500">
+                Cancelling closes this request — approvers won't see it in their queue. You can submit a new request anytime.
+              </p>
+              <Textarea
+                label="Reason *"
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. ordered through a different supplier, requirements changed…"
+              />
+            </div>
+          </Modal>
         </div>
       )}
     </AnimatePresence>

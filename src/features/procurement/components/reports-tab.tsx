@@ -59,7 +59,8 @@ function buildBreakdown<K extends string>(
 const STATUS_LABEL: Record<RequestStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
-  rejected: 'Rejected',
+  rejected: 'Declined',
+  cancelled: 'Cancelled',
 }
 
 export function ReportsTab() {
@@ -136,7 +137,7 @@ export function ReportsTab() {
     { key: 'chain', label: 'Approval' },
     { key: 'createdAt', label: 'Created' },
     { key: 'approvedAt', label: 'Approved' },
-    { key: 'rejectedReason', label: 'Rejection Reason' },
+    { key: 'rejectedReason', label: 'Decline Reason' },
   ]
 
   if (isLoading) {
@@ -164,7 +165,7 @@ export function ReportsTab() {
         <StatCard title="Total Requests" value={stats.total} icon={ShoppingCart} iconBg="bg-zinc-100" iconColor="text-zinc-600" index={0} />
         <StatCard title="Pending" value={stats.pending} subtitle={formatCompactCurrency(stats.pendingValue) + ' value'} icon={Clock} iconBg="bg-blue-50" iconColor="text-blue-600" index={1} />
         <StatCard title="Approved Spend" value={formatCompactCurrency(stats.approvedSpend)} subtitle={`${stats.approved} request${stats.approved === 1 ? '' : 's'}`} icon={CheckCircle2} iconBg="bg-emerald-50" iconColor="text-emerald-600" index={2} />
-        <StatCard title="Rejected" value={stats.rejected} icon={ThumbsDown} iconBg="bg-red-50" iconColor="text-red-600" index={3} />
+        <StatCard title="Declined" value={stats.rejected} icon={ThumbsDown} iconBg="bg-red-50" iconColor="text-red-600" index={3} />
         <StatCard title="Overdue" value={stats.overdue} subtitle="Pending past needed-by" icon={TriangleAlert} iconBg="bg-amber-50" iconColor="text-amber-600" index={4} />
         <StatCard title="Urgent Pending" value={stats.urgent} icon={TrendingUp} iconBg="bg-red-50" iconColor="text-red-600" index={5} />
       </div>

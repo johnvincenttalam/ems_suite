@@ -50,7 +50,7 @@ export function RequestDetail({ request, itemMap, uomMap }: RequestDetailProps) 
       </table>
       {request.rejectedReason && (
         <div className="mt-3 px-3 py-2 rounded-md bg-red-50 border border-red-200">
-          <p className="text-[11px] uppercase tracking-wider text-red-600 font-semibold">Rejected</p>
+          <p className="text-[11px] uppercase tracking-wider text-red-600 font-semibold">Declined</p>
           <p className="text-[13px] text-red-700 mt-0.5">{request.rejectedReason}</p>
         </div>
       )}

@@ -6,7 +6,7 @@ export { ProcurementAlertsPage } from './pages/procurement-alerts-page'
 export { ProcurementLogsPage } from './pages/procurement-logs-page'
 export { ProcurementUsersPage } from './pages/procurement-users-page'
 export { ProcurementSettingsPage } from './pages/procurement-settings-page'
-export { useRequests, useRequestItems } from './hooks/use-procurement'
+export { useRequests, useRequestItems, useCancelRequest, useUpdateRequestMeta } from './hooks/use-procurement'
 export { procurementApi } from './api/procurement-api'
 export { mockProcurementRequests, mockRequestItems } from './data/mock-procurement'
 export type {

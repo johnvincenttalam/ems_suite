@@ -38,6 +38,7 @@ export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   assetsReports:       () => import('@/features/assets'),
   procurement:         () => import('@/features/procurement'),
   procurementApprovals:() => import('@/features/procurement'),
+  procurementPurchaseOrders: () => import('@/features/purchase-orders'),
   procurementReports:  () => import('@/features/procurement'),
   procurementDashboard:() => import('@/features/procurement'),
   procurementAlerts:   () => import('@/features/procurement'),

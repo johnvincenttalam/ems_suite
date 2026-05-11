@@ -28,6 +28,7 @@ export const features = {
   assetsReports: true,
   procurement: true,
   procurementApprovals: true,
+  procurementPurchaseOrders: true,
   procurementReports: true,
   procurementDashboard: true,
   procurementAlerts: true,

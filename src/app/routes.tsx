@@ -39,6 +39,7 @@ const featurePages: Record<FeatureKey, ComponentType> = {
   assetsReports:       lazy(() => featureImports.assetsReports().then((m: any) => ({ default: m.AssetsReportsPage }))),
   procurement:         lazy(() => featureImports.procurement().then((m: any) => ({ default: m.RequestsPage }))),
   procurementApprovals:lazy(() => featureImports.procurementApprovals().then((m: any) => ({ default: m.ApprovalsPage }))),
+  procurementPurchaseOrders: lazy(() => featureImports.procurementPurchaseOrders().then((m: any) => ({ default: m.PurchaseOrdersPage }))),
   procurementReports:  lazy(() => featureImports.procurementReports().then((m: any) => ({ default: m.ProcurementReportsPage }))),
   procurementDashboard:lazy(() => featureImports.procurementDashboard().then((m: any) => ({ default: m.ProcurementDashboard }))),
   procurementAlerts:   lazy(() => featureImports.procurementAlerts().then((m: any) => ({ default: m.ProcurementAlertsPage }))),

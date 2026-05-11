@@ -1,4 +1,4 @@
-export type RequestStatus = 'pending' | 'approved' | 'rejected'
+export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 export type RequestPriority = 'low' | 'normal' | 'urgent'
 
@@ -37,6 +37,10 @@ export interface ProcurementRequest {
   rejectedReason?: string
   rejectedBy?: string
   rejectedAt?: string
+  /** Set when the requester (or admin) withdraws a pending request. */
+  cancelledAt?: string
+  cancelledBy?: string
+  cancelReason?: string
   priority?: RequestPriority
   /** ISO date the requester needs the goods/services by. */
   neededBy?: string
