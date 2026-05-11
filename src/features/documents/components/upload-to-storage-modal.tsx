@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadCloud, X, File as FileIconGeneric } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUploadToStorage } from '@/features/documents/hooks/use-storage'
@@ -45,6 +45,9 @@ export function UploadToStorageModal({ open, onClose, folderId, folderLabel }: U
   const [description, setDescription] = useState('')
   const [tagsRaw, setTagsRaw] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  // True once the blob URL has been handed off to a storage item. We must NOT
+  // revoke it on close in that case — the item now owns it for the session.
+  const transferredRef = useRef(false)
 
   useEffect(() => {
     if (!open) {
@@ -52,13 +55,16 @@ export function UploadToStorageModal({ open, onClose, folderId, folderLabel }: U
       setTitle('')
       setDescription('')
       setTagsRaw('')
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      if (previewUrl && !transferredRef.current) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
+      transferredRef.current = false
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const accept = useCallback((next: File | null) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    // Replacing the staged file — the previous blob URL was never transferred,
+    // so it's safe to revoke.
+    if (previewUrl && !transferredRef.current) URL.revokeObjectURL(previewUrl)
     if (!next) {
       setFile(null)
       setPreviewUrl(null)
@@ -110,6 +116,7 @@ export function UploadToStorageModal({ open, onClose, folderId, folderLabel }: U
       },
       {
         onSuccess: () => {
+          transferredRef.current = true
           toast.success('File uploaded to storage')
           onClose()
         },
