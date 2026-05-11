@@ -31,7 +31,7 @@ function bucketize(orders: WorkOrder[]): Bucket[] {
   const later: WorkOrder[] = []
 
   for (const wo of orders) {
-    if (wo.status === 'completed') continue
+    if (wo.status !== 'pending' && wo.status !== 'ongoing') continue
     const date = parseISO(wo.scheduledDate)
     if (isToday(date)) today.push(wo)
     else if (isPast(date)) overdue.push(wo)
@@ -59,7 +59,7 @@ export function ScheduleTab() {
 
   if (isLoading) return <TableSkeleton columns={3} rows={6} />
 
-  if (workOrders.filter((w) => w.status !== 'completed').length === 0) {
+  if (workOrders.filter((w) => w.status === 'pending' || w.status === 'ongoing').length === 0) {
     return (
       <div className="bg-white rounded-xl border border-zinc-200/60">
         <EmptyState

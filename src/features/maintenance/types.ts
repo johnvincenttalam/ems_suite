@@ -65,6 +65,9 @@ export interface WorkOrder {
   partsUsed?: WorkOrderPart[]
   /** Captured at completion for inspection-type WOs only. */
   inspectionResult?: InspectionResult
+  /** Files attached to this WO. Bytes live in the active AttachmentAdapter;
+   * this array holds only metadata + opaque refs. */
+  attachments?: import('@/shared/attachments').Attachment[]
   checklistId?: string
   /** Set when this WO was created by escalating an Issue. Lets the maintenance
    * UI prompt "Resolve linked issue?" on completion without scanning issues. */

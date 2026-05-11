@@ -33,7 +33,7 @@ export function TechniciansTab() {
         pending: orders.filter((o) => o.status === 'pending').length,
         ongoing: orders.filter((o) => o.status === 'ongoing').length,
         completed: orders.filter((o) => o.status === 'completed').length,
-        active: orders.filter((o) => o.status !== 'completed').sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
+        active: orders.filter((o) => o.status === 'pending' || o.status === 'ongoing').sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
       }))
       .filter((g) => g.user)
       .sort((a, b) => (b.pending + b.ongoing) - (a.pending + a.ongoing))

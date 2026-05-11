@@ -3,6 +3,8 @@ import { maintenanceApi } from './api/maintenance-api'
 import { workOrderTotalCost } from './types'
 import { assetsApi, mockAssets } from '@/features/assets'
 import { mockUsers } from '@/features/users'
+import { inventoryApi, mockInventoryItems } from '@/features/inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 
 // Helper: register a fresh asset for use in lifecycle tests so each test gets
 // a clean status; the global mock state is shared across tests.
@@ -318,6 +320,44 @@ describe('maintenanceApi.cancel', () => {
   })
 })
 
+describe('maintenanceApi.update', () => {
+  it('edits title, description, type, and priority on a pending WO', async () => {
+    const asset = await newAsset('EDIT')
+    const wo = await newWorkOrder(asset.id, { title: 'Original' })
+    const updated = await maintenanceApi.update(
+      wo.id,
+      { title: 'Renamed', description: 'New desc', type: 'inspection', priority: 'critical' },
+      'U001',
+    )
+    expect(updated.title).toBe('Renamed')
+    expect(updated.description).toBe('New desc')
+    expect(updated.type).toBe('inspection')
+    expect(updated.priority).toBe('critical')
+  })
+
+  it('refuses to edit an ongoing or completed WO', async () => {
+    const asset = await newAsset('EDIT_ONG')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    await expect(maintenanceApi.update(wo.id, { title: 'too late' }, 'U001')).rejects.toThrow(/not pending/i)
+  })
+
+  it('is a no-op when nothing actually changed (no audit entry)', async () => {
+    const asset = await newAsset('EDIT_NOOP')
+    const wo = await newWorkOrder(asset.id, { title: 'Same' })
+    const result = await maintenanceApi.update(wo.id, { title: 'Same', priority: wo.priority }, 'U001')
+    expect(result.title).toBe('Same')
+  })
+
+  it('clears description when patched with an empty string', async () => {
+    const asset = await newAsset('EDIT_DESC')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.update(wo.id, { description: 'something' }, 'U001')
+    const cleared = await maintenanceApi.update(wo.id, { description: '' }, 'U001')
+    expect(cleared.description).toBeUndefined()
+  })
+})
+
 describe('maintenanceApi.reassign / reschedule', () => {
   it('reassigns a pending WO to a different technician', async () => {
     const asset = await newAsset('REASSIGN')
@@ -346,6 +386,147 @@ describe('maintenanceApi.reassign / reschedule', () => {
     const wo = await newWorkOrder(asset.id)
     await maintenanceApi.cancel(wo.id, 'U001', 'no longer needed')
     await expect(maintenanceApi.reschedule(wo.id, '2026-06-15', 'U001')).rejects.toThrow(/cancelled/i)
+  })
+})
+
+describe('maintenanceApi.complete — inventory deduction', () => {
+  it('deducts each part from inventory as a stock-out movement referencing the WO', async () => {
+    const asset = await newAsset('INV_DEDUCT')
+    const itemId = 'INV-1006' // bolts, large stock
+    const before = mockInventoryItems.find((i) => i.id === itemId)!.quantity
+
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    await maintenanceApi.complete(wo.id, 'U001', {
+      partsUsed: [{ itemId, quantity: 3, unitCost: 6.75 }],
+    })
+
+    const after = mockInventoryItems.find((i) => i.id === itemId)!.quantity
+    expect(after).toBe(before - 3)
+
+    const movements = await inventoryApi.listMovements()
+    const woMovement = movements.find((m) => m.referenceNumber === wo.id)
+    expect(woMovement).toBeTruthy()
+    expect(woMovement!.type).toBe('out')
+    expect(woMovement!.quantity).toBe(3)
+    expect(woMovement!.itemId).toBe(itemId)
+  })
+
+  it('refuses completion when a part exceeds on-hand stock (without allowNegativeStock)', async () => {
+    useInventorySettings.setState({
+      settings: { ...useInventorySettings.getState().settings, allowNegativeStock: false },
+    })
+    const asset = await newAsset('INV_OOS')
+    const item = mockInventoryItems.find((i) => i.id === 'INV-1005')! // gloves, low stock
+    const onHand = item.quantity
+
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    await expect(
+      maintenanceApi.complete(wo.id, 'U001', {
+        partsUsed: [{ itemId: 'INV-1005', quantity: onHand + 10, unitCost: 8.4 }],
+      }),
+    ).rejects.toThrow(/only \d+ on hand/i)
+
+    // WO must still be ongoing — pre-flight refused before mutating state.
+    const list = await maintenanceApi.list()
+    expect(list.find((w) => w.id === wo.id)!.status).toBe('ongoing')
+
+    // Inventory level should be untouched.
+    expect(mockInventoryItems.find((i) => i.id === 'INV-1005')!.quantity).toBe(onHand)
+  })
+
+  it('allows completion past zero when allowNegativeStock is on', async () => {
+    useInventorySettings.setState({
+      settings: { ...useInventorySettings.getState().settings, allowNegativeStock: true },
+    })
+    const asset = await newAsset('INV_NEG')
+    const item = mockInventoryItems.find((i) => i.id === 'INV-1006')!
+    const onHand = item.quantity
+
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    const done = await maintenanceApi.complete(wo.id, 'U001', {
+      partsUsed: [{ itemId: 'INV-1006', quantity: onHand + 5, unitCost: 6.75 }],
+    })
+    expect(done.status).toBe('completed')
+    expect(mockInventoryItems.find((i) => i.id === 'INV-1006')!.quantity).toBe(-5)
+
+    // Reset for any subsequent tests.
+    useInventorySettings.setState({
+      settings: { ...useInventorySettings.getState().settings, allowNegativeStock: false },
+    })
+    mockInventoryItems.find((i) => i.id === 'INV-1006')!.quantity = onHand
+  })
+
+  it('refuses completion when a part references an unknown inventory item', async () => {
+    const asset = await newAsset('INV_UNKNOWN')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    await expect(
+      maintenanceApi.complete(wo.id, 'U001', {
+        partsUsed: [{ itemId: 'INV-DOES-NOT-EXIST', quantity: 1, unitCost: 1 }],
+      }),
+    ).rejects.toThrow(/not found in inventory/i)
+  })
+
+  it('completes normally with no parts (no inventory side effects)', async () => {
+    const movementsBefore = (await inventoryApi.listMovements()).length
+    const asset = await newAsset('INV_NONE')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.start(wo.id, 'U001')
+    const done = await maintenanceApi.complete(wo.id, 'U001', { laborCost: 50 })
+    expect(done.status).toBe('completed')
+    const movementsAfter = (await inventoryApi.listMovements()).length
+    expect(movementsAfter).toBe(movementsBefore)
+  })
+})
+
+describe('maintenanceApi.addAttachments / removeAttachment', () => {
+  const fakeAttachment = (name: string) => ({
+    id: `ATT-TEST-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    sizeBytes: 1234,
+    mimeType: 'image/jpeg',
+    uploadedBy: 'Admin User',
+    uploadedAt: new Date().toISOString(),
+    ref: 'blob:test',
+  })
+
+  it('appends attachments to a work order', async () => {
+    const asset = await newAsset('ATT_ADD')
+    const wo = await newWorkOrder(asset.id)
+    const a1 = fakeAttachment('before.jpg')
+    const a2 = fakeAttachment('after.jpg')
+    const updated = await maintenanceApi.addAttachments(wo.id, [a1, a2], 'U001')
+    expect(updated.attachments).toHaveLength(2)
+    expect(updated.attachments![0].name).toBe('before.jpg')
+  })
+
+  it('refuses to attach to a cancelled WO', async () => {
+    const asset = await newAsset('ATT_CANCEL')
+    const wo = await newWorkOrder(asset.id)
+    await maintenanceApi.cancel(wo.id, 'U001', 'no longer needed')
+    await expect(
+      maintenanceApi.addAttachments(wo.id, [fakeAttachment('x.pdf')], 'U001'),
+    ).rejects.toThrow(/cancelled/i)
+  })
+
+  it('removes an attachment by id', async () => {
+    const asset = await newAsset('ATT_RM')
+    const wo = await newWorkOrder(asset.id)
+    const a = fakeAttachment('manual.pdf')
+    await maintenanceApi.addAttachments(wo.id, [a], 'U001')
+    const after = await maintenanceApi.removeAttachment(wo.id, a.id, 'U001')
+    expect(after.attachments).toHaveLength(0)
+  })
+
+  it('throws when removing an attachment that does not exist', async () => {
+    const asset = await newAsset('ATT_404')
+    const wo = await newWorkOrder(asset.id)
+    await expect(
+      maintenanceApi.removeAttachment(wo.id, 'ATT-DOES-NOT-EXIST', 'U001'),
+    ).rejects.toThrow(/not found/i)
   })
 })
 

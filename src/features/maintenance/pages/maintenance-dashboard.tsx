@@ -122,7 +122,7 @@ export function MaintenanceDashboard() {
 
   const stats = useMemo(() => {
     const today = new Date()
-    const open = workOrders.filter((w) => w.status !== 'completed')
+    const open = workOrders.filter((w) => w.status === 'pending' || w.status === 'ongoing')
     const overdue = open.filter((w) => differenceInCalendarDays(parseISO(w.scheduledDate), today) < 0).length
     const dueSoon = open.filter((w) => {
       const days = differenceInCalendarDays(parseISO(w.scheduledDate), today)
@@ -162,7 +162,7 @@ export function MaintenanceDashboard() {
 
   const priorityBreakdown = useMemo(() => {
     const counts = new Map<WorkOrderPriority, number>()
-    for (const w of workOrders.filter((x) => x.status !== 'completed')) {
+    for (const w of workOrders.filter((x) => x.status === 'pending' || x.status === 'ongoing')) {
       counts.set(w.priority, (counts.get(w.priority) ?? 0) + 1)
     }
     const order: WorkOrderPriority[] = ['critical', 'high', 'medium', 'low']
@@ -174,7 +174,7 @@ export function MaintenanceDashboard() {
   const myQueue = useMemo(() => {
     if (!user) return []
     return workOrders
-      .filter((w) => w.assignedTo === user.id && w.status !== 'completed')
+      .filter((w) => w.assignedTo === user.id && (w.status === 'pending' || w.status === 'ongoing'))
       .sort((a, b) => {
         const pa = PRIORITY_RANK[a.priority]
         const pb = PRIORITY_RANK[b.priority]
@@ -187,7 +187,7 @@ export function MaintenanceDashboard() {
   const upcoming = useMemo(() => {
     const today = new Date()
     return workOrders
-      .filter((w) => w.status !== 'completed')
+      .filter((w) => w.status === 'pending' || w.status === 'ongoing')
       .map((w) => ({
         wo: w,
         days: differenceInCalendarDays(parseISO(w.scheduledDate), today),
@@ -198,7 +198,7 @@ export function MaintenanceDashboard() {
 
   const technicianLoad = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const w of workOrders.filter((x) => x.status !== 'completed')) {
+    for (const w of workOrders.filter((x) => x.status === 'pending' || x.status === 'ongoing')) {
       counts.set(w.assignedTo, (counts.get(w.assignedTo) ?? 0) + 1)
     }
     return Array.from(counts.entries())

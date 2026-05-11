@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle, AlertCircle } from 'lucide-react'
+import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle, AlertCircle, Pencil, Paperclip } from 'lucide-react'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { ChecklistPanel } from '@/shared/checklists'
 import { useSearchParams } from 'react-router-dom'
@@ -17,6 +17,8 @@ import { useAuthStore } from '@/features/auth'
 import { issuesApi } from '@/features/issues'
 import type { InspectionResult, WorkOrder, WorkOrderPart, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance/types'
 import { CompleteWorkOrderModal } from './complete-work-order-modal'
+import { EditWorkOrderModal } from './edit-work-order-modal'
+import { WorkOrderFilesModal } from './work-order-files-modal'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
@@ -94,6 +96,8 @@ export function WorkOrdersTab() {
   const [inspectionWO, setInspectionWO] = useState<WorkOrder | null>(null)
   const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null)
   const [cancellingWO, setCancellingWO] = useState<WorkOrder | null>(null)
+  const [editingWO, setEditingWO] = useState<WorkOrder | null>(null)
+  const [filesWO, setFilesWO] = useState<WorkOrder | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
   useEffect(() => {
@@ -113,6 +117,7 @@ export function WorkOrdersTab() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['maintenance'] })
     queryClient.invalidateQueries({ queryKey: ['assets'] })
+    queryClient.invalidateQueries({ queryKey: ['inventory'] })
     queryClient.invalidateQueries({ queryKey: ['audit-log'] })
   }
 
@@ -191,6 +196,25 @@ export function WorkOrdersTab() {
     onError: (err) => toast.error('Complete failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: { title?: string; description?: string; type?: WorkOrderType; priority?: WorkOrderPriority }
+    }) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return maintenanceApi.update(id, patch, currentUser.id)
+    },
+    onSuccess: (wo) => {
+      toast.success(`Updated ${wo.id}`)
+      setEditingWO(null)
+      invalidate()
+    },
+    onError: (err) => toast.error('Update failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
   const cancelMutation = useMutation({
     mutationFn: ({ wo, reason }: { wo: WorkOrder; reason: string }) => {
       if (!currentUser) throw new Error('Not signed in')
@@ -243,6 +267,12 @@ export function WorkOrdersTab() {
               {row.original.sourceIssueId}
             </span>
           )}
+          {row.original.attachments && row.original.attachments.length > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-600 text-[10.5px] font-medium">
+              <Paperclip className="w-2.5 h-2.5" />
+              {row.original.attachments.length}
+            </span>
+          )}
         </div>
         {row.original.description && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{row.original.description}</p>}
       </div>
@@ -280,6 +310,18 @@ export function WorkOrdersTab() {
           label: 'Open inspection checklist',
           icon: ClipboardList,
           onClick: () => setInspectionWO(wo),
+        }] : []),
+        ...(wo.status !== 'cancelled' ? [{
+          key: 'files',
+          label: `Files${wo.attachments && wo.attachments.length > 0 ? ` (${wo.attachments.length})` : ''}`,
+          icon: Paperclip,
+          onClick: () => setFilesWO(wo),
+        }] : []),
+        ...(wo.status === 'pending' ? [{
+          key: 'edit',
+          label: 'Edit work order',
+          icon: Pencil,
+          onClick: () => setEditingWO(wo),
         }] : []),
         ...(wo.status === 'pending' ? [{
           key: 'start',
@@ -442,6 +484,20 @@ export function WorkOrdersTab() {
         loading={completeMutation.isPending}
         onClose={() => setCompletingWO(null)}
         onConfirm={(input) => completingWO && completeMutation.mutate({ wo: completingWO, input })}
+      />
+
+      <EditWorkOrderModal
+        open={!!editingWO}
+        wo={editingWO}
+        loading={updateMutation.isPending}
+        onClose={() => setEditingWO(null)}
+        onConfirm={(patch) => editingWO && updateMutation.mutate({ id: editingWO.id, patch })}
+      />
+
+      <WorkOrderFilesModal
+        open={!!filesWO}
+        wo={filesWO ? (workOrders.find((w) => w.id === filesWO.id) ?? filesWO) : null}
+        onClose={() => setFilesWO(null)}
       />
 
       <Modal open={!!cancellingWO} onClose={() => { setCancellingWO(null); setCancelReason('') }} title={`Cancel ${cancellingWO?.id ?? ''}`} size="md">

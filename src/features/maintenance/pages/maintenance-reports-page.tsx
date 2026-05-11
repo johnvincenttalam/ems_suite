@@ -245,7 +245,7 @@ export function MaintenanceReportsPage() {
   const overdueList = useMemo(() => {
     const today = new Date()
     return workOrders
-      .filter((w) => w.status !== 'completed' && isAfter(today, parseISO(w.scheduledDate)))
+      .filter((w) => (w.status === 'pending' || w.status === 'ongoing') && isAfter(today, parseISO(w.scheduledDate)))
       .map((w) => ({
         ...w,
         daysOverdue: differenceInCalendarDays(today, parseISO(w.scheduledDate)),

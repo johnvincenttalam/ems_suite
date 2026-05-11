@@ -4,6 +4,11 @@ import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 import { mockUsers } from '@/features/users/data/mock-users'
 import { mockAssets } from '@/features/assets/data/mock-assets'
 import { assetsApi } from '@/features/assets/api/assets-api'
+import { inventoryApi } from '@/features/inventory/api/inventory-api'
+import { mockInventoryItems } from '@/features/inventory/data/mock-inventory'
+import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
+import { attachmentAdapter } from '@/shared/attachments'
+import type { Attachment } from '@/shared/attachments'
 // import { http } from '@/shared/lib/http'
 
 const delay = (ms?: number) =>
@@ -45,6 +50,29 @@ function hasOtherOpenWorkOrders(assetId: string, excludeId: string): boolean {
       wo.id !== excludeId &&
       (wo.status === 'pending' || wo.status === 'ongoing'),
   )
+}
+
+/**
+ * Validate that every part in `parts` can be issued from inventory. Throws on
+ * the first failure so we can refuse a completion before mutating WO state.
+ *
+ * Mirrors the check inside `inventoryApi.addMovement` (item exists, stock is
+ * sufficient unless `allowNegativeStock` is on). We pre-flight here so we
+ * never end up in a half-deducted state where part 1 issued but part 2 failed.
+ */
+function preflightPartsAvailability(parts: WorkOrderPart[]): void {
+  if (parts.length === 0) return
+  const allowNegative = useInventorySettings.getState().settings.allowNegativeStock
+  for (const p of parts) {
+    const item = mockInventoryItems.find((i) => i.id === p.itemId)
+    if (!item) throw new Error(`Part ${p.itemId} not found in inventory`)
+    if (!allowNegative && p.quantity > item.quantity) {
+      throw new Error(
+        `Cannot use ${p.quantity} × ${item.name} — only ${item.quantity} on hand. ` +
+        `Enable "Allow negative stock" in Inventory settings to override.`,
+      )
+    }
+  }
 }
 
 interface CreateWorkOrderInput {
@@ -160,6 +188,12 @@ export const maintenanceApi = {
       throw new Error('inspectionResult is only valid for inspection-type work orders')
     }
 
+    // Pre-flight before mutating WO state — refuse completion if any part
+    // can't be sourced from inventory. This keeps WO state and inventory
+    // movements consistent: either both happen or neither.
+    const partsToIssue = options.partsUsed ?? []
+    preflightPartsAvailability(partsToIssue)
+
     const actor = userName(byUserId)
     wo.status = 'completed'
     wo.completedDate = new Date().toISOString()
@@ -168,6 +202,31 @@ export const maintenanceApi = {
     if (options.laborCost !== undefined) wo.laborCost = options.laborCost
     if (options.partsUsed) wo.partsUsed = options.partsUsed
     if (options.inspectionResult) wo.inspectionResult = options.inspectionResult
+
+    // Issue stock-out movements for each part. Pre-flight already validated
+    // availability so these are not expected to throw.
+    for (const p of partsToIssue) {
+      try {
+        await inventoryApi.addMovement({
+          itemId: p.itemId,
+          type: 'out',
+          quantity: p.quantity,
+          reason: `Used in ${wo.id} — ${wo.title}`,
+          referenceNumber: wo.id,
+          createdBy: actor,
+        })
+      } catch (err) {
+        // Should be unreachable given the pre-flight. If it does fire (e.g.
+        // settings flipped mid-completion), surface it but leave the WO
+        // completed — operator needs to reconcile manually.
+        recordAudit({
+          userId: actor,
+          action: 'update',
+          module: 'Maintenance',
+          detail: `Stock-out failed for ${wo.id}: ${err instanceof Error ? err.message : 'unknown error'}`,
+        })
+      }
+    }
 
     if (!hasOtherOpenWorkOrders(wo.assetId, wo.id)) {
       try {
@@ -222,6 +281,63 @@ export const maintenanceApi = {
     return wo
   },
 
+  /**
+   * Edit metadata on a pending work order. Restricted to fields that don't
+   * invalidate downstream state — title/description/type/priority/checklistId.
+   * Asset can't be edited (would orphan asset-side maintenance events) and
+   * schedule/assignee already have their own purpose-built endpoints
+   * (`reschedule`, `reassign`) that work past pending.
+   */
+  update: async (
+    id: string,
+    patch: {
+      title?: string
+      description?: string
+      type?: WorkOrderType
+      priority?: WorkOrderPriority
+      checklistId?: string
+    },
+    byUserId: string,
+  ): Promise<WorkOrder> => {
+    await delay(100)
+    const wo = mockWorkOrders.find((w) => w.id === id)
+    if (!wo) throw new Error(`Work order ${id} not found`)
+    if (wo.status !== 'pending') throw new Error(`Work order ${id} is not pending`)
+
+    const changes: string[] = []
+    if (patch.title !== undefined && patch.title !== wo.title) {
+      changes.push(`title "${wo.title}" → "${patch.title}"`)
+      wo.title = patch.title
+    }
+    if (patch.description !== undefined && patch.description !== (wo.description ?? '')) {
+      changes.push('description')
+      wo.description = patch.description || undefined
+    }
+    if (patch.type !== undefined && patch.type !== wo.type) {
+      changes.push(`type ${wo.type} → ${patch.type}`)
+      wo.type = patch.type
+    }
+    if (patch.priority !== undefined && patch.priority !== wo.priority) {
+      changes.push(`priority ${wo.priority} → ${patch.priority}`)
+      wo.priority = patch.priority
+    }
+    if (patch.checklistId !== undefined && patch.checklistId !== (wo.checklistId ?? '')) {
+      changes.push('checklist')
+      wo.checklistId = patch.checklistId || undefined
+    }
+
+    // No-op patch — don't pollute the audit log.
+    if (changes.length === 0) return wo
+
+    recordAudit({
+      userId: userName(byUserId),
+      action: 'update',
+      module: 'Maintenance',
+      detail: `Edited ${wo.id} — ${changes.join(', ')}`,
+    })
+    return wo
+  },
+
   reassign: async (id: string, newAssigneeUserId: string, byUserId: string): Promise<WorkOrder> => {
     await delay(100)
     const wo = mockWorkOrders.find((w) => w.id === id)
@@ -263,6 +379,52 @@ export const maintenanceApi = {
       action: 'update',
       module: 'Maintenance',
       detail: `Rescheduled ${wo.id}: ${previousDate} → ${newDate}`,
+    })
+    return wo
+  },
+
+  /**
+   * Attach pre-uploaded files to a work order. Attachments must already be
+   * `Attachment` records produced by `attachmentAdapter.upload()` — the API
+   * is metadata-only because storage is an adapter concern. Allowed in any
+   * status except cancelled (no point) so technicians can attach before/
+   * during/after the job.
+   */
+  addAttachments: async (id: string, attachments: Attachment[], byUserId: string): Promise<WorkOrder> => {
+    await delay(80)
+    const wo = mockWorkOrders.find((w) => w.id === id)
+    if (!wo) throw new Error(`Work order ${id} not found`)
+    if (wo.status === 'cancelled') throw new Error(`Cannot attach files to a cancelled work order`)
+    if (attachments.length === 0) return wo
+
+    wo.attachments = [...(wo.attachments ?? []), ...attachments]
+
+    recordAudit({
+      userId: userName(byUserId),
+      action: 'update',
+      module: 'Maintenance',
+      detail: `Attached ${attachments.length} file${attachments.length === 1 ? '' : 's'} to ${wo.id}: ${attachments.map((a) => a.name).join(', ')}`,
+    })
+    return wo
+  },
+
+  removeAttachment: async (id: string, attachmentId: string, byUserId: string): Promise<WorkOrder> => {
+    await delay(80)
+    const wo = mockWorkOrders.find((w) => w.id === id)
+    if (!wo) throw new Error(`Work order ${id} not found`)
+    const target = (wo.attachments ?? []).find((a) => a.id === attachmentId)
+    if (!target) throw new Error(`Attachment ${attachmentId} not found on ${wo.id}`)
+
+    wo.attachments = (wo.attachments ?? []).filter((a) => a.id !== attachmentId)
+
+    // Best-effort cleanup; ignore failures (e.g. blob URL already revoked).
+    attachmentAdapter.remove(target).catch(() => undefined)
+
+    recordAudit({
+      userId: userName(byUserId),
+      action: 'update',
+      module: 'Maintenance',
+      detail: `Removed attachment "${target.name}" from ${wo.id}`,
     })
     return wo
   },

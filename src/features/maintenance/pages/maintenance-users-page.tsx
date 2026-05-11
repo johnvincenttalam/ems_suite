@@ -98,7 +98,7 @@ export function MaintenanceUsersPage() {
       .filter((u) => u.modules.includes('maintenance'))
       .map((u) => {
         const assigned = workOrders.filter((w) => w.assignedTo === u.id)
-        const open = assigned.filter((w) => w.status !== 'completed')
+        const open = assigned.filter((w) => w.status === 'pending' || w.status === 'ongoing')
         const overdue = open.filter((w) => differenceInCalendarDays(parseISO(w.scheduledDate), today) < 0)
         const completed = assigned.filter((w) => w.status === 'completed')
         return {
