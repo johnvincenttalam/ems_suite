@@ -439,6 +439,18 @@ export function SdmsStoragePage() {
                 onFolderAction={handleFolderAction}
               />
             )
+          ) : childFolders.length === 0 && items.length === 0 ? (
+            <EmptyState
+              icon={Bookmark}
+              title={headerTitle === 'Storage' ? 'Your storage is empty' : `Nothing in ${headerTitle}`}
+              description={
+                search
+                  ? 'No items match your search.'
+                  : selection.view === 'trash'
+                  ? 'Items you move to trash will appear here.'
+                  : 'Open any document and click Add to Storage to bookmark it.'
+              }
+            />
           ) : (
             <>
               {selection.view === 'folder' && childFolders.length > 0 && (
@@ -450,21 +462,15 @@ export function SdmsStoragePage() {
                   onFolderAction={handleFolderAction}
                 />
               )}
-              <DataTable
-                table={table}
-                columns={columns}
-                emptyIcon={Bookmark}
-                emptyMessage={
-                  search
-                    ? 'No items match your search'
-                    : selection.view === 'trash'
-                    ? 'Trash is empty'
-                    : childFolders.length > 0
-                    ? 'No files in this folder yet — only subfolders.'
-                    : 'Your storage is empty — open any document and click Add to Storage to bookmark it.'
-                }
-                onRowClick={handleItemClick}
-              />
+              {items.length > 0 && (
+                <DataTable
+                  table={table}
+                  columns={columns}
+                  emptyIcon={Bookmark}
+                  emptyMessage={search ? 'No items match your search' : 'No files'}
+                  onRowClick={handleItemClick}
+                />
+              )}
             </>
           )}
         </div>
