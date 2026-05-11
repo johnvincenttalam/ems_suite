@@ -114,14 +114,12 @@ function FolderCard({
           onClick()
         }
       }}
-      className="group flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-zinc-100/80 transition-colors text-left cursor-pointer"
+      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-100/80 hover:bg-zinc-200/70 transition-colors text-left cursor-pointer"
     >
-      <div className="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center flex-shrink-0">
-        <Folder className="w-4 h-4 text-amber-500" />
-      </div>
+      <Folder className="w-4 h-4 text-zinc-700 flex-shrink-0" fill="currentColor" />
       <span className="text-[13px] font-medium text-zinc-700 truncate flex-1">{folder.name}</span>
       {menuItems.length > 0 && (
-        <span className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <span onClick={(e) => e.stopPropagation()}>
           <ActionMenu items={menuItems} triggerLabel={`${folder.name} actions`} />
         </span>
       )}
