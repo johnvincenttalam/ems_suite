@@ -12,6 +12,8 @@ import {
   Star,
   RotateCcw,
   UploadCloud,
+  FolderInput,
+  Pencil,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
@@ -20,6 +22,8 @@ import {
   useMyStorage,
   useStorageFolders,
   useCreateStorageFolder,
+  useRenameStorageFolder,
+  useDeleteStorageFolder,
   useMoveStorageItemToTrash,
   useRestoreStorageItem,
   useEmptyStorageTrash,
@@ -45,6 +49,7 @@ import { FolderTree, type StorageSelection } from '@/features/documents/componen
 import { StorageGrid } from '@/features/documents/components/storage-grid'
 import { StoragePreviewDrawer } from '@/features/documents/components/storage-preview-drawer'
 import { UploadToStorageModal } from '@/features/documents/components/upload-to-storage-modal'
+import { MoveStorageItemModal } from '@/features/documents/components/move-storage-item-modal'
 
 const SORT_OPTIONS: { value: StorageSort; label: string }[] = [
   { value: 'date_desc',  label: 'Newest first' },
@@ -109,6 +114,24 @@ export function SdmsStoragePage() {
 
   const [uploadOpen, setUploadOpen] = useState(false)
   const [previewItem, setPreviewItem] = useState<StorageItem | null>(null)
+  const [moveItemTarget, setMoveItemTarget] = useState<StorageItem | null>(null)
+
+  const renameFolder = useRenameStorageFolder()
+  const deleteFolder = useDeleteStorageFolder()
+  const [renameFolderTarget, setRenameFolderTarget] = useState<StorageFolder | null>(null)
+  const [renameFolderValue, setRenameFolderValue] = useState('')
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<StorageFolder | null>(null)
+
+  const activeFolder = useMemo(() => {
+    if (selection.view !== 'folder' || selection.folderId === null) return null
+    return folders.find((f) => f.id === selection.folderId) ?? null
+  }, [folders, selection])
+
+  const activeFolderChildCount = useMemo(() => {
+    if (!activeFolder) return { folders: 0, items: 0 }
+    const childFolderCount = folders.filter((f) => f.parentId === activeFolder.id).length
+    return { folders: childFolderCount, items: items.length }
+  }, [activeFolder, folders, items])
 
   const [trashTarget, setTrashTarget] = useState<StorageItem | null>(null)
   const [emptyTrashOpen, setEmptyTrashOpen] = useState(false)
@@ -242,6 +265,12 @@ export function SdmsStoragePage() {
                 onClick: () => toggleStar.mutate(item.id),
               },
               {
+                key: 'move',
+                label: 'Move to folder…',
+                icon: FolderInput,
+                onClick: () => setMoveItemTarget(item),
+              },
+              {
                 key: 'trash',
                 label: 'Move to Trash',
                 icon: Trash2,
@@ -308,11 +337,39 @@ export function SdmsStoragePage() {
         </aside>
 
         <div className="min-w-0">
-          <StorageBreadcrumb
-            selection={selection}
-            path={breadcrumbPath}
-            onNavigate={(s) => setSelection(s)}
-          />
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <StorageBreadcrumb
+              selection={selection}
+              path={breadcrumbPath}
+              onNavigate={(s) => setSelection(s)}
+            />
+            {activeFolder && (
+              <div className="flex items-center gap-1 text-[12px] text-zinc-500">
+                <span>Folder actions</span>
+                <ActionMenu
+                  triggerLabel="Folder actions"
+                  items={[
+                    {
+                      key: 'rename',
+                      label: 'Rename folder',
+                      icon: Pencil,
+                      onClick: () => {
+                        setRenameFolderTarget(activeFolder)
+                        setRenameFolderValue(activeFolder.name)
+                      },
+                    },
+                    {
+                      key: 'delete',
+                      label: 'Delete folder',
+                      icon: Trash2,
+                      danger: true,
+                      onClick: () => setDeleteFolderTarget(activeFolder),
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
 
           <ListToolbar
             search={{ value: search, onChange: setSearch, placeholder: 'Search title, description, tags…' }}
@@ -508,7 +565,113 @@ export function SdmsStoragePage() {
         open={!!previewItem}
         item={previewItem}
         onClose={() => setPreviewItem(null)}
+        onRequestMove={(item) => {
+          setPreviewItem(null)
+          setMoveItemTarget(item)
+        }}
       />
+
+      <MoveStorageItemModal
+        open={!!moveItemTarget}
+        item={moveItemTarget}
+        onClose={() => setMoveItemTarget(null)}
+      />
+
+      <Modal
+        open={!!renameFolderTarget}
+        onClose={() => setRenameFolderTarget(null)}
+        title="Rename folder"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRenameFolderTarget(null)} disabled={renameFolder.isPending}>
+              Cancel
+            </Button>
+            <Button
+              loading={renameFolder.isPending}
+              disabled={!renameFolderValue.trim() || renameFolderValue.trim() === renameFolderTarget?.name}
+              onClick={() => {
+                if (!renameFolderTarget) return
+                renameFolder.mutate(
+                  { id: renameFolderTarget.id, name: renameFolderValue.trim() },
+                  {
+                    onSuccess: () => {
+                      toast.success('Folder renamed')
+                      setRenameFolderTarget(null)
+                    },
+                    onError: (err) =>
+                      toast.error('Rename failed', {
+                        description: err instanceof Error ? err.message : 'Unknown error',
+                      }),
+                  },
+                )
+              }}
+            >
+              Rename
+            </Button>
+          </>
+        }
+      >
+        <Input
+          autoFocus
+          value={renameFolderValue}
+          onChange={(e) => setRenameFolderValue(e.target.value)}
+          placeholder="Folder name"
+        />
+      </Modal>
+
+      <Modal
+        open={!!deleteFolderTarget}
+        onClose={() => setDeleteFolderTarget(null)}
+        title="Delete folder?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteFolderTarget(null)} disabled={deleteFolder.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={deleteFolder.isPending}
+              onClick={() => {
+                if (!deleteFolderTarget) return
+                const parentId = deleteFolderTarget.parentId
+                deleteFolder.mutate(deleteFolderTarget.id, {
+                  onSuccess: () => {
+                    toast.success(`Deleted "${deleteFolderTarget.name}"`)
+                    setDeleteFolderTarget(null)
+                    setSelection({ view: 'folder', folderId: parentId })
+                  },
+                  onError: (err) =>
+                    toast.error('Delete failed', {
+                      description: err instanceof Error ? err.message : 'Unknown error',
+                    }),
+                })
+              }}
+            >
+              Delete folder
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-zinc-500">
+          Delete <span className="font-medium text-zinc-700">{deleteFolderTarget?.name}</span>?
+        </p>
+        <p className="text-[12px] text-zinc-500 mt-2">
+          {activeFolderChildCount.items > 0 && (
+            <>
+              {activeFolderChildCount.items} file{activeFolderChildCount.items === 1 ? '' : 's'} inside will move to{' '}
+              <span className="font-medium text-zinc-700">My Storage</span> (root).{' '}
+            </>
+          )}
+          {activeFolderChildCount.folders > 0 && (
+            <>
+              {activeFolderChildCount.folders} subfolder{activeFolderChildCount.folders === 1 ? '' : 's'} will move up one level.
+            </>
+          )}
+          {activeFolderChildCount.items === 0 && activeFolderChildCount.folders === 0 && 'This folder is empty.'}
+        </p>
+      </Modal>
 
       {currentUser ? null : null}
     </div>
