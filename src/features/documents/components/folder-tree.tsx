@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Folder, FolderOpen, HardDrive, Clock, Star, Trash2 } from 'lucide-react'
+import { ChevronRight, Folder, FolderOpen, HardDrive, Clock, Star, Trash2, Pencil, FolderInput } from 'lucide-react'
 import type { StorageFolder } from '@/features/documents/types'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { cn } from '@/shared/utils/cn'
 
 export type StorageSelection =
@@ -9,6 +10,8 @@ export type StorageSelection =
   | { view: 'starred' }
   | { view: 'trash' }
 
+export type FolderAction = 'rename' | 'move' | 'delete'
+
 interface FolderTreeProps {
   folders: StorageFolder[]
   selection: StorageSelection
@@ -16,6 +19,8 @@ interface FolderTreeProps {
   /** Optional counts beside each virtual view. */
   trashCount?: number
   starredCount?: number
+  /** When set, renders a kebab on each folder row with Rename / Move / Delete. */
+  onFolderAction?: (folder: StorageFolder, action: FolderAction) => void
 }
 
 interface TreeNode {
@@ -43,7 +48,7 @@ function isFolderSelected(sel: StorageSelection, id: string | null): boolean {
   return sel.view === 'folder' && sel.folderId === id
 }
 
-export function FolderTree({ folders, selection, onSelect, trashCount, starredCount }: FolderTreeProps) {
+export function FolderTree({ folders, selection, onSelect, trashCount, starredCount, onFolderAction }: FolderTreeProps) {
   const tree = useMemo(() => buildTree(folders), [folders])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -72,6 +77,7 @@ export function FolderTree({ folders, selection, onSelect, trashCount, starredCo
             onToggle={toggle}
             selection={selection}
             onSelect={onSelect}
+            onFolderAction={onFolderAction}
           />
         ))}
       </div>
@@ -113,7 +119,7 @@ function RootRow({ active, onClick }: { active: boolean; onClick: () => void }) 
       )}
     >
       <HardDrive className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
-      <span className="truncate">My Storage</span>
+      <span className="truncate">Storage</span>
     </button>
   )
 }
@@ -125,12 +131,21 @@ interface TreeRowProps {
   onToggle: (id: string) => void
   selection: StorageSelection
   onSelect: (s: StorageSelection) => void
+  onFolderAction?: (folder: StorageFolder, action: FolderAction) => void
 }
 
-function TreeRow({ node, depth, expanded, onToggle, selection, onSelect }: TreeRowProps) {
+function TreeRow({ node, depth, expanded, onToggle, selection, onSelect, onFolderAction }: TreeRowProps) {
   const isOpen = expanded.has(node.folder.id)
   const hasChildren = node.children.length > 0
   const active = isFolderSelected(selection, node.folder.id)
+
+  const menuItems: ActionMenuItem[] = onFolderAction
+    ? [
+        { key: 'rename', label: 'Rename', icon: Pencil, onClick: () => onFolderAction(node.folder, 'rename') },
+        { key: 'move', label: 'Move to…', icon: FolderInput, onClick: () => onFolderAction(node.folder, 'move') },
+        { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => onFolderAction(node.folder, 'delete') },
+      ]
+    : []
 
   return (
     <div>
@@ -145,7 +160,7 @@ function TreeRow({ node, depth, expanded, onToggle, selection, onSelect }: TreeR
           }
         }}
         className={cn(
-          'flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer',
+          'group flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer',
           active ? 'bg-accent/10 text-accent-fg font-medium' : 'hover:bg-zinc-100/80',
         )}
         style={{ paddingLeft: `${depth * 12}px` }}
@@ -171,6 +186,11 @@ function TreeRow({ node, depth, expanded, onToggle, selection, onSelect }: TreeR
           <Folder className={cn('w-3.5 h-3.5 flex-shrink-0', active ? 'text-accent' : 'text-zinc-400')} />
         )}
         <span className="truncate flex-1">{node.folder.name}</span>
+        {menuItems.length > 0 && (
+          <span className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+            <ActionMenu items={menuItems} triggerLabel={`${node.folder.name} actions`} />
+          </span>
+        )}
       </div>
       {isOpen && hasChildren && (
         <div>
@@ -183,6 +203,7 @@ function TreeRow({ node, depth, expanded, onToggle, selection, onSelect }: TreeR
               onToggle={onToggle}
               selection={selection}
               onSelect={onSelect}
+              onFolderAction={onFolderAction}
             />
           ))}
         </div>

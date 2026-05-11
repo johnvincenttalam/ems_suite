@@ -1,8 +1,10 @@
-import { Folder, FileText, FileSpreadsheet, FileImage, File, Star } from 'lucide-react'
+import { Folder, FileText, FileSpreadsheet, FileImage, File, Star, Pencil, FolderInput, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import type { LucideIcon } from 'lucide-react'
 import type { StorageFolder, StorageItem, DocumentFileType, AppDocument } from '@/features/documents/types'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { cn } from '@/shared/utils/cn'
+import type { FolderAction } from '@/features/documents/components/folder-tree'
 
 interface StorageGridProps {
   folders: StorageFolder[]
@@ -15,6 +17,8 @@ interface StorageGridProps {
   /** Hide the folders section even if `folders` is non-empty (e.g., in the
    * Recent / Starred / Trash virtual views where mixing folders is confusing). */
   hideFolders?: boolean
+  /** When set, renders a kebab on each folder card with Rename / Move / Delete. */
+  onFolderAction?: (folder: StorageFolder, action: FolderAction) => void
 }
 
 const FILE_ICON: Record<DocumentFileType, { icon: LucideIcon; bg: string; fg: string }> = {
@@ -34,7 +38,7 @@ function resolveFileType(item: StorageItem, documentMap: Record<string, AppDocum
   return null
 }
 
-export function StorageGrid({ folders, items, documentMap, onFolderClick, onItemClick, hideFolders }: StorageGridProps) {
+export function StorageGrid({ folders, items, documentMap, onFolderClick, onItemClick, hideFolders, onFolderAction }: StorageGridProps) {
   const showFolders = !hideFolders && folders.length > 0
 
   return (
@@ -44,7 +48,12 @@ export function StorageGrid({ folders, items, documentMap, onFolderClick, onItem
           <h3 className="text-[11px] font-semibold tracking-wider text-zinc-400 uppercase mb-2">Folders</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
             {folders.map((folder) => (
-              <FolderCard key={folder.id} folder={folder} onClick={() => onFolderClick(folder)} />
+              <FolderCard
+                key={folder.id}
+                folder={folder}
+                onClick={() => onFolderClick(folder)}
+                onFolderAction={onFolderAction}
+              />
             ))}
           </div>
         </section>
@@ -71,18 +80,46 @@ export function StorageGrid({ folders, items, documentMap, onFolderClick, onItem
   )
 }
 
-function FolderCard({ folder, onClick }: { folder: StorageFolder; onClick: () => void }) {
+function FolderCard({
+  folder,
+  onClick,
+  onFolderAction,
+}: {
+  folder: StorageFolder
+  onClick: () => void
+  onFolderAction?: (folder: StorageFolder, action: FolderAction) => void
+}) {
+  const menuItems: ActionMenuItem[] = onFolderAction
+    ? [
+        { key: 'rename', label: 'Rename', icon: Pencil, onClick: () => onFolderAction(folder, 'rename') },
+        { key: 'move', label: 'Move to…', icon: FolderInput, onClick: () => onFolderAction(folder, 'move') },
+        { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => onFolderAction(folder, 'delete') },
+      ]
+    : []
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-zinc-200/60 hover:border-zinc-300 hover:shadow-sm transition text-left"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="group flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-zinc-200/60 hover:border-zinc-300 hover:shadow-sm transition text-left cursor-pointer"
     >
       <div className="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center flex-shrink-0">
         <Folder className="w-4 h-4 text-amber-500" />
       </div>
       <span className="text-[13px] font-medium text-zinc-700 truncate flex-1">{folder.name}</span>
-    </button>
+      {menuItems.length > 0 && (
+        <span className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <ActionMenu items={menuItems} triggerLabel={`${folder.name} actions`} />
+        </span>
+      )}
+    </div>
   )
 }
 

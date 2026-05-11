@@ -47,9 +47,11 @@ import { getModulePath } from '@/config/modules'
 import { cn } from '@/shared/utils/cn'
 import { FolderTree, type StorageSelection } from '@/features/documents/components/folder-tree'
 import { StorageGrid } from '@/features/documents/components/storage-grid'
+import { FolderListSection } from '@/features/documents/components/folder-list-section'
 import { StoragePreviewDrawer } from '@/features/documents/components/storage-preview-drawer'
 import { UploadToStorageModal } from '@/features/documents/components/upload-to-storage-modal'
 import { MoveStorageItemModal } from '@/features/documents/components/move-storage-item-modal'
+import { MoveStorageFolderModal } from '@/features/documents/components/move-storage-folder-modal'
 
 const SORT_OPTIONS: { value: StorageSort; label: string }[] = [
   { value: 'date_desc',  label: 'Newest first' },
@@ -95,6 +97,7 @@ export function SdmsStoragePage() {
   const { data: documents = [] } = useDocuments()
   const { data: trashItems = [] } = useMyStorage({ view: 'trash' })
   const { data: starredItems = [] } = useMyStorage({ view: 'starred' })
+  const { data: allItems = [] } = useMyStorage({ view: 'all' })
 
   const docMap = useMemo(() => Object.fromEntries(documents.map((d) => [d.id, d])), [documents])
 
@@ -120,18 +123,31 @@ export function SdmsStoragePage() {
   const deleteFolder = useDeleteStorageFolder()
   const [renameFolderTarget, setRenameFolderTarget] = useState<StorageFolder | null>(null)
   const [renameFolderValue, setRenameFolderValue] = useState('')
+  const [moveFolderTarget, setMoveFolderTarget] = useState<StorageFolder | null>(null)
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<StorageFolder | null>(null)
+
+  function handleFolderAction(folder: StorageFolder, action: 'rename' | 'move' | 'delete') {
+    if (action === 'rename') {
+      setRenameFolderTarget(folder)
+      setRenameFolderValue(folder.name)
+    } else if (action === 'move') {
+      setMoveFolderTarget(folder)
+    } else {
+      setDeleteFolderTarget(folder)
+    }
+  }
+
+  const deleteFolderChildCount = useMemo(() => {
+    if (!deleteFolderTarget) return { folders: 0, items: 0 }
+    const childFolderCount = folders.filter((f) => f.parentId === deleteFolderTarget.id).length
+    const itemCount = allItems.filter((i) => i.folderId === deleteFolderTarget.id && !i.deletedAt).length
+    return { folders: childFolderCount, items: itemCount }
+  }, [deleteFolderTarget, folders, allItems])
 
   const activeFolder = useMemo(() => {
     if (selection.view !== 'folder' || selection.folderId === null) return null
     return folders.find((f) => f.id === selection.folderId) ?? null
   }, [folders, selection])
-
-  const activeFolderChildCount = useMemo(() => {
-    if (!activeFolder) return { folders: 0, items: 0 }
-    const childFolderCount = folders.filter((f) => f.parentId === activeFolder.id).length
-    return { folders: childFolderCount, items: items.length }
-  }, [activeFolder, folders, items])
 
   const [trashTarget, setTrashTarget] = useState<StorageItem | null>(null)
   const [emptyTrashOpen, setEmptyTrashOpen] = useState(false)
@@ -304,13 +320,13 @@ export function SdmsStoragePage() {
     selection.view === 'starred' ? 'Starred' :
     selection.view === 'trash' ? 'Trash' :
     breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1].name :
-    'My Storage'
+    'Storage'
 
   return (
     <div>
       <PageHeader
-        title="My Storage"
-        subtitle="Your document vault — bookmark SDMS references and organize them into folders."
+        title="Storage"
+        subtitle="Your personal document vault — only you can see what's in here. Bookmark SDMS references or upload files directly."
         actions={
           <>
             <Button variant="secondary" onClick={() => setNewFolderOpen(true)}>
@@ -333,6 +349,7 @@ export function SdmsStoragePage() {
             onSelect={(s) => setSelection(s)}
             trashCount={trashItems.length}
             starredCount={starredItems.length}
+            onFolderAction={handleFolderAction}
           />
         </aside>
 
@@ -353,17 +370,20 @@ export function SdmsStoragePage() {
                       key: 'rename',
                       label: 'Rename folder',
                       icon: Pencil,
-                      onClick: () => {
-                        setRenameFolderTarget(activeFolder)
-                        setRenameFolderValue(activeFolder.name)
-                      },
+                      onClick: () => handleFolderAction(activeFolder, 'rename'),
+                    },
+                    {
+                      key: 'move',
+                      label: 'Move folder…',
+                      icon: FolderInput,
+                      onClick: () => handleFolderAction(activeFolder, 'move'),
                     },
                     {
                       key: 'delete',
                       label: 'Delete folder',
                       icon: Trash2,
                       danger: true,
-                      onClick: () => setDeleteFolderTarget(activeFolder),
+                      onClick: () => handleFolderAction(activeFolder, 'delete'),
                     },
                   ]}
                 />
@@ -399,7 +419,7 @@ export function SdmsStoragePage() {
             childFolders.length === 0 && items.length === 0 ? (
               <EmptyState
                 icon={Bookmark}
-                title={headerTitle === 'My Storage' ? 'Your storage is empty' : `Nothing in ${headerTitle}`}
+                title={headerTitle === 'Storage' ? 'Your storage is empty' : `Nothing in ${headerTitle}`}
                 description={
                   search
                     ? 'No items match your search.'
@@ -416,22 +436,36 @@ export function SdmsStoragePage() {
                 onFolderClick={(f) => setSelection({ view: 'folder', folderId: f.id })}
                 onItemClick={handleItemClick}
                 hideFolders={selection.view !== 'folder'}
+                onFolderAction={handleFolderAction}
               />
             )
           ) : (
-            <DataTable
-              table={table}
-              columns={columns}
-              emptyIcon={Bookmark}
-              emptyMessage={
-                search
-                  ? 'No items match your search'
-                  : selection.view === 'trash'
-                  ? 'Trash is empty'
-                  : 'Your storage is empty — open any document and click Add to Storage to bookmark it.'
-              }
-              onRowClick={handleItemClick}
-            />
+            <>
+              {selection.view === 'folder' && childFolders.length > 0 && (
+                <FolderListSection
+                  folders={childFolders}
+                  allItems={allItems}
+                  allFolders={folders}
+                  onFolderClick={(f) => setSelection({ view: 'folder', folderId: f.id })}
+                  onFolderAction={handleFolderAction}
+                />
+              )}
+              <DataTable
+                table={table}
+                columns={columns}
+                emptyIcon={Bookmark}
+                emptyMessage={
+                  search
+                    ? 'No items match your search'
+                    : selection.view === 'trash'
+                    ? 'Trash is empty'
+                    : childFolders.length > 0
+                    ? 'No files in this folder yet — only subfolders.'
+                    : 'Your storage is empty — open any document and click Add to Storage to bookmark it.'
+                }
+                onRowClick={handleItemClick}
+              />
+            </>
           )}
         </div>
       </div>
@@ -470,7 +504,7 @@ export function SdmsStoragePage() {
           <p className="text-[12px] text-zinc-500">
             {selection.view === 'folder' && breadcrumbPath.length > 0
               ? `Inside ${breadcrumbPath[breadcrumbPath.length - 1].name}`
-              : 'At the root of My Storage'}
+              : 'At the root of Storage'}
           </p>
           <Input
             autoFocus
@@ -557,7 +591,7 @@ export function SdmsStoragePage() {
         folderLabel={
           selection.view === 'folder' && breadcrumbPath.length > 0
             ? breadcrumbPath[breadcrumbPath.length - 1].name
-            : 'My Storage'
+            : 'Storage'
         }
       />
 
@@ -575,6 +609,12 @@ export function SdmsStoragePage() {
         open={!!moveItemTarget}
         item={moveItemTarget}
         onClose={() => setMoveItemTarget(null)}
+      />
+
+      <MoveStorageFolderModal
+        open={!!moveFolderTarget}
+        folder={moveFolderTarget}
+        onClose={() => setMoveFolderTarget(null)}
       />
 
       <Modal
@@ -658,18 +698,18 @@ export function SdmsStoragePage() {
           Delete <span className="font-medium text-zinc-700">{deleteFolderTarget?.name}</span>?
         </p>
         <p className="text-[12px] text-zinc-500 mt-2">
-          {activeFolderChildCount.items > 0 && (
+          {deleteFolderChildCount.items > 0 && (
             <>
-              {activeFolderChildCount.items} file{activeFolderChildCount.items === 1 ? '' : 's'} inside will move to{' '}
-              <span className="font-medium text-zinc-700">My Storage</span> (root).{' '}
+              {deleteFolderChildCount.items} file{deleteFolderChildCount.items === 1 ? '' : 's'} inside will move to{' '}
+              <span className="font-medium text-zinc-700">Storage</span> (root).{' '}
             </>
           )}
-          {activeFolderChildCount.folders > 0 && (
+          {deleteFolderChildCount.folders > 0 && (
             <>
-              {activeFolderChildCount.folders} subfolder{activeFolderChildCount.folders === 1 ? '' : 's'} will move up one level.
+              {deleteFolderChildCount.folders} subfolder{deleteFolderChildCount.folders === 1 ? '' : 's'} will move up one level.
             </>
           )}
-          {activeFolderChildCount.items === 0 && activeFolderChildCount.folders === 0 && 'This folder is empty.'}
+          {deleteFolderChildCount.items === 0 && deleteFolderChildCount.folders === 0 && 'This folder is empty.'}
         </p>
       </Modal>
 
@@ -723,7 +763,7 @@ function StorageBreadcrumb({ selection, path, onNavigate }: StorageBreadcrumbPro
         onClick={() => onNavigate({ view: 'folder', folderId: null })}
         className="text-zinc-400 hover:text-zinc-600 transition-colors"
       >
-        My Storage
+        Storage
       </button>
       {selection.view === 'folder' && path.map((folder, i) => {
         const isLast = i === path.length - 1

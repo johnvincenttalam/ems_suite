@@ -326,7 +326,7 @@ function DetailsTab({ item }: { item: StorageItem }) {
   }, [folders, item.folderId])
 
   const location =
-    folderPath.length === 0 ? 'My Storage (root)' : ['My Storage', ...folderPath.map((f) => f.name)].join(' › ')
+    folderPath.length === 0 ? 'Storage (root)' : ['Storage', ...folderPath.map((f) => f.name)].join(' › ')
 
   return (
     <div className="space-y-6">

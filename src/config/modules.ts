@@ -100,7 +100,7 @@ export const modules: EmsModule[] = [
           { label: 'My Tasks', path: 'my-tasks', icon: ListChecks, feature: 'sdmsMyTasks' },
           { label: 'Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
           { label: 'Smart Search', path: 'smart-search', icon: Sparkles, feature: 'sdmsSmartSearch' },
-          { label: 'My Storage', path: 'storage', icon: Bookmark, feature: 'sdmsStorage' },
+          { label: 'Storage', path: 'storage', icon: Bookmark, feature: 'sdmsStorage' },
           { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'documentsReports' },
         ],
       },
