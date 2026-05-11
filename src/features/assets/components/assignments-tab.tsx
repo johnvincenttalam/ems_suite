@@ -1,13 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
-import { ClipboardList, Undo2 } from 'lucide-react'
+import { ClipboardList, Plus, Undo2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod/v4'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { useAssetAssignments, useAssets } from '@/features/assets'
+import { useAssetAssignments, useAssets, useAssignAsset, useReturnAsset } from '@/features/assets'
 import { useUsers } from '@/features/users'
+import { useAuthStore } from '@/features/auth'
+import { useAssetsSettings } from '@/features/assets/store/assets-settings-store'
 import type { AssetAssignment } from '@/features/assets/types'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
+import { Button } from '@/shared/ui/button'
+import { Modal } from '@/shared/ui/modal'
+import { Select } from '@/shared/ui/select'
+import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { ListToolbar } from '@/shared/ui/list-toolbar'
@@ -21,22 +30,113 @@ const filterOptions: { value: AssignmentFilter; label: string }[] = [
   { value: 'returned', label: 'Returned' },
 ]
 
+const assignSchema = z.object({
+  assetId: z.string().min(1, 'Asset is required'),
+  assignedTo: z.string().min(1, 'User is required'),
+  notes: z.string().optional(),
+})
+
+type AssignForm = z.infer<typeof assignSchema>
+
 export function AssignmentsTab() {
   const { data: assignments = [], isLoading } = useAssetAssignments()
   const { data: assets = [] } = useAssets()
   const { data: users = [] } = useUsers()
+  const currentUser = useAuthStore((s) => s.user)
+  const settings = useAssetsSettings((s) => s.settings)
+  const assignMutation = useAssignAsset()
+  const returnMutation = useReturnAsset()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AssignmentFilter>('all')
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [returnTarget, setReturnTarget] = useState<AssetAssignment | null>(null)
+  const [returnNotes, setReturnNotes] = useState('')
+
+  const assignForm = useForm<AssignForm>({
+    resolver: zodResolver(assignSchema),
+    defaultValues: { assetId: '', assignedTo: '', notes: '' },
+  })
+
+  const assignableAssets = useMemo(
+    () => assets.filter((a) => !a.assignedTo && a.status === 'active'),
+    [assets],
+  )
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return assignments
     if (statusFilter === 'active') return assignments.filter((a) => !a.returnedDate)
     return assignments.filter((a) => !!a.returnedDate)
   }, [assignments, statusFilter])
+
+  function openAssign() {
+    assignForm.reset({ assetId: '', assignedTo: '', notes: '' })
+    setAssignOpen(true)
+  }
+
+  function closeAssign() {
+    setAssignOpen(false)
+    assignForm.reset({ assetId: '', assignedTo: '', notes: '' })
+  }
+
+  function onAssignSubmit(data: AssignForm) {
+    if (!currentUser) {
+      toast.error('You must be signed in')
+      return
+    }
+    assignMutation.mutate(
+      {
+        assetId: data.assetId,
+        userId: data.assignedTo,
+        notes: data.notes,
+        actorName: currentUser.name,
+      },
+      {
+        onSuccess: ({ asset, assignment }) => {
+          const u = userMap[assignment.assignedTo]
+          toast.success(`Assigned ${asset.name} to ${u?.name ?? assignment.assignedTo}`)
+          closeAssign()
+        },
+        onError: (err) =>
+          toast.error('Assignment failed', {
+            description: err instanceof Error ? err.message : 'Unknown error',
+          }),
+      },
+    )
+  }
+
+  function closeReturn() {
+    setReturnTarget(null)
+    setReturnNotes('')
+  }
+
+  function onReturnSubmit() {
+    if (!returnTarget || !currentUser) return
+    if (settings.requireReturnNotes && returnNotes.trim().length < 2) {
+      toast.error('Return notes are required (per Settings → Assignments)')
+      return
+    }
+    returnMutation.mutate(
+      {
+        assetId: returnTarget.assetId,
+        actorName: currentUser.name,
+        notes: returnNotes.trim() || undefined,
+      },
+      {
+        onSuccess: (asset) => {
+          toast.success(`${asset.name} returned`)
+          closeReturn()
+        },
+        onError: (err) =>
+          toast.error('Return failed', {
+            description: err instanceof Error ? err.message : 'Unknown error',
+          }),
+      },
+    )
+  }
 
   const columns = useMemo<ColumnDef<AssetAssignment>[]>(() => [
     { accessorKey: 'assignedDate', header: 'Assigned', cell: ({ getValue }) => (
@@ -70,7 +170,11 @@ export function AssignmentsTab() {
       if (row.original.returnedDate) return null
       return (
         <button
-          onClick={() => toast.success(`Returned ${assetMap[row.original.assetId]?.name ?? 'asset'}`)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setReturnTarget(row.original)
+            setReturnNotes('')
+          }}
           title="Mark returned"
           className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
         >
@@ -87,6 +191,10 @@ export function AssignmentsTab() {
   })
 
   if (isLoading) return <TableSkeleton columns={6} rows={6} />
+
+  const returnAsset = returnTarget ? assetMap[returnTarget.assetId] : undefined
+  const returnUser = returnTarget ? userMap[returnTarget.assignedTo] : undefined
+  const returnNotesRequired = settings.requireReturnNotes
 
   return (
     <div>
@@ -107,6 +215,9 @@ export function AssignmentsTab() {
             { key: 'notes', label: 'Notes' },
           ]}
         />
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAssign} disabled={assignableAssets.length === 0}>
+          Assign Asset
+        </Button>
       </ListToolbar>
 
       <DataTable
@@ -115,6 +226,92 @@ export function AssignmentsTab() {
         emptyIcon={ClipboardList}
         emptyMessage="No assignments to show"
       />
+
+      <Modal
+        open={assignOpen}
+        onClose={closeAssign}
+        title="Assign Asset"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={assignMutation.isPending} onClick={closeAssign}>
+              Cancel
+            </Button>
+            <Button type="submit" form="asset-assign-form" loading={assignMutation.isPending}>
+              Confirm Assignment
+            </Button>
+          </>
+        }
+      >
+        <form id="asset-assign-form" onSubmit={assignForm.handleSubmit(onAssignSubmit)} className="space-y-4">
+          {assignableAssets.length === 0 ? (
+            <p className="text-[12.5px] text-zinc-500">
+              No assets are currently available for assignment. Return an active assignment first, or register a new asset.
+            </p>
+          ) : (
+            <>
+              <Select
+                label="Asset *"
+                {...assignForm.register('assetId')}
+                error={assignForm.formState.errors.assetId?.message}
+                placeholder="Select asset"
+                options={assignableAssets.map((a) => ({
+                  value: a.id,
+                  label: `${a.name} · ${a.serialNumber}`,
+                }))}
+              />
+              <Select
+                label="Assign To *"
+                {...assignForm.register('assignedTo')}
+                error={assignForm.formState.errors.assignedTo?.message}
+                placeholder="Select user"
+                options={users
+                  .filter((u) => u.status === 'active')
+                  .map((u) => ({ value: u.id, label: u.name }))}
+              />
+              <Textarea label="Notes" {...assignForm.register('notes')} rows={3} />
+            </>
+          )}
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!returnTarget}
+        onClose={closeReturn}
+        title={`Return ${returnAsset?.name ?? 'Asset'}`}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="secondary" disabled={returnMutation.isPending} onClick={closeReturn}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={returnMutation.isPending}
+              disabled={returnNotesRequired && returnNotes.trim().length < 2}
+              onClick={onReturnSubmit}
+            >
+              Confirm Return
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {returnUser && (
+            <p className="text-[13px] text-zinc-500">
+              Currently assigned to <span className="font-medium text-zinc-700">{returnUser.name}</span>.
+              Returning closes the open assignment record and frees the asset for reassignment.
+            </p>
+          )}
+          <Textarea
+            label={returnNotesRequired ? 'Handover Notes *' : 'Handover Notes'}
+            rows={3}
+            value={returnNotes}
+            onChange={(e) => setReturnNotes(e.target.value)}
+            placeholder="Condition, location, any observations…"
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -15,6 +15,8 @@ export { AssetsTrackingScansPage } from './pages/assets-tracking-scans-page'
 export {
   useAssets,
   useAssetAssignments,
+  useAssignAsset,
+  useReturnAsset,
   useAssetEvents,
   useAssetInspections,
 } from './hooks/use-assets'
