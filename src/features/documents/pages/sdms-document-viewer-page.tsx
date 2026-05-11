@@ -65,6 +65,7 @@ export function SdmsDocumentViewerPage() {
   const queryClient = useQueryClient()
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const departmentNameById = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments])
   const doc = useMemo(() => documents.find((d) => d.id === id), [documents, id])
   const dept = doc?.departmentId ? departments.find((d) => d.id === doc.departmentId) : null
 
@@ -419,7 +420,7 @@ export function SdmsDocumentViewerPage() {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start">
-          <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} />
+          <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} departmentNameById={departmentNameById} />
 
           <div className="bg-white rounded-xl border border-zinc-200/60 p-4 space-y-3">
             <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Actions</p>
@@ -776,9 +777,10 @@ interface WorkflowProgressProps {
   doc: AppDocument
   userMap: Record<string, User | undefined>
   currentUserId?: string
+  departmentNameById: Map<string, string>
 }
 
-function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps) {
+function WorkflowProgress({ doc, userMap, currentUserId, departmentNameById }: WorkflowProgressProps) {
   const signatureMap = Object.fromEntries(
     doc.signatures.filter((s) => !s.revokedAt).map((s) => [s.signerId, s]),
   )
@@ -875,8 +877,14 @@ function WorkflowProgress({ doc, userMap, currentUserId }: WorkflowProgressProps
                   ) : (
                     <span>{step.actor}{step.actorIsYou ? ' (You)' : ''}</span>
                   )}
-                  {step.actorUser?.position && (
-                    <p className="text-[11px] text-zinc-400 leading-tight mt-0.5">{step.actorUser.position}</p>
+                  {(step.actorUser?.position || step.actorUser?.departmentId) && (
+                    <p className="text-[11px] text-zinc-400 leading-tight mt-0.5">
+                      {step.actorUser?.position}
+                      {step.actorUser?.position && step.actorUser?.departmentId && departmentNameById.get(step.actorUser.departmentId) && (
+                        <span className="text-zinc-300"> · </span>
+                      )}
+                      {step.actorUser?.departmentId && departmentNameById.get(step.actorUser.departmentId)}
+                    </p>
                   )}
                 </div>
               )}

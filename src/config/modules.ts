@@ -99,6 +99,7 @@ export const modules: EmsModule[] = [
           { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'sdmsDashboard' },
           { label: 'My Tasks', path: 'my-tasks', icon: ListChecks, feature: 'sdmsMyTasks' },
           { label: 'Documents', path: 'documents', icon: FolderOpen, feature: 'documents' },
+          { label: 'Workflow', path: 'workflow-templates', icon: Workflow, feature: 'sdmsWorkflowTemplates' },
           { label: 'Smart Search', path: 'smart-search', icon: Sparkles, feature: 'sdmsSmartSearch' },
           { label: 'Storage', path: 'storage', icon: Bookmark, feature: 'sdmsStorage' },
           { label: 'Reports', path: 'reports', icon: ClipboardCheck, feature: 'documentsReports' },
@@ -108,7 +109,6 @@ export const modules: EmsModule[] = [
         title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
-          { label: 'Workflow', path: 'workflow-templates', icon: Workflow, feature: 'sdmsWorkflowTemplates' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
         ],
       },
