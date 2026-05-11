@@ -363,7 +363,7 @@ function PreviewContent({ doc, assetUrl, fileType, fileName, compact }: PreviewC
           </div>
         }
       >
-        <PdfViewer doc={doc} url={assetUrl} userMap={{}} />
+        <PdfViewer doc={doc} url={assetUrl} userMap={{}} toolbarPosition="bottom" />
       </Suspense>
     )
   }

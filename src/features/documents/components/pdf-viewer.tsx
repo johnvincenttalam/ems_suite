@@ -6,6 +6,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AppDocument, SignatureSlot } from '@/features/documents/types'
 import { Spinner } from '@/shared/ui/spinner'
+import { cn } from '@/shared/utils/cn'
 import { SignatureLayer, PlacementOverlay } from './signature'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
@@ -16,9 +17,14 @@ interface PdfViewerProps {
   userMap: Record<string, { name: string } | undefined>
   placementMode?: boolean
   onSlotPlaced?: (slot: Omit<SignatureSlot, 'key'>) => void
+  /** Where to render the page navigator. `top-sticky` (default) is the SDMS
+   * viewer behavior — the bar sticks under the topbar while scrolling. `bottom`
+   * places it as a fixed bar at the bottom of the viewer, useful inside slide-in
+   * drawers where the topbar sticky offset doesn't apply. */
+  toolbarPosition?: 'top-sticky' | 'bottom'
 }
 
-export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlaced }: PdfViewerProps) {
+export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlaced, toolbarPosition = 'top-sticky' }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [numPages, setNumPages] = useState<number>(0)
@@ -75,6 +81,64 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
 
   const pages = useMemo(() => Array.from({ length: numPages }, (_, i) => i + 1), [numPages])
 
+  const toolbar = showToolbar ? (
+    <div
+      className={cn(
+        'flex justify-center',
+        toolbarPosition === 'top-sticky'
+          ? 'sticky top-[calc(var(--topbar-h)+1rem)] z-10 mb-3'
+          : 'sticky bottom-2 z-10 mt-3',
+      )}
+    >
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur">
+        <button
+          type="button"
+          onClick={() => scrollToPage(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="p-1 rounded text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Previous page"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="flex items-center gap-1 text-[12px] text-zinc-700">
+          <span>Page</span>
+          <input
+            type="number"
+            min={1}
+            max={numPages}
+            value={pageInputValue}
+            onChange={(e) => setPageInputValue(e.target.value)}
+            onBlur={() => {
+              const n = Number(pageInputValue)
+              const target = Number.isFinite(n) && n >= 1
+                ? Math.min(Math.max(Math.floor(n), 1), numPages)
+                : currentPage
+              scrollToPage(target)
+              setPageInputValue(String(target))
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                ;(e.currentTarget as HTMLInputElement).blur()
+              }
+            }}
+            className="w-10 px-1 py-0.5 text-center tabular-nums border border-zinc-200 rounded text-[12px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+          />
+          <span className="text-zinc-400">of {numPages}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => scrollToPage(currentPage + 1)}
+          disabled={currentPage >= numPages}
+          className="p-1 rounded text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Next page"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  ) : null
+
   return (
     <div ref={containerRef} className="rounded-lg border border-zinc-200/60 bg-zinc-100/50 p-4">
       {error ? (
@@ -86,56 +150,7 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
           onLoadError={(err) => setError(err.message || 'Failed to load PDF')}
           loading={<div className="flex justify-center py-16"><Spinner size="lg" /></div>}
         >
-          {showToolbar && (
-            <div className="sticky top-[calc(var(--topbar-h)+1rem)] z-10 flex justify-center mb-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => scrollToPage(currentPage - 1)}
-                  disabled={currentPage <= 1}
-                  className="p-1 rounded text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Previous page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <div className="flex items-center gap-1 text-[12px] text-zinc-700">
-                  <span>Page</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={numPages}
-                    value={pageInputValue}
-                    onChange={(e) => setPageInputValue(e.target.value)}
-                    onBlur={() => {
-                      const n = Number(pageInputValue)
-                      const target = Number.isFinite(n) && n >= 1
-                        ? Math.min(Math.max(Math.floor(n), 1), numPages)
-                        : currentPage
-                      scrollToPage(target)
-                      setPageInputValue(String(target))
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        ;(e.currentTarget as HTMLInputElement).blur()
-                      }
-                    }}
-                    className="w-10 px-1 py-0.5 text-center tabular-nums border border-zinc-200 rounded text-[12px] focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                  />
-                  <span className="text-zinc-400">of {numPages}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => scrollToPage(currentPage + 1)}
-                  disabled={currentPage >= numPages}
-                  className="p-1 rounded text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Next page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          {toolbarPosition === 'top-sticky' && toolbar}
 
           <div className="space-y-4">
             {pages.map((page) => (
@@ -154,6 +169,8 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
               </div>
             ))}
           </div>
+
+          {toolbarPosition === 'bottom' && toolbar}
         </Document>
       )}
     </div>
