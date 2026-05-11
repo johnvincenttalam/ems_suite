@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Star,
   RotateCcw,
+  UploadCloud,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
@@ -42,6 +43,8 @@ import { getModulePath } from '@/config/modules'
 import { cn } from '@/shared/utils/cn'
 import { FolderTree, type StorageSelection } from '@/features/documents/components/folder-tree'
 import { StorageGrid } from '@/features/documents/components/storage-grid'
+import { StoragePreviewDrawer } from '@/features/documents/components/storage-preview-drawer'
+import { UploadToStorageModal } from '@/features/documents/components/upload-to-storage-modal'
 
 const SORT_OPTIONS: { value: StorageSort; label: string }[] = [
   { value: 'date_desc',  label: 'Newest first' },
@@ -103,6 +106,9 @@ export function SdmsStoragePage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const createFolder = useCreateStorageFolder()
+
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [previewItem, setPreviewItem] = useState<StorageItem | null>(null)
 
   const [trashTarget, setTrashTarget] = useState<StorageItem | null>(null)
   const [emptyTrashOpen, setEmptyTrashOpen] = useState(false)
@@ -261,19 +267,7 @@ export function SdmsStoragePage() {
   })
 
   function handleItemClick(item: StorageItem) {
-    if (selection.view === 'trash') {
-      restoreItem.mutate(item.id, {
-        onSuccess: () => toast.success('Restored from trash'),
-        onError: (err) =>
-          toast.error('Restore failed', {
-            description: err instanceof Error ? err.message : 'Unknown error',
-          }),
-      })
-      return
-    }
-    if (item.documentId) {
-      navigate(getModulePath('sdms', `documents/${item.documentId}`))
-    }
+    setPreviewItem(item)
   }
 
   const headerTitle =
@@ -289,10 +283,16 @@ export function SdmsStoragePage() {
         title="My Storage"
         subtitle="Your document vault — bookmark SDMS references and organize them into folders."
         actions={
-          <Button variant="secondary" onClick={() => setNewFolderOpen(true)}>
-            <FolderPlus className="w-3.5 h-3.5" />
-            New folder
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => setNewFolderOpen(true)}>
+              <FolderPlus className="w-3.5 h-3.5" />
+              New folder
+            </Button>
+            <Button onClick={() => setUploadOpen(true)}>
+              <UploadCloud className="w-3.5 h-3.5" />
+              Upload
+            </Button>
+          </>
         }
       />
 
@@ -492,6 +492,23 @@ export function SdmsStoragePage() {
           {trashItems.length} item{trashItems.length === 1 ? '' : 's'} will be permanently deleted. This cannot be undone.
         </p>
       </Modal>
+
+      <UploadToStorageModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        folderId={selection.view === 'folder' ? selection.folderId : null}
+        folderLabel={
+          selection.view === 'folder' && breadcrumbPath.length > 0
+            ? breadcrumbPath[breadcrumbPath.length - 1].name
+            : 'My Storage'
+        }
+      />
+
+      <StoragePreviewDrawer
+        open={!!previewItem}
+        item={previewItem}
+        onClose={() => setPreviewItem(null)}
+      />
 
       {currentUser ? null : null}
     </div>
