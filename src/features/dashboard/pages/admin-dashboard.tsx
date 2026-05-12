@@ -18,6 +18,7 @@ import { formatCompactCurrency, formatCurrency } from '@/shared/utils/format'
 import { RecentActivityWidget } from '@/features/dashboard/components/recent-activity-widget'
 import { DepartmentPerformanceWidget } from '@/features/dashboard/components/department-performance-widget'
 import { QualityScorecard } from '@/shared/qms'
+import { InsightsPanel, useInsights } from '@/shared/insights'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -46,6 +47,7 @@ export function AdminDashboard() {
   const k = data.kpis
   const { data: issues = [] } = useIssues({ status: 'all-open' })
   const openCritical = issues.filter((i) => i.severity === 'critical').length
+  const { insights, isLoading: insightsLoading } = useInsights()
 
   if (data.isLoading) {
     return (
@@ -81,6 +83,10 @@ export function AdminDashboard() {
         <StatCard title="Active Assets"    value={k.activeAssets}                          subtitle={`${k.assetsInMaintenance} in maintenance`}                                        icon={Package}      iconBg="bg-emerald-50" iconColor="text-emerald-600" index={1} />
         <StatCard title="Approved Spend"   value={formatCompactCurrency(k.monthSpend)}     subtitle={`${k.pendingRequests} pending approval`}                                          icon={ShoppingCart} iconBg="bg-violet-50"  iconColor="text-violet-500"  index={2} />
         <StatCard title="Open Work Orders" value={k.overdueWorkOrders}                     subtitle={k.overdueWorkOrders > 0 ? 'Past scheduled date' : 'All on track'}                  icon={Wrench}       iconBg="bg-amber-50"   iconColor="text-amber-500"   index={3} />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <InsightsPanel insights={insights} loading={insightsLoading} limit={6} />
       </motion.div>
 
       <motion.div variants={itemVariants}>
