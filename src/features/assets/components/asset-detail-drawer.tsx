@@ -14,6 +14,7 @@ import {
   Plus,
   AlertTriangle,
   AlertCircle,
+  Gauge,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -46,6 +47,7 @@ import type { Issue } from '@/features/issues'
 import type {
   Asset,
   AssetEventType,
+  AssetMeterUnit,
   Inspection,
   InspectionLine,
 } from '@/features/assets/types'
@@ -341,6 +343,8 @@ function MaintenanceTab({ asset }: { asset: Asset }) {
 
   return (
     <div className="space-y-5">
+      <MeterPanel asset={asset} />
+
       <div className="flex items-center justify-between">
         <p className="text-[12px] text-zinc-500">
           {orders.length} work order{orders.length === 1 ? '' : 's'} on file
@@ -873,6 +877,7 @@ function EventIcon({ type }: { type: AssetEventType }) {
     disposal_submitted: { icon: AlertTriangle, bg: 'bg-orange-50', color: 'text-orange-700' },
     disposal_approved: { icon: CheckCircle2, bg: 'bg-zinc-100', color: 'text-zinc-700' },
     disposal_rejected: { icon: XCircle, bg: 'bg-blue-50', color: 'text-blue-700' },
+    meter_updated: { icon: Gauge, bg: 'bg-blue-50', color: 'text-blue-700' },
   }
   const meta = map[type] ?? { icon: HistoryIcon, bg: 'bg-zinc-100', color: 'text-zinc-700' }
   const Icon = meta.icon
@@ -912,6 +917,128 @@ function EmptyState({ icon: Icon, message }: { icon: typeof Package; message: st
     <div className="text-center py-12">
       <Icon className="w-7 h-7 text-zinc-300 mx-auto mb-2" />
       <p className="text-[13px] text-zinc-500">{message}</p>
+    </div>
+  )
+}
+
+const METER_UNIT_LABEL: Record<AssetMeterUnit, string> = {
+  hours: 'hours',
+  kilometers: 'km',
+  cycles: 'cycles',
+}
+
+function MeterPanel({ asset }: { asset: Asset }) {
+  const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.user)
+  const [editing, setEditing] = useState(false)
+  const [reading, setReading] = useState('')
+  const [unit, setUnit] = useState<AssetMeterUnit>(asset.meterUnit ?? 'hours')
+  const [error, setError] = useState<string | null>(null)
+
+  const hasMeter = asset.meterUnit !== undefined && asset.currentMeter !== undefined
+  const isLocked = !!asset.meterUnit
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      if (!currentUser) throw new Error('Not signed in')
+      const value = Number(reading)
+      if (!Number.isFinite(value)) throw new Error('Enter a numeric reading')
+      return assetsApi.updateMeter(asset.id, value, currentUser.name, isLocked ? undefined : unit)
+    },
+    onSuccess: () => {
+      toast.success('Meter updated')
+      setEditing(false)
+      setReading('')
+      setError(null)
+      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      queryClient.invalidateQueries({ queryKey: ['preventive-schedules'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Update failed'),
+  })
+
+  if (asset.status === 'disposed' && !hasMeter) return null
+
+  return (
+    <div className="bg-zinc-50/60 border border-zinc-200/60 rounded-xl p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <Gauge className="w-4 h-4 text-blue-700" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Meter</p>
+            {hasMeter ? (
+              <>
+                <p className="text-[15px] font-semibold text-zinc-900 tabular-nums mt-0.5">
+                  {asset.currentMeter} {METER_UNIT_LABEL[asset.meterUnit as AssetMeterUnit]}
+                </p>
+                {asset.meterUpdatedAt && (
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Updated {format(parseISO(asset.meterUpdatedAt), 'MMM d, yyyy')}
+                    {asset.meterUpdatedBy ? ` by ${asset.meterUpdatedBy}` : ''}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[13px] text-zinc-500 mt-0.5">No meter configured.</p>
+            )}
+          </div>
+        </div>
+        {!editing && asset.status !== 'disposed' && (
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            {hasMeter ? 'Update reading' : 'Configure meter'}
+          </Button>
+        )}
+      </div>
+
+      {editing && (
+        <div className="mt-4 space-y-3">
+          {!isLocked && (
+            <div>
+              <Select
+                label="Meter Unit *"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value as AssetMeterUnit)}
+                options={[
+                  { value: 'hours', label: 'Hours' },
+                  { value: 'kilometers', label: 'Kilometers' },
+                  { value: 'cycles', label: 'Cycles' },
+                ]}
+              />
+              <p className="text-[11px] text-zinc-400 mt-1">Locked after the first reading is saved.</p>
+            </div>
+          )}
+          <Input
+            label={`New Reading * (${isLocked ? METER_UNIT_LABEL[asset.meterUnit as AssetMeterUnit] : METER_UNIT_LABEL[unit]})`}
+            type="number"
+            min={asset.currentMeter ?? 0}
+            step="1"
+            value={reading}
+            onChange={(e) => { setReading(e.target.value); setError(null) }}
+            placeholder={asset.currentMeter !== undefined ? `≥ ${asset.currentMeter}` : '0'}
+            error={error ?? undefined}
+          />
+          <div className="flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { setEditing(false); setReading(''); setError(null) }}
+              disabled={updateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              loading={updateMutation.isPending}
+              disabled={!reading.trim()}
+              onClick={() => updateMutation.mutate()}
+            >
+              Save reading
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
