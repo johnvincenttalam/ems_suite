@@ -17,7 +17,7 @@ import { usersApi } from '@/features/users/api/users-api'
 import type { User } from '@/features/users/types'
 import { useWorkOrders } from '@/features/maintenance'
 import { useAuthStore } from '@/features/auth/store/auth-store'
-import { isModuleAdmin } from '@/features/auth'
+import { isModuleAdmin, userModules } from '@/features/auth'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -59,7 +59,7 @@ export function MaintenanceUsersPage() {
   const revokeMutation = useMutation({
     mutationFn: (userId: string) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.removeFromModule(userId, 'maintenance', 'Maintenance', currentUser.id)
+      return usersApi.setModuleRole({ userId, moduleKey: 'maintenance', role: null, auditModule: 'Maintenance', byId: currentUser.id })
     },
     onSuccess: (user) => {
       toast.success(`Revoked ${user.name}'s Maintenance access`)
@@ -74,11 +74,11 @@ export function MaintenanceUsersPage() {
   const adminMutation = useMutation({
     mutationFn: ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.setModuleAdmin({
+      return usersApi.setModuleRole({
         userId,
         moduleKey: 'maintenance',
         auditModule: 'Maintenance',
-        makeAdmin,
+        role: makeAdmin ? 'admin' : 'member',
         byId: currentUser.id,
       })
     },
@@ -95,7 +95,7 @@ export function MaintenanceUsersPage() {
   const maintUsers = useMemo<UserActivity[]>(() => {
     const today = new Date()
     return allUsers
-      .filter((u) => u.modules.includes('maintenance'))
+      .filter((u) => !!u.moduleRoles?.maintenance)
       .map((u) => {
         const assigned = workOrders.filter((w) => w.assignedTo === u.id)
         const open = assigned.filter((w) => w.status === 'pending' || w.status === 'ongoing')
@@ -128,7 +128,7 @@ export function MaintenanceUsersPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium text-zinc-900 truncate">{row.original.name}</p>
-                {row.original.moduleAdmins?.includes('maintenance') && (
+                {isModuleAdmin(row.original, 'maintenance') && (
                   <span title="Maintenance module admin" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-medium border border-violet-200">
                     <Crown className="w-2.5 h-2.5" />
                     Admin
@@ -136,7 +136,7 @@ export function MaintenanceUsersPage() {
                 )}
               </div>
               <p className="text-xs text-zinc-400 truncate">{row.original.position ?? row.original.email}</p>
-              <ModuleAccessPills modules={row.original.modules} excludeModule="maintenance" className="mt-1" />
+              <ModuleAccessPills modules={userModules(row.original)} excludeModule="maintenance" className="mt-1" />
             </div>
           </div>
         ),
@@ -193,7 +193,7 @@ export function MaintenanceUsersPage() {
         cell: ({ row }) => {
           const u = row.original
           const isSelf = u.id === currentUser?.id
-          const isAdmin = u.moduleAdmins?.includes('maintenance')
+          const isAdmin = isModuleAdmin(u, 'maintenance')
           const items: ActionMenuItem[] = [
             { key: 'edit', label: 'Edit user', icon: Pencil, onClick: () => setEditTarget(u) },
           ]

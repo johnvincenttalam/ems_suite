@@ -41,9 +41,11 @@ export const appConfig: AppConfig = {
   demo: {
     password: 'demo123',
     accounts: [
-      { email: 'admin@example.com',       label: 'Admin',      scope: 'All modules' },
-      { email: 'operations@example.com',  label: 'Operations', scope: 'MIS, Inventory, Assets, Fleet, Maintenance' },
-      { email: 'documents@example.com',   label: 'Documents',  scope: 'MIS, SDMS' },
+      { email: 'admin@example.com',                 label: 'Platform Admin',     scope: 'Admin · all 7 modules' },
+      { email: 'operations@example.com',            label: 'Operations Lead',    scope: 'Mixed tiers · 6 modules' },
+      { email: 'documents@example.com',             label: 'Document Controller',scope: 'SDMS admin · 2 modules' },
+      { email: 'maintenance-admin@example.com',     label: 'Maintenance Admin',  scope: 'Maintenance admin only' },
+      { email: 'procurement-manager@example.com',   label: 'Procurement Manager',scope: 'Procurement manager · 2 modules' },
     ],
   },
 }

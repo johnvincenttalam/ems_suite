@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import type { ModuleKey } from '@/config/modules'
 import { getModulePath } from '@/config/modules'
 import { useAuthStore } from '@/features/auth/store/auth-store'
-import { isModuleAdmin } from '@/features/auth'
+import { isModuleAdmin, hasModuleAccess, userModules } from '@/features/auth'
 import { useDepartments } from '@/features/departments'
 import { useAuditLog } from '@/features/audit-log'
 import { useUsers } from '@/features/users/hooks/use-users'
@@ -79,8 +79,8 @@ export function UserProfilePage() {
   const targetUser = useMemo(() => users.find((u) => u.id === id), [users, id])
   const dept = targetUser?.departmentId ? departments.find((d) => d.id === targetUser.departmentId) : undefined
   const isSelf = !!currentUser && targetUser?.id === currentUser.id
-  const isAdminInModule = !!targetUser?.moduleAdmins.includes(moduleKey)
-  const inModule = !!targetUser?.modules.includes(moduleKey)
+  const isAdminInModule = isModuleAdmin(targetUser, moduleKey)
+  const inModule = hasModuleAccess(targetUser, moduleKey)
   const canManage = isModuleAdmin(currentUser, moduleKey)
 
   const moduleActivity = useMemo(() => {
@@ -106,7 +106,7 @@ export function UserProfilePage() {
   const revokeMutation = useMutation({
     mutationFn: () => {
       if (!currentUser || !targetUser) throw new Error('Not signed in')
-      return usersApi.removeFromModule(targetUser.id, moduleKey, auditModuleName, currentUser.id)
+      return usersApi.setModuleRole({ userId: targetUser.id, moduleKey, role: null, auditModule: auditModuleName, byId: currentUser.id })
     },
     onSuccess: () => {
       toast.success(`Revoked ${targetUser?.name ?? ''}'s ${moduleLabel} access`)
@@ -122,11 +122,11 @@ export function UserProfilePage() {
   const adminMutation = useMutation({
     mutationFn: ({ makeAdmin }: { makeAdmin: boolean }) => {
       if (!currentUser || !targetUser) throw new Error('Not signed in')
-      return usersApi.setModuleAdmin({
+      return usersApi.setModuleRole({
         userId: targetUser.id,
         moduleKey,
         auditModule: auditModuleName,
-        makeAdmin,
+        role: makeAdmin ? 'admin' : 'member',
         byId: currentUser.id,
       })
     },
@@ -416,20 +416,30 @@ function AccessPanel({ user, currentModule }: { user: User; currentModule: Modul
     <div className="space-y-5">
       <div>
         <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">Module access</p>
-        {user.modules.length === 0 ? (
+        {userModules(user).length === 0 ? (
           <p className="text-[13px] text-zinc-500">No module access.</p>
         ) : (
           <ul className="space-y-2">
-            {user.modules.map((m) => {
-              const isAdmin = user.moduleAdmins.includes(m)
+            {userModules(user).map((m: ModuleKey) => {
+              const role = user.moduleRoles[m]
               return (
                 <li key={m} className="flex items-center justify-between rounded-md border border-zinc-200/60 bg-zinc-50/40 px-3 py-2">
                   <span className="text-[13px] font-medium text-zinc-900">{MODULE_LABEL[m] ?? m}</span>
                   <span className="flex items-center gap-2">
-                    {isAdmin && (
+                    {role === 'admin' && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-medium border border-violet-200">
                         <Crown className="w-2.5 h-2.5" />
                         Admin
+                      </span>
+                    )}
+                    {role === 'manager' && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-medium border border-blue-200">
+                        Manager
+                      </span>
+                    )}
+                    {role === 'member' && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-600 text-[10px] font-medium border border-zinc-200">
+                        Member
                       </span>
                     )}
                     {m === currentModule && (
@@ -447,8 +457,8 @@ function AccessPanel({ user, currentModule }: { user: User; currentModule: Modul
 
       <div>
         <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">Cross-module access</p>
-        <ModuleAccessPills modules={user.modules} excludeModule={currentModule} />
-        {user.modules.filter((m) => m !== currentModule).length === 0 && (
+        <ModuleAccessPills modules={userModules(user)} excludeModule={currentModule} />
+        {userModules(user).filter((m: ModuleKey) => m !== currentModule).length === 0 && (
           <p className="text-[12px] text-zinc-500">No access to other modules.</p>
         )}
       </div>

@@ -8,12 +8,12 @@ import { useAuthStore } from '@/features/auth/store/auth-store'
 import { usersApi, nextEmployeeId } from '@/features/users/api/users-api'
 import { useDepartments } from '@/features/departments'
 import { modules, type ModuleKey } from '@/config/modules'
-import type { User } from '@/features/users/types'
+import type { ModuleRole, User } from '@/features/users/types'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
-import { Checkbox } from '@/shared/ui/checkbox'
+type RoleChoice = 'none' | 'member' | 'manager' | 'admin'
 
 const userSchema = z.object({
   employeeId: z.string().optional(),
@@ -23,10 +23,35 @@ const userSchema = z.object({
   departmentId: z.string().optional(),
   position: z.string().optional(),
   status: z.enum(['active', 'inactive']),
-  modules: z.array(z.string()),
+  // Per-module role picker — 'none' means no access.
+  moduleRoles: z.record(z.string(), z.enum(['none', 'member', 'manager', 'admin'])),
 })
 
 type UserForm = z.infer<typeof userSchema>
+
+const ROLE_OPTIONS: { value: RoleChoice; label: string }[] = [
+  { value: 'none', label: 'No access' },
+  { value: 'member', label: 'Member' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'admin', label: 'Admin' },
+]
+
+function rolesToForm(roles: Partial<Record<ModuleKey, ModuleRole>>): Record<string, RoleChoice> {
+  const out: Record<string, RoleChoice> = {}
+  for (const m of modules) {
+    out[m.key] = (roles[m.key] as RoleChoice | undefined) ?? 'none'
+  }
+  return out
+}
+
+function formToRoles(form: Record<string, RoleChoice>): Partial<Record<ModuleKey, ModuleRole>> {
+  const out: Partial<Record<ModuleKey, ModuleRole>> = {}
+  for (const m of modules) {
+    const choice = form[m.key]
+    if (choice && choice !== 'none') out[m.key] = choice
+  }
+  return out
+}
 
 interface CreateEditUserModalProps {
   open: boolean
@@ -69,7 +94,7 @@ export function CreateEditUserModal({
       departmentId: '',
       position: '',
       status: 'active',
-      modules: [moduleKey],
+      moduleRoles: {},
     },
   })
 
@@ -84,9 +109,11 @@ export function CreateEditUserModal({
         departmentId: user.departmentId ?? '',
         position: user.position ?? '',
         status: user.status,
-        modules: user.modules,
+        moduleRoles: rolesToForm(user.moduleRoles ?? {}),
       })
     } else {
+      const seedRoles: Record<string, RoleChoice> = {}
+      for (const m of modules) seedRoles[m.key] = m.key === moduleKey ? 'member' : 'none'
       reset({
         employeeId: nextEmployeeId(),
         name: '',
@@ -95,7 +122,7 @@ export function CreateEditUserModal({
         departmentId: '',
         position: '',
         status: 'active',
-        modules: [moduleKey],
+        moduleRoles: seedRoles,
       })
     }
   }, [open, isEdit, user, moduleKey, reset])
@@ -111,7 +138,7 @@ export function CreateEditUserModal({
         departmentId: input.departmentId,
         position: input.position,
         status: input.status,
-        modules: input.modules as ModuleKey[],
+        moduleRoles: formToRoles(input.moduleRoles as Record<string, RoleChoice>),
         createdBy: currentUser.id,
       })
     },
@@ -136,7 +163,7 @@ export function CreateEditUserModal({
         departmentId: input.departmentId,
         position: input.position,
         status: input.status,
-        modules: input.modules as ModuleKey[],
+        moduleRoles: formToRoles(input.moduleRoles as Record<string, RoleChoice>),
         updatedBy: currentUser.id,
       })
     },
@@ -238,31 +265,34 @@ export function CreateEditUserModal({
         </div>
 
         <div>
-          <p className="text-[13px] font-medium text-zinc-700 mb-2">Module Access</p>
+          <p className="text-[13px] font-medium text-zinc-700 mb-1">Module Access</p>
+          <p className="text-[12px] text-zinc-500 mb-3">
+            Pick a role per module. Admin manages the module; manager reviews / approves; member is day-to-day access.
+          </p>
           <Controller
-            name="modules"
+            name="moduleRoles"
             control={control}
-            render={({ field }) => (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {modules.map((m) => {
-                  const checked = (field.value as string[]).includes(m.key)
-                  return (
-                    <label key={m.key} className="flex items-center gap-2 cursor-pointer text-sm text-zinc-700">
-                      <Checkbox
-                        checked={checked}
-                        onChange={(on) => {
-                          const next = on
-                            ? [...field.value, m.key]
-                            : (field.value as string[]).filter((k) => k !== m.key)
-                          field.onChange(next)
-                        }}
-                      />
-                      {m.shortName}
-                    </label>
-                  )
-                })}
-              </div>
-            )}
+            render={({ field }) => {
+              const value = (field.value ?? {}) as Record<string, RoleChoice>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {modules.map((m) => (
+                    <div key={m.key} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-zinc-200/60 bg-white">
+                      <span className="text-[13px] text-zinc-700 flex-1 min-w-0 truncate">{m.shortName}</span>
+                      <select
+                        value={value[m.key] ?? 'none'}
+                        onChange={(e) => field.onChange({ ...value, [m.key]: e.target.value as RoleChoice })}
+                        className="h-8 rounded-md border border-zinc-200 bg-white text-[12.5px] px-2 text-zinc-700 hover:border-zinc-400 focus:outline-none focus:border-zinc-900"
+                      >
+                        {ROLE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )
+            }}
           />
         </div>
       </form>

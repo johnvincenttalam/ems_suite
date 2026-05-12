@@ -1,6 +1,7 @@
 import { cn } from '@/shared/utils/cn'
 import { Menu, Search, LogOut, User, Sun, Moon, LayoutGrid } from 'lucide-react'
 import { useAuthStore } from '@/features/auth/store/auth-store'
+import { moduleRoleOf } from '@/features/auth'
 import { useThemeStore } from '@/shared/stores/theme-store'
 import { Avatar } from '@/shared/ui/avatar'
 import { NotificationCenter } from '@/shared/layout/notification-center'
@@ -117,7 +118,7 @@ export function Topbar({ module, sidebarCollapsed, onToggleMobileSidebar, onSear
               <p className="text-[13px] font-medium text-zinc-700 leading-tight">
                 {user?.name ?? 'User'}
               </p>
-              <p className="text-[11px] text-zinc-400 capitalize">{user?.role ?? 'admin'}</p>
+              <p className="text-[11px] text-zinc-400 capitalize">{moduleRoleOf(user, module.key) ?? 'no access'}</p>
             </div>
           </button>
 

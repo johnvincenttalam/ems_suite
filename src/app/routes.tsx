@@ -170,7 +170,7 @@ export function AppRoutes() {
           key={m.key}
           path={`/module/${m.key}`}
           element={
-            <ProtectedRoute allowedRoles={['admin']} loginPath={`/module/${m.key}/login`} module={m}>
+            <ProtectedRoute loginPath={`/module/${m.key}/login`} module={m}>
               <ModuleLayout module={m} />
             </ProtectedRoute>
           }

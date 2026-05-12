@@ -13,11 +13,9 @@ const userWithSdmsOnly: User = {
   id: 'U-test',
   name: 'Limited User',
   email: 'limited@example.com',
-  role: 'admin',
   status: 'active',
   createdAt: '2025-01-01',
-  modules: ['sdms'],
-  moduleAdmins: [],
+  moduleRoles: { sdms: 'member' },
 }
 
 function renderProtected(opts: { module?: typeof inventoryModule; loginPath?: string }) {

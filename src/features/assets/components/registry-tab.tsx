@@ -16,7 +16,7 @@ import type { Asset, AssetStatus, AssetCondition, DisposalType } from '@/feature
 import { useCategories } from '@/features/categories'
 import { useWarehouses } from '@/features/warehouses'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
 import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -461,7 +461,7 @@ export function RegistryTab() {
   })
 
   const approverOptions = users
-    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('assets') && u.name !== currentUser?.name)
+    .filter((u) => u.status === 'active' && isModuleManagerOrAbove(u, 'assets') && u.name !== currentUser?.name)
     .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
   if (isLoading) return <TableSkeleton columns={8} rows={6} />

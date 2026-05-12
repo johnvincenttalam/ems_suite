@@ -18,7 +18,7 @@ import type { User } from '@/features/users/types'
 import { useStockMovements } from '@/features/inventory'
 import { useAuditLog } from '@/features/audit-log'
 import { useAuthStore } from '@/features/auth/store/auth-store'
-import { isModuleAdmin } from '@/features/auth'
+import { isModuleAdmin, userModules } from '@/features/auth'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -60,7 +60,7 @@ export function InventoryUsersPage() {
   const revokeMutation = useMutation({
     mutationFn: (userId: string) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.removeFromModule(userId, 'inventory', 'Inventory', currentUser.id)
+      return usersApi.setModuleRole({ userId, moduleKey: 'inventory', role: null, auditModule: 'Inventory', byId: currentUser.id })
     },
     onSuccess: (user) => {
       toast.success(`Revoked ${user.name}'s Inventory access`)
@@ -75,11 +75,11 @@ export function InventoryUsersPage() {
   const adminMutation = useMutation({
     mutationFn: ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.setModuleAdmin({
+      return usersApi.setModuleRole({
         userId,
         moduleKey: 'inventory',
         auditModule: 'Inventory',
-        makeAdmin,
+        role: makeAdmin ? 'admin' : 'member',
         byId: currentUser.id,
       })
     },
@@ -96,7 +96,7 @@ export function InventoryUsersPage() {
   const invUsers = useMemo<UserActivity[]>(() => {
     const invAudit = auditEntries.filter((e) => e.module === 'Inventory')
     return allUsers
-      .filter((u) => u.modules.includes('inventory'))
+      .filter((u) => !!u.moduleRoles?.inventory)
       .map((u) => {
         const movementsCount = movements.filter((m) => m.createdBy === u.id).length
         const lastEntry = invAudit.find((e) => e.userId === u.id)
@@ -122,7 +122,7 @@ export function InventoryUsersPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium text-zinc-900 truncate">{row.original.name}</p>
-                {row.original.moduleAdmins?.includes('inventory') && (
+                {isModuleAdmin(row.original, 'inventory') && (
                   <span title="Inventory module admin" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-medium border border-violet-200">
                     <Crown className="w-2.5 h-2.5" />
                     Admin
@@ -130,7 +130,7 @@ export function InventoryUsersPage() {
                 )}
               </div>
               <p className="text-xs text-zinc-400 truncate">{row.original.position ?? row.original.email}</p>
-              <ModuleAccessPills modules={row.original.modules} excludeModule="inventory" className="mt-1" />
+              <ModuleAccessPills modules={userModules(row.original)} excludeModule="inventory" className="mt-1" />
             </div>
           </div>
         ),
@@ -180,7 +180,7 @@ export function InventoryUsersPage() {
         cell: ({ row }) => {
           const u = row.original
           const isSelf = u.id === currentUser?.id
-          const isAdmin = u.moduleAdmins?.includes('inventory')
+          const isAdmin = isModuleAdmin(u, 'inventory')
           const items: ActionMenuItem[] = [
             { key: 'edit', label: 'Edit user', icon: Pencil, onClick: () => setEditTarget(u) },
           ]

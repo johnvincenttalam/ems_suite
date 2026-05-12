@@ -1,4 +1,4 @@
-import type { User } from '@/features/users/types'
+import type { ModuleRole, User } from '@/features/users/types'
 import type { ModuleKey } from '@/config/modules'
 import { mockUsers } from '@/features/users/data/mock-users'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
@@ -15,7 +15,8 @@ interface AddUserInput {
   departmentId?: string
   position?: string
   status?: 'active' | 'inactive'
-  modules?: ModuleKey[]
+  /** Initial per-module role assignments. Empty grants no access. */
+  moduleRoles?: Partial<Record<ModuleKey, ModuleRole>>
   createdBy: string
 }
 
@@ -27,7 +28,7 @@ interface UpdateUserInput {
   departmentId?: string
   position?: string
   status?: 'active' | 'inactive'
-  modules?: ModuleKey[]
+  moduleRoles?: Partial<Record<ModuleKey, ModuleRole>>
   updatedBy: string
 }
 
@@ -72,11 +73,9 @@ export const usersApi = {
       employeeId: input.employeeId,
       departmentId: input.departmentId,
       position: input.position,
-      role: 'admin',
       status: input.status ?? 'active',
       createdAt: new Date().toISOString().slice(0, 10),
-      modules: input.modules ?? [],
-      moduleAdmins: [],
+      moduleRoles: input.moduleRoles ?? {},
     }
     mockUsers.push(u)
     recordAudit({
@@ -126,32 +125,33 @@ export const usersApi = {
   },
 
   /**
-   * Invite a user to a specific module. If the email already exists, grants
-   * access to that module; otherwise creates a new user and grants access.
-   * The audit entry is tagged with the inviting module's display name so it
-   * surfaces in that module's logs view. Caller authorization (isModuleAdmin
-   * for the target module) is enforced in the calling component.
+   * Invite a user to a specific module at a given role. If the email already
+   * exists, sets that user's role for the module; otherwise creates a new user
+   * and grants access at the supplied role. Caller authorization (admin of the
+   * target module) is enforced in the calling component.
    */
   inviteToModule: async (input: {
     name: string
     email: string
     phone?: string
     moduleKey: ModuleKey
+    role?: ModuleRole
     auditModule: string
     invitedBy: string
   }): Promise<{ user: User; created: boolean }> => {
     await delay(120)
+    const role: ModuleRole = input.role ?? 'member'
     const existing = mockUsers.find((u) => u.email.toLowerCase() === input.email.toLowerCase())
     if (existing) {
-      if (existing.modules.includes(input.moduleKey)) {
+      if (existing.moduleRoles[input.moduleKey]) {
         throw new Error(`${existing.name} already has access to this module`)
       }
-      existing.modules = [...existing.modules, input.moduleKey]
+      existing.moduleRoles = { ...existing.moduleRoles, [input.moduleKey]: role }
       recordAudit({
         userId: input.invitedBy,
         action: 'update',
         module: input.auditModule,
-        detail: `Granted ${existing.name} access`,
+        detail: `Granted ${existing.name} ${role} access`,
       })
       return { user: existing, created: false }
     }
@@ -160,105 +160,79 @@ export const usersApi = {
       name: input.name,
       email: input.email,
       phone: input.phone,
-      role: 'admin',
       status: 'active',
       createdAt: new Date().toISOString().slice(0, 10),
-      modules: [input.moduleKey],
-      moduleAdmins: [],
+      moduleRoles: { [input.moduleKey]: role },
     }
     mockUsers.push(u)
     recordAudit({
       userId: input.invitedBy,
       action: 'create',
       module: input.auditModule,
-      detail: `Invited ${u.name} (${u.email}) and granted access`,
+      detail: `Invited ${u.name} (${u.email}) as ${role}`,
     })
     return { user: u, created: true }
   },
 
   /**
-   * Promote or demote a user as administrator of a specific module. Promotion
-   * requires the user to already have access; demotion is forbidden if they
-   * are the last admin (every module must have at least one admin so admin
-   * power isn't orphaned). The audit entry is tagged with the calling
-   * module's display name.
+   * Set a user's role in a specific module. Supplying `null` revokes access.
+   * Demoting / removing the last admin of a module is refused so admin power
+   * never gets orphaned. Self-revocation (revoking your own access to a module
+   * you administer via this same module) is refused — use the Admin module
+   * to manage your own access.
    */
-  setModuleAdmin: async (input: {
+  setModuleRole: async (input: {
     userId: string
     moduleKey: ModuleKey
+    role: ModuleRole | null
     auditModule: string
-    makeAdmin: boolean
     byId: string
   }): Promise<User> => {
     await delay(120)
     const idx = mockUsers.findIndex((u) => u.id === input.userId)
     if (idx === -1) throw new Error(`User ${input.userId} not found`)
     const u = mockUsers[idx]
-    const isAdmin = u.moduleAdmins.includes(input.moduleKey)
+    const current = u.moduleRoles[input.moduleKey] ?? null
 
-    if (input.makeAdmin) {
-      if (isAdmin) throw new Error(`${u.name} is already a ${input.auditModule} admin`)
-      if (!u.modules.includes(input.moduleKey)) {
-        throw new Error(`${u.name} doesn't have ${input.auditModule} access — grant access first`)
-      }
-      u.moduleAdmins = [...u.moduleAdmins, input.moduleKey]
-      recordAudit({
-        userId: input.byId,
-        action: 'update',
-        module: input.auditModule,
-        detail: `Promoted ${u.name} to ${input.auditModule} admin`,
-      })
-    } else {
-      if (!isAdmin) throw new Error(`${u.name} is not a ${input.auditModule} admin`)
+    if (current === input.role) {
+      const verb = input.role === null ? 'have access to' : `be a ${input.role} of`
+      throw new Error(`${u.name} doesn't ${verb} this module to change`)
+    }
+
+    // Guard: removing the last admin orphans admin power.
+    if (current === 'admin' && input.role !== 'admin') {
       const otherAdmins = mockUsers.filter(
-        (other) => other.id !== u.id && other.moduleAdmins.includes(input.moduleKey),
+        (other) => other.id !== u.id && other.moduleRoles[input.moduleKey] === 'admin',
       )
       if (otherAdmins.length === 0) {
         throw new Error(`${u.name} is the last ${input.auditModule} admin — promote another user first`)
       }
-      u.moduleAdmins = u.moduleAdmins.filter((m) => m !== input.moduleKey)
-      recordAudit({
-        userId: input.byId,
-        action: 'update',
-        module: input.auditModule,
-        detail: `Removed ${u.name} as ${input.auditModule} admin`,
-      })
     }
-    return u
-  },
 
-  /**
-   * Revoke a user's access to a specific module. Their global record stays —
-   * other modules they belong to are unaffected. Throws if the user doesn't
-   * have access in the first place. Module admins themselves cannot be revoked
-   * from a module they administer (would orphan admin power); demote them
-   * first by editing moduleAdmins.
-   */
-  removeFromModule: async (
-    userId: string,
-    moduleKey: ModuleKey,
-    auditModule: string,
-    removedBy: string,
-  ): Promise<User> => {
-    await delay(120)
-    const idx = mockUsers.findIndex((u) => u.id === userId)
-    if (idx === -1) throw new Error(`User ${userId} not found`)
-    const u = mockUsers[idx]
-    if (!u.modules.includes(moduleKey)) {
-      throw new Error(`${u.name} doesn't have access to this module`)
-    }
-    if (u.moduleAdmins.includes(moduleKey)) {
-      throw new Error(`${u.name} is an admin of this module — demote first`)
-    }
-    if (userId === removedBy) {
+    // Guard: self-revoke from within a module you're managing.
+    if (input.userId === input.byId && input.role === null) {
       throw new Error('You cannot revoke your own access')
     }
-    u.modules = u.modules.filter((m) => m !== moduleKey)
+
+    const nextRoles = { ...u.moduleRoles }
+    if (input.role === null) {
+      delete nextRoles[input.moduleKey]
+    } else {
+      nextRoles[input.moduleKey] = input.role
+    }
+    u.moduleRoles = nextRoles
+
+    const action =
+      input.role === null
+        ? `Revoked ${u.name}'s access`
+        : current === null
+        ? `Granted ${u.name} ${input.role} access`
+        : `Changed ${u.name} from ${current} to ${input.role}`
     recordAudit({
-      userId: removedBy,
+      userId: input.byId,
       action: 'update',
-      module: auditModule,
-      detail: `Revoked ${u.name}'s access`,
+      module: input.auditModule,
+      detail: action,
     })
     return u
   },

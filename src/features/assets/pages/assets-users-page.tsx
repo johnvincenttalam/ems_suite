@@ -17,7 +17,7 @@ import { usersApi } from '@/features/users/api/users-api'
 import type { User } from '@/features/users/types'
 import { useAssetAssignments } from '@/features/assets'
 import { useAuthStore } from '@/features/auth/store/auth-store'
-import { isModuleAdmin } from '@/features/auth'
+import { isModuleAdmin, userModules } from '@/features/auth'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { ExportMenu } from '@/shared/ui/export-menu'
@@ -58,7 +58,7 @@ export function AssetsUsersPage() {
   const revokeMutation = useMutation({
     mutationFn: (userId: string) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.removeFromModule(userId, 'assets', 'Assets', currentUser.id)
+      return usersApi.setModuleRole({ userId, moduleKey: 'assets', role: null, auditModule: 'Assets', byId: currentUser.id })
     },
     onSuccess: (user) => {
       toast.success(`Revoked ${user.name}'s Assets access`)
@@ -73,11 +73,11 @@ export function AssetsUsersPage() {
   const adminMutation = useMutation({
     mutationFn: ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
       if (!currentUser) throw new Error('Not signed in')
-      return usersApi.setModuleAdmin({
+      return usersApi.setModuleRole({
         userId,
         moduleKey: 'assets',
         auditModule: 'Assets',
-        makeAdmin,
+        role: makeAdmin ? 'admin' : 'member',
         byId: currentUser.id,
       })
     },
@@ -93,7 +93,7 @@ export function AssetsUsersPage() {
 
   const assetUsers = useMemo<UserActivity[]>(() => {
     return allUsers
-      .filter((u) => u.modules.includes('assets'))
+      .filter((u) => !!u.moduleRoles?.assets)
       .map((u) => {
         const userAssignments = assignments.filter((a) => a.assignedTo === u.id)
         const open = userAssignments.filter((a) => !a.returnedDate)
@@ -123,7 +123,7 @@ export function AssetsUsersPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium text-zinc-900 truncate">{row.original.name}</p>
-                {row.original.moduleAdmins?.includes('assets') && (
+                {isModuleAdmin(row.original, 'assets') && (
                   <span title="Assets module admin" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-medium border border-violet-200">
                     <Crown className="w-2.5 h-2.5" />
                     Admin
@@ -131,7 +131,7 @@ export function AssetsUsersPage() {
                 )}
               </div>
               <p className="text-xs text-zinc-400 truncate">{row.original.position ?? row.original.email}</p>
-              <ModuleAccessPills modules={row.original.modules} excludeModule="assets" className="mt-1" />
+              <ModuleAccessPills modules={userModules(row.original)} excludeModule="assets" className="mt-1" />
             </div>
           </div>
         ),
@@ -176,7 +176,7 @@ export function AssetsUsersPage() {
         cell: ({ row }) => {
           const u = row.original
           const isSelf = u.id === currentUser?.id
-          const isAdmin = u.moduleAdmins?.includes('assets')
+          const isAdmin = isModuleAdmin(u, 'assets')
           const items: ActionMenuItem[] = [
             { key: 'edit', label: 'Edit user', icon: Pencil, onClick: () => setEditTarget(u) },
           ]

@@ -2,20 +2,18 @@ import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { hasModuleAccess } from '@/features/auth/lib/access'
 import { AccessDeniedPage } from '@/features/auth/pages/access-denied-page'
-import type { UserRole } from '@/features/users/types'
 import type { EmsModule } from '@/config/modules'
 import { Spinner } from '@/shared/ui/spinner'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
-  allowedRoles?: UserRole[]
   /** Where to redirect when unauthenticated. Defaults to the module selector. */
   loginPath?: string
   /** When provided, the user must have access to this module or AccessDenied is rendered. */
   module?: EmsModule
 }
 
-export function ProtectedRoute({ children, allowedRoles, loginPath = '/', module }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, loginPath = '/', module }: ProtectedRouteProps) {
   const { isAuthenticated, user, isRestoring } = useAuthStore()
 
   if (isRestoring) {
@@ -28,10 +26,6 @@ export function ProtectedRoute({ children, allowedRoles, loginPath = '/', module
 
   if (!isAuthenticated || !user) {
     return <Navigate to={loginPath} replace />
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />
   }
 
   if (module && !hasModuleAccess(user, module.key)) {

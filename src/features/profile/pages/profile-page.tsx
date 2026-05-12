@@ -35,7 +35,7 @@ export function ProfilePage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-semibold text-zinc-900">{user?.name ?? 'Admin User'}</h2>
-                <Badge variant="success">{user?.role ?? 'admin'}</Badge>
+                {user?.position && <Badge variant="success">{user.position}</Badge>}
               </div>
               <p className="text-[13px] text-zinc-500 mt-0.5">{user?.email ?? 'admin@example.com'}</p>
             </div>

@@ -10,7 +10,7 @@ import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/i
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useWarehouses } from '@/features/warehouses'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
@@ -144,7 +144,7 @@ export function TransfersPage() {
   const itemOptions = items.map((i) => ({ value: i.id, label: `${i.sku} — ${i.name}` }))
   const warehouseOptions = warehouses.map((w) => ({ value: w.id, label: w.name }))
   const approverOptions = users
-    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('inventory') && u.name !== currentUser?.name)
+    .filter((u) => u.status === 'active' && isModuleManagerOrAbove(u, 'inventory') && u.name !== currentUser?.name)
     .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
   return (

@@ -4,6 +4,7 @@ import { Repeat2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useUsers } from '@/features/users'
+import { userModules } from '@/features/auth'
 import { useClickOutside } from '@/shared/hooks/use-click-outside'
 import { Avatar } from '@/shared/ui/avatar'
 import { cn } from '@/shared/utils/cn'
@@ -78,7 +79,7 @@ export function UserSwitcher() {
                     </div>
                     <p className="text-[11px] text-zinc-400 truncate">{u.email}</p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {u.modules.map((m) => (
+                      {userModules(u).map((m) => (
                         <span key={m} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">
                           {MODULE_LABEL[m]}
                         </span>

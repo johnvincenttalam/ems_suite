@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
@@ -150,7 +150,7 @@ export function AdjustmentsPage() {
 
   const itemOptions = items.map((i) => ({ value: i.id, label: `${i.sku} — ${i.name}` }))
   const approverOptions = users
-    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('inventory') && u.name !== currentUser?.name)
+    .filter((u) => u.status === 'active' && isModuleManagerOrAbove(u, 'inventory') && u.name !== currentUser?.name)
     .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
   return (

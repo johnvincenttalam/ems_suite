@@ -15,7 +15,8 @@ import {
 import { toast } from 'sonner'
 import { useAssets, assetsApi, DISPOSAL_TYPE_LABELS, AssetThumbnail } from '@/features/assets'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
+import type { User } from '@/features/users'
 import type { Asset, DisposalType } from '@/features/assets/types'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
@@ -453,7 +454,7 @@ function SubmitDisposalModal({
   open: boolean
   onClose: () => void
   assets: Asset[]
-  users: { id: string; name: string; status: string; position?: string; moduleAdmins: string[] }[]
+  users: User[]
   onDone: () => void
 }) {
   const currentUser = useAuthStore((s) => s.user)
@@ -494,7 +495,7 @@ function SubmitDisposalModal({
     .map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))
 
   const approverOptions = users
-    .filter((u) => u.status === 'active' && u.moduleAdmins.includes('assets') && u.name !== currentUser?.name)
+    .filter((u) => u.status === 'active' && isModuleManagerOrAbove(u, 'assets') && u.name !== currentUser?.name)
     .map((u) => ({ value: u.name, label: u.name + (u.position ? ` — ${u.position}` : '') }))
 
   return (
