@@ -23,7 +23,7 @@ import type {
   PreventiveSchedule,
   ScheduleStatus,
 } from '@/features/preventive-maintenance/types'
-import { INTERVAL_UNIT_LABEL } from '@/features/preventive-maintenance/types'
+import { INTERVAL_UNIT_LABEL, isUsageInterval } from '@/features/preventive-maintenance/types'
 import { useAssets } from '@/features/assets'
 import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
@@ -73,14 +73,28 @@ export function PreventiveSchedulesTab() {
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
+  // Schedule is "due" when:
+  //  - time-based: nextServiceDate ≤ today
+  //  - usage-based: asset.currentMeter ≥ lastServiceMeter + intervalValue
+  const isScheduleDue = (s: PreventiveSchedule): boolean => {
+    if (s.status !== 'active') return false
+    if (isUsageInterval(s.intervalUnit)) {
+      const asset = assetMap[s.assetId]
+      if (!asset || asset.currentMeter === undefined || s.lastServiceMeter === undefined) return false
+      return asset.currentMeter >= s.lastServiceMeter + s.intervalValue
+    }
+    return s.nextServiceDate <= today
+  }
+
   const filtered = useMemo(
     () => (statusFilter === 'all' ? schedules : schedules.filter((s) => s.status === statusFilter)),
     [schedules, statusFilter],
   )
 
   const dueCount = useMemo(
-    () => schedules.filter((s) => s.status === 'active' && s.nextServiceDate <= today).length,
-    [schedules, today],
+    () => schedules.filter((s) => isScheduleDue(s)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schedules, today, assetMap],
   )
 
   const invalidate = () => {
@@ -123,7 +137,7 @@ export function PreventiveSchedulesTab() {
 
   function handleGenerateAllDue() {
     if (!currentUser) return
-    const due = schedules.filter((s) => s.status === 'active' && s.nextServiceDate <= today)
+    const due = schedules.filter((s) => isScheduleDue(s))
     if (due.length === 0) {
       toast.info('Nothing due', { description: 'No active schedules are due as of today.' })
       return
@@ -188,33 +202,82 @@ export function PreventiveSchedulesTab() {
       {
         id: 'interval',
         header: 'Interval',
-        cell: ({ row }) => (
-          <span className="text-[13px] text-zinc-700">
-            Every {row.original.intervalValue} {INTERVAL_UNIT_LABEL[row.original.intervalUnit]}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const s = row.original
+          const usage = isUsageInterval(s.intervalUnit)
+          return (
+            <div>
+              <span className="text-[13px] text-zinc-700">
+                Every {s.intervalValue} {INTERVAL_UNIT_LABEL[s.intervalUnit]}
+              </span>
+              {usage && (
+                <p className="text-[10.5px] text-zinc-400 uppercase tracking-wide mt-0.5">meter-based</p>
+              )}
+            </div>
+          )
+        },
       },
       {
         accessorKey: 'lastServiceDate',
         header: 'Last Service',
-        cell: ({ getValue }) => (
-          <span className="text-[13px] text-zinc-600">
-            {format(parseISO(getValue() as string), 'MMM dd, yyyy')}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const s = row.original
+          if (isUsageInterval(s.intervalUnit) && s.lastServiceMeter !== undefined) {
+            return (
+              <div>
+                <p className="text-[13px] text-zinc-700">
+                  {s.lastServiceMeter} {INTERVAL_UNIT_LABEL[s.intervalUnit]}
+                </p>
+                <p className="text-[10.5px] text-zinc-400">{format(parseISO(s.lastServiceDate), 'MMM dd, yyyy')}</p>
+              </div>
+            )
+          }
+          return (
+            <span className="text-[13px] text-zinc-600">
+              {format(parseISO(s.lastServiceDate), 'MMM dd, yyyy')}
+            </span>
+          )
+        },
       },
       {
         accessorKey: 'nextServiceDate',
         header: 'Next Service',
         cell: ({ row }) => {
-          const next = row.original.nextServiceDate
+          const s = row.original
+          if (isUsageInterval(s.intervalUnit) && s.lastServiceMeter !== undefined) {
+            const triggerAt = s.lastServiceMeter + s.intervalValue
+            const asset = assetMap[s.assetId]
+            const current = asset?.currentMeter
+            const remaining = current !== undefined ? triggerAt - current : null
+            const dueNow = remaining !== null && remaining <= 0
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] text-zinc-700">
+                  {triggerAt} {INTERVAL_UNIT_LABEL[s.intervalUnit]}
+                </span>
+                {s.status === 'active' && remaining !== null && (
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-md text-[10.5px] font-medium',
+                      dueNow ? 'bg-amber-50 text-amber-700' : 'bg-zinc-100 text-zinc-600',
+                    )}
+                  >
+                    {dueNow
+                      ? `${Math.abs(remaining)} over`
+                      : `${remaining} ${INTERVAL_UNIT_LABEL[s.intervalUnit]} to go`}
+                  </span>
+                )}
+              </div>
+            )
+          }
+          const next = s.nextServiceDate
           const days = differenceInCalendarDays(parseISO(next), new Date())
           const overdue = days < 0
-          const due = days <= 0 && row.original.status === 'active'
+          const due = days <= 0 && s.status === 'active'
           return (
             <div className="flex items-center gap-2">
               <span className="text-[13px] text-zinc-700">{format(parseISO(next), 'MMM dd, yyyy')}</span>
-              {row.original.status === 'active' && (
+              {s.status === 'active' && (
                 <span
                   className={cn(
                     'px-1.5 py-0.5 rounded-md text-[10.5px] font-medium',
@@ -277,7 +340,7 @@ export function PreventiveSchedulesTab() {
         header: '',
         cell: ({ row }) => {
           const s = row.original
-          const dueNow = s.status === 'active' && s.nextServiceDate <= today
+          const dueNow = isScheduleDue(s)
           const items: ActionMenuItem[] = [
             {
               key: 'edit',

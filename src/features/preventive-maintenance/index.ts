@@ -8,5 +8,7 @@ export type {
   PreventiveSchedule,
   ScheduleStatus,
   IntervalUnit,
+  TimeIntervalUnit,
+  UsageIntervalUnit,
 } from './types'
-export { INTERVAL_UNIT_LABEL } from './types'
+export { INTERVAL_UNIT_LABEL, USAGE_INTERVAL_UNITS, isUsageInterval } from './types'

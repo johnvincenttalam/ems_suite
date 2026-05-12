@@ -38,6 +38,7 @@ export type {
   AssetCondition,
   AssetEvent,
   AssetEventType,
+  AssetMeterUnit,
   DisposalType,
   Inspection,
   InspectionLine,

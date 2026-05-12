@@ -1,26 +1,46 @@
 import type { WorkOrderPriority } from '@/features/maintenance/types'
 
 /**
- * Interval unit for a preventive schedule. Only time-based units auto-advance
- * `nextServiceDate` on work-order generation. Usage-based units (engine hours,
- * kilometers, cycles) would need asset meter readings to advance — they aren't
- * supported yet but the type is intentionally extensible so adding them later
- * doesn't require a model migration.
+ * Time-based interval units — advance `nextServiceDate` on generation.
  */
-export type IntervalUnit = 'days' | 'weeks' | 'months'
+export type TimeIntervalUnit = 'days' | 'weeks' | 'months'
+
+/**
+ * Usage-based interval units — advance based on the asset's meter reading.
+ * The asset must have a matching `meterUnit` set.
+ */
+export type UsageIntervalUnit = 'hours' | 'kilometers' | 'cycles'
+
+export type IntervalUnit = TimeIntervalUnit | UsageIntervalUnit
 
 export type ScheduleStatus = 'active' | 'paused'
 
+/**
+ * A preventive maintenance schedule. Two shapes share this record:
+ *
+ *  - time-based   (intervalUnit ∈ days/weeks/months): driven by
+ *    `lastServiceDate` + interval; `nextServiceDate` is the trigger.
+ *  - usage-based  (intervalUnit ∈ hours/km/cycles): driven by
+ *    `lastServiceMeter` + interval; due when the asset's currentMeter
+ *    reaches `lastServiceMeter + intervalValue`. `nextServiceDate` is
+ *    informational only — set to today on creation as a placeholder so
+ *    list sorting still works.
+ */
 export interface PreventiveSchedule {
   id: string
   title: string
   assetId: string
   intervalUnit: IntervalUnit
   intervalValue: number
-  /** ISO date (YYYY-MM-DD). The last time service ran for this schedule. */
+  /** ISO date (YYYY-MM-DD). Last completion date for the schedule. Always
+   * set; for usage-based schedules it's informational. */
   lastServiceDate: string
-  /** ISO date. Computed from lastServiceDate + interval; advanced on generate. */
+  /** ISO date. Computed from lastServiceDate + interval for time-based;
+   * mirrors lastServiceDate for usage-based (the meter drives the trigger). */
   nextServiceDate: string
+  /** Usage-based only: meter reading at the last service. Trigger fires
+   * when the asset's `currentMeter ≥ lastServiceMeter + intervalValue`. */
+  lastServiceMeter?: number
   status: ScheduleStatus
   priority: WorkOrderPriority
   /** Technician assigned by default when this schedule auto-generates a WO. */
@@ -37,4 +57,13 @@ export const INTERVAL_UNIT_LABEL: Record<IntervalUnit, string> = {
   days: 'days',
   weeks: 'weeks',
   months: 'months',
+  hours: 'hours',
+  kilometers: 'km',
+  cycles: 'cycles',
+}
+
+export const USAGE_INTERVAL_UNITS: UsageIntervalUnit[] = ['hours', 'kilometers', 'cycles']
+
+export function isUsageInterval(unit: IntervalUnit): unit is UsageIntervalUnit {
+  return unit === 'hours' || unit === 'kilometers' || unit === 'cycles'
 }

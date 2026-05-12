@@ -501,3 +501,42 @@ describe('assetsApi.recordInspection', () => {
     expect(eventsAfter).toBe(eventsBefore)
   })
 })
+
+describe('assetsApi.updateMeter', () => {
+  async function newAsset(suffix: string) {
+    return assetsApi.create({
+      name: `Meter ${suffix}`,
+      serialNumber: `SN-METER-${suffix}-${Date.now()}`,
+      categoryId: 'C004',
+      locationId: 'W001',
+      purchaseDate: '2026-01-01',
+      createdBy: 'Admin User',
+    })
+  }
+
+  it('records the first reading and locks the meter unit', async () => {
+    const asset = await newAsset('FIRST')
+    const updated = await assetsApi.updateMeter(asset.id, 100, 'Tech User', 'hours')
+    expect(updated.meterUnit).toBe('hours')
+    expect(updated.currentMeter).toBe(100)
+    const events = await assetsApi.listEvents(asset.id)
+    expect(events.some((e) => e.type === 'meter_updated')).toBe(true)
+  })
+
+  it('enforces monotonicity — refuses readings below the current value', async () => {
+    const asset = await newAsset('MONO')
+    await assetsApi.updateMeter(asset.id, 250, 'Tech', 'hours')
+    await expect(assetsApi.updateMeter(asset.id, 200, 'Tech')).rejects.toThrow(/monotonic/i)
+  })
+
+  it('refuses to change a locked meter unit', async () => {
+    const asset = await newAsset('LOCK')
+    await assetsApi.updateMeter(asset.id, 50, 'Tech', 'hours')
+    await expect(assetsApi.updateMeter(asset.id, 60, 'Tech', 'kilometers')).rejects.toThrow(/locked/i)
+  })
+
+  it('rejects a first reading without a unit', async () => {
+    const asset = await newAsset('NOUNIT')
+    await expect(assetsApi.updateMeter(asset.id, 10, 'Tech')).rejects.toThrow(/no meter unit/i)
+  })
+})

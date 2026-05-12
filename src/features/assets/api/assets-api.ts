@@ -4,6 +4,7 @@ import type {
   AssetCondition,
   AssetEvent,
   AssetEventType,
+  AssetMeterUnit,
   DisposalType,
   Inspection,
   InspectionLine,
@@ -572,6 +573,54 @@ export const assetsApi = {
       detail: `Returned to service — all work orders closed`,
       actorName,
     })
+    return asset
+  },
+
+  /**
+   * Record a new meter reading. Monotonic — refuses readings ≤ the current
+   * value. If `unit` is supplied, it sets/changes the asset's meter unit
+   * (only allowed when there's no prior reading yet — once a meter has
+   * accumulated history, the unit is frozen).
+   */
+  updateMeter: async (
+    assetId: string,
+    value: number,
+    actorName: string,
+    unit?: AssetMeterUnit,
+  ): Promise<Asset> => {
+    const asset = findAsset(assetId)
+    if (asset.status === 'disposed') throw new Error(`Cannot update meter on a disposed asset`)
+    if (value < 0) throw new Error(`Meter reading cannot be negative`)
+    if (asset.currentMeter !== undefined && value < asset.currentMeter) {
+      throw new Error(
+        `Meter readings are monotonic — got ${value}, last reading was ${asset.currentMeter}`,
+      )
+    }
+    if (unit && asset.meterUnit && unit !== asset.meterUnit) {
+      throw new Error(`Asset meter unit is locked to ${asset.meterUnit}`)
+    }
+    if (!asset.meterUnit && !unit) {
+      throw new Error(`Asset has no meter unit configured — pass one on first reading`)
+    }
+
+    const fromMeter = asset.currentMeter
+    const fromUnit = asset.meterUnit
+    if (unit && !fromUnit) asset.meterUnit = unit
+    asset.currentMeter = value
+    asset.meterUpdatedAt = new Date().toISOString()
+    asset.meterUpdatedBy = actorName
+
+    emitEvent({
+      assetId: asset.id,
+      type: 'meter_updated',
+      detail:
+        fromMeter === undefined
+          ? `Initial meter reading: ${value} ${asset.meterUnit}`
+          : `Meter updated: ${fromMeter} → ${value} ${asset.meterUnit}`,
+      actorName,
+      payload: { fromMeter, toMeter: value, meterUnit: asset.meterUnit },
+    })
+
     return asset
   },
 }

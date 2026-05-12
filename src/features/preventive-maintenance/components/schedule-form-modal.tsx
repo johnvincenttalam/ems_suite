@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
@@ -16,16 +16,25 @@ import { Select } from '@/shared/ui/select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 
-const schema = z.object({
-  title: z.string().min(2, 'Title is required'),
-  assetId: z.string().min(1, 'Asset is required'),
-  intervalUnit: z.enum(['days', 'weeks', 'months']),
-  intervalValue: z.number().int().positive('Must be > 0'),
-  lastServiceDate: z.string().min(1, 'Last service date is required'),
-  priority: z.enum(['low', 'medium', 'high', 'critical']),
-  defaultAssigneeId: z.string().min(1, 'Technician is required'),
-  notes: z.string().optional(),
-})
+const schema = z
+  .object({
+    title: z.string().min(2, 'Title is required'),
+    assetId: z.string().min(1, 'Asset is required'),
+    intervalUnit: z.enum(['days', 'weeks', 'months', 'hours', 'kilometers', 'cycles']),
+    intervalValue: z.number().int().positive('Must be > 0'),
+    lastServiceDate: z.string().min(1, 'Last service date is required'),
+    lastServiceMeter: z.number().nonnegative('Cannot be negative').optional(),
+    priority: z.enum(['low', 'medium', 'high', 'critical']),
+    defaultAssigneeId: z.string().min(1, 'Technician is required'),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      const usage = data.intervalUnit === 'hours' || data.intervalUnit === 'kilometers' || data.intervalUnit === 'cycles'
+      return !usage || data.lastServiceMeter !== undefined
+    },
+    { message: 'Last service meter is required for usage-based intervals', path: ['lastServiceMeter'] },
+  )
 
 type ScheduleForm = z.infer<typeof schema>
 
@@ -47,11 +56,16 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<ScheduleForm>({
     resolver: zodResolver(schema),
     defaultValues: { intervalUnit: 'months', intervalValue: 1, priority: 'medium' },
   })
+
+  const watchedUnit = useWatch({ control, name: 'intervalUnit' })
+  const isUsageMode =
+    watchedUnit === 'hours' || watchedUnit === 'kilometers' || watchedUnit === 'cycles'
 
   useEffect(() => {
     if (!open) return
@@ -62,6 +76,7 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
         intervalUnit: schedule.intervalUnit,
         intervalValue: schedule.intervalValue,
         lastServiceDate: schedule.lastServiceDate,
+        lastServiceMeter: schedule.lastServiceMeter,
         priority: schedule.priority,
         defaultAssigneeId: schedule.defaultAssigneeId,
         notes: schedule.notes ?? '',
@@ -73,6 +88,7 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
         intervalUnit: 'months',
         intervalValue: 1,
         lastServiceDate: '',
+        lastServiceMeter: undefined,
         priority: 'medium',
         defaultAssigneeId: '',
         notes: '',
@@ -91,6 +107,7 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
             intervalUnit: data.intervalUnit,
             intervalValue: data.intervalValue,
             lastServiceDate: data.lastServiceDate,
+            lastServiceMeter: data.lastServiceMeter,
             priority: data.priority,
             defaultAssigneeId: data.defaultAssigneeId,
             notes: data.notes,
@@ -104,6 +121,7 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
         intervalUnit: data.intervalUnit,
         intervalValue: data.intervalValue,
         lastServiceDate: data.lastServiceDate,
+        lastServiceMeter: data.lastServiceMeter,
         priority: data.priority,
         defaultAssigneeId: data.defaultAssigneeId,
         notes: data.notes,
@@ -194,6 +212,9 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
               { value: 'days', label: 'Days' },
               { value: 'weeks', label: 'Weeks' },
               { value: 'months', label: 'Months' },
+              { value: 'hours', label: 'Hours (meter)' },
+              { value: 'kilometers', label: 'Kilometers (meter)' },
+              { value: 'cycles', label: 'Cycles (meter)' },
             ]}
           />
           <Input
@@ -203,6 +224,17 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
             error={errors.lastServiceDate?.message}
           />
         </div>
+        {isUsageMode && (
+          <Input
+            label={`Last Service Meter * (${watchedUnit})`}
+            type="number"
+            min={0}
+            step="1"
+            {...register('lastServiceMeter', { valueAsNumber: true })}
+            error={errors.lastServiceMeter?.message}
+            helperText="Asset's meter reading at the time of last service. Next due fires at this + Every."
+          />
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Select
             label="Priority *"

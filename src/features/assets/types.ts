@@ -15,6 +15,14 @@ export type AssetCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'out_of_se
 
 export type DisposalType = 'sold' | 'scrapped' | 'donated' | 'lost' | 'traded_in'
 
+/**
+ * Unit a meter ticks in. `hours` is for engine/equipment runtime;
+ * `kilometers` mirrors a vehicle odometer for linked assets; `cycles` is for
+ * count-based wear (lifts, presses). Pick one per asset — meters are
+ * monotonic: readings can only increase.
+ */
+export type AssetMeterUnit = 'hours' | 'kilometers' | 'cycles'
+
 export interface Asset {
   id: string
   /** Human-readable code surfaced in tables and tags (e.g. "GEN-0012"). */
@@ -43,6 +51,13 @@ export interface Asset {
   notes?: string
   /** Optional checklist template — used for inspection / intake / disposal. */
   checklistId?: string
+  /** Meter unit, if this asset has one. Drives usage-based preventive
+   * maintenance scheduling. Absent → asset is service-on-calendar only. */
+  meterUnit?: AssetMeterUnit
+  /** Last recorded meter reading. Monotonic: updates must be ≥ this value. */
+  currentMeter?: number
+  meterUpdatedAt?: string
+  meterUpdatedBy?: string
   /** Disposal metadata, populated when status flips to 'retiring' on submit
    * and finalized when an approver runs `approveDisposal`. Stays on the asset
    * after disposal completes for audit. */
@@ -86,6 +101,7 @@ export type AssetEventType =
   | 'inspection'
   | 'maintenance_started'
   | 'maintenance_ended'
+  | 'meter_updated'
   | 'disposal_submitted'
   | 'disposal_approved'
   | 'disposal_rejected'
@@ -112,6 +128,10 @@ export interface AssetEvent {
     disposalType?: DisposalType
     disposalAmount?: number
     rejectionReason?: string
+    /** meter_updated payload. */
+    fromMeter?: number
+    toMeter?: number
+    meterUnit?: AssetMeterUnit
   }
 }
 

@@ -29,6 +29,92 @@ async function newSchedule(
   })
 }
 
+describe('preventiveSchedulesApi.create — usage-based', () => {
+  it('rejects a usage interval when the asset has no meterUnit', async () => {
+    await expect(
+      preventiveSchedulesApi.create({
+        title: 'Bad usage PM',
+        assetId: 'AST-001', // a laptop, no meter
+        intervalUnit: 'hours',
+        intervalValue: 500,
+        lastServiceDate: '2026-01-01',
+        lastServiceMeter: 100,
+        priority: 'medium',
+        defaultAssigneeId: 'U002',
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/meterUnit/i)
+  })
+
+  it('rejects when lastServiceMeter is missing on a usage schedule', async () => {
+    await expect(
+      preventiveSchedulesApi.create({
+        title: 'Missing meter PM',
+        assetId: 'AST-010', // has hours meter
+        intervalUnit: 'hours',
+        intervalValue: 250,
+        lastServiceDate: '2026-01-01',
+        priority: 'medium',
+        defaultAssigneeId: 'U002',
+        createdBy: 'U001',
+      }),
+    ).rejects.toThrow(/lastServiceMeter is required/i)
+  })
+
+  it('creates a usage-based schedule and stamps lastServiceMeter', async () => {
+    const created = await preventiveSchedulesApi.create({
+      title: 'Genset 250h',
+      assetId: 'AST-010',
+      intervalUnit: 'hours',
+      intervalValue: 250,
+      lastServiceDate: '2026-01-01',
+      lastServiceMeter: 500,
+      priority: 'medium',
+      defaultAssigneeId: 'U003',
+      createdBy: 'U001',
+    })
+    expect(created.lastServiceMeter).toBe(500)
+    expect(created.intervalUnit).toBe('hours')
+  })
+})
+
+describe('preventiveSchedulesApi.generateDueWorkOrder — usage-based', () => {
+  it('refuses to generate when meter has not reached the trigger', async () => {
+    // AST-010 currentMeter is 1480; lastServiceMeter 1400 + 250 = 1650 > 1480.
+    const s = await preventiveSchedulesApi.create({
+      title: 'Not due yet',
+      assetId: 'AST-010',
+      intervalUnit: 'hours',
+      intervalValue: 250,
+      lastServiceDate: '2026-01-01',
+      lastServiceMeter: 1400,
+      priority: 'medium',
+      defaultAssigneeId: 'U003',
+      createdBy: 'U001',
+    })
+    await expect(preventiveSchedulesApi.generateDueWorkOrder(s.id, 'U001')).rejects.toThrow(/not due until meter/i)
+  })
+
+  it('generates and advances lastServiceMeter when meter has reached the trigger', async () => {
+    // AST-011 currentMeter 3275; choose lastServiceMeter so the schedule is due.
+    const s = await preventiveSchedulesApi.create({
+      title: 'Due usage PM',
+      assetId: 'AST-011',
+      intervalUnit: 'hours',
+      intervalValue: 500,
+      lastServiceDate: '2026-01-01',
+      lastServiceMeter: 2700, // 2700 + 500 = 3200 ≤ 3275
+      priority: 'medium',
+      defaultAssigneeId: 'U002',
+      createdBy: 'U001',
+    })
+    const { schedule, workOrder } = await preventiveSchedulesApi.generateDueWorkOrder(s.id, 'U001')
+    expect(workOrder.type).toBe('preventive')
+    expect(workOrder.status).toBe('pending')
+    expect(schedule.lastServiceMeter).toBe(3275)
+  })
+})
+
 describe('preventiveSchedulesApi.list', () => {
   it('returns schedules sorted by nextServiceDate ascending', async () => {
     const result = await preventiveSchedulesApi.list()
