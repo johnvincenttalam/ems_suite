@@ -3,6 +3,7 @@ import { format, isToday, isPast, isThisWeek, parseISO } from 'date-fns'
 import { Calendar, AlertTriangle, Clock } from 'lucide-react'
 import { useWorkOrders } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
+import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
 import type { WorkOrder, WorkOrderPriority } from '@/features/maintenance/types'
 import { Avatar } from '@/shared/ui/avatar'
@@ -50,10 +51,16 @@ function bucketize(orders: WorkOrder[]): Bucket[] {
 export function ScheduleTab() {
   const { data: workOrders = [], isLoading } = useWorkOrders()
   const { data: assets = [] } = useAssets()
+  const { data: vehicles = [] } = useVehicles()
   const { data: users = [] } = useUsers()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const vehicleByAssetId = useMemo(() => {
+    const map: Record<string, typeof vehicles[number]> = {}
+    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
+    return map
+  }, [vehicles])
 
   const buckets = useMemo(() => bucketize(workOrders), [workOrders])
 
@@ -87,8 +94,12 @@ export function ScheduleTab() {
             </div>
             <div className="space-y-2">
               {bucket.orders.map((wo) => {
+                const vehicle = vehicleByAssetId[wo.assetId]
                 const asset = assetMap[wo.assetId]
                 const user = userMap[wo.assignedTo]
+                const subjectLabel = vehicle
+                  ? `🚛 ${vehicle.plateNumber} · ${vehicle.model}`
+                  : asset?.name ?? wo.assetId
                 return (
                   <div key={wo.id} className={cn(
                     'bg-white rounded-lg border px-4 py-3 flex items-center gap-4',
@@ -108,7 +119,7 @@ export function ScheduleTab() {
                         <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize', priorityStyles[wo.priority])}>{wo.priority}</span>
                       </div>
                       <p className="text-[13px] font-medium text-zinc-900 mt-0.5">{wo.title}</p>
-                      <p className="text-[12px] text-zinc-500">{asset?.name ?? wo.assetId}</p>
+                      <p className="text-[12px] text-zinc-500">{subjectLabel}</p>
                     </div>
                     {user && (
                       <div className="flex items-center gap-2 flex-shrink-0">

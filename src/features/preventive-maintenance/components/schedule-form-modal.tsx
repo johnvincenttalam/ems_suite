@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { preventiveSchedulesApi } from '@/features/preventive-maintenance/api/preventive-schedules-api'
 import type { PreventiveSchedule } from '@/features/preventive-maintenance/types'
 import { useAssets } from '@/features/assets'
+import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
@@ -37,6 +38,7 @@ interface ScheduleFormModalProps {
 
 export function ScheduleFormModal({ open, onClose, schedule, onSaved }: ScheduleFormModalProps) {
   const { data: assets = [] } = useAssets()
+  const { data: vehicles = [] } = useVehicles()
   const { data: users = [] } = useUsers()
   const currentUser = useAuthStore((s) => s.user)
   const isEditing = !!schedule
@@ -124,6 +126,26 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
   const activeAssets = assets.filter((a) => a.status !== 'disposed')
   const activeUsers = users.filter((u) => u.status === 'active')
 
+  const linkedAssetIds = new Set(
+    vehicles.map((v) => v.linkedAssetId).filter((id): id is string => !!id),
+  )
+  const assetById: Record<string, typeof assets[number]> = Object.fromEntries(assets.map((a) => [a.id, a]))
+  const subjectOptions = [
+    ...vehicles
+      .filter((v) => v.linkedAssetId && v.status !== 'retired')
+      .filter((v) => {
+        const a = assetById[v.linkedAssetId as string]
+        return a && a.status !== 'disposed'
+      })
+      .map((v) => ({
+        value: v.linkedAssetId as string,
+        label: `🚛 ${v.plateNumber} · ${v.model}`,
+      })),
+    ...activeAssets
+      .filter((a) => !linkedAssetIds.has(a.id))
+      .map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` })),
+  ]
+
   return (
     <Modal
       open={open}
@@ -149,15 +171,12 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
           placeholder="e.g. Engine oil & filter service"
         />
         <Select
-          label="Asset *"
+          label="Asset / Vehicle *"
           {...register('assetId')}
           error={errors.assetId?.message}
-          placeholder="Select asset"
+          placeholder="Select asset or vehicle"
           disabled={isEditing}
-          options={activeAssets.map((a) => ({
-            value: a.id,
-            label: `${a.name} (${a.serialNumber})`,
-          }))}
+          options={subjectOptions}
         />
         <div className="grid grid-cols-3 gap-3">
           <Input

@@ -25,6 +25,7 @@ import type {
 } from '@/features/preventive-maintenance/types'
 import { INTERVAL_UNIT_LABEL } from '@/features/preventive-maintenance/types'
 import { useAssets } from '@/features/assets'
+import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
@@ -52,12 +53,18 @@ const statusStyles: Record<ScheduleStatus, string> = {
 export function PreventiveSchedulesTab() {
   const { data: schedules = [], isLoading } = usePreventiveSchedules()
   const { data: assets = [] } = useAssets()
+  const { data: vehicles = [] } = useVehicles()
   const { data: users = [] } = useUsers()
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  const vehicleByAssetId = useMemo(() => {
+    const map: Record<string, typeof vehicles[number]> = {}
+    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
+    return map
+  }, [vehicles])
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<ScheduleStatus | 'all'>('all')
@@ -155,16 +162,26 @@ export function PreventiveSchedulesTab() {
       },
       {
         accessorKey: 'assetId',
-        header: 'Asset',
+        header: 'Asset / Vehicle',
         cell: ({ getValue }) => {
-          const asset = assetMap[getValue() as string]
+          const id = getValue() as string
+          const vehicle = vehicleByAssetId[id]
+          if (vehicle) {
+            return (
+              <div>
+                <p className="text-[13px] text-zinc-700 font-mono">{vehicle.plateNumber}</p>
+                <p className="text-[11px] text-zinc-400">{vehicle.model}</p>
+              </div>
+            )
+          }
+          const asset = assetMap[id]
           return asset ? (
             <div>
               <p className="text-[13px] text-zinc-700">{asset.name}</p>
               <p className="text-[11px] font-mono text-zinc-400">{asset.serialNumber}</p>
             </div>
           ) : (
-            <span className="text-zinc-400">{getValue() as string}</span>
+            <span className="text-zinc-400">{id}</span>
           )
         },
       },
@@ -304,7 +321,7 @@ export function PreventiveSchedulesTab() {
         },
       },
     ],
-    [assetMap, userMap, today, generateMutation, setStatusMutation],
+    [assetMap, userMap, vehicleByAssetId, today, generateMutation, setStatusMutation],
   )
 
   const table = useReactTable({

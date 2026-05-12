@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useWorkOrders, maintenanceApi } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
+import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
 import { useAuthStore } from '@/features/auth'
 import { issuesApi } from '@/features/issues'
@@ -81,12 +82,21 @@ const typeLabel: Record<WorkOrderType, string> = {
 export function WorkOrdersTab() {
   const { data: workOrders = [], isLoading } = useWorkOrders()
   const { data: assets = [] } = useAssets()
+  const { data: vehicles = [] } = useVehicles()
   const { data: users = [] } = useUsers()
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  // Reverse-lookup: WO.assetId → vehicle when that asset is a linked-vehicle's
+  // backing record. Lets the table show "SGX 5482 K · Toyota Hilux" instead of
+  // the underlying asset name for fleet WOs.
+  const vehicleByAssetId = useMemo(() => {
+    const map: Record<string, typeof vehicles[number]> = {}
+    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
+    return map
+  }, [vehicles])
 
   const [searchParams] = useSearchParams()
   const [globalFilter, setGlobalFilter] = useState(searchParams.get('wo') ?? '')
@@ -277,14 +287,24 @@ export function WorkOrdersTab() {
         {row.original.description && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{row.original.description}</p>}
       </div>
     )},
-    { accessorKey: 'assetId', header: 'Asset', cell: ({ getValue }) => {
-      const asset = assetMap[getValue() as string]
+    { accessorKey: 'assetId', header: 'Asset / Vehicle', cell: ({ getValue }) => {
+      const id = getValue() as string
+      const vehicle = vehicleByAssetId[id]
+      if (vehicle) {
+        return (
+          <div>
+            <p className="text-[13px] text-zinc-700 font-mono">{vehicle.plateNumber}</p>
+            <p className="text-[11px] text-zinc-400">{vehicle.model}</p>
+          </div>
+        )
+      }
+      const asset = assetMap[id]
       return asset ? (
         <div>
           <p className="text-[13px] text-zinc-700">{asset.name}</p>
           <p className="text-[11px] font-mono text-zinc-400">{asset.serialNumber}</p>
         </div>
-      ) : <span className="text-zinc-400">{getValue() as string}</span>
+      ) : <span className="text-zinc-400">{id}</span>
     }},
     { accessorKey: 'priority', header: 'Priority', cell: ({ getValue }) => {
       const v = getValue() as WorkOrderPriority
@@ -350,7 +370,7 @@ export function WorkOrdersTab() {
         </div>
       )
     }},
-  ], [assetMap, userMap, startMutation])
+  ], [assetMap, userMap, vehicleByAssetId, startMutation])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
@@ -368,6 +388,30 @@ export function WorkOrdersTab() {
 
   const activeAssets = assets.filter((a) => a.status !== 'disposed')
   const activeUsers = users.filter((u) => u.status === 'active')
+
+  // Subject picker = assets + vehicles (resolved to their linked asset). A
+  // vehicle without a linkedAssetId is intentionally absent — surfacing one
+  // here would let users create a WO with no maintenance target. The asset
+  // backing a linked vehicle is hidden from the picker so the same target
+  // isn't selectable two ways.
+  const linkedAssetIds = new Set(
+    vehicles.map((v) => v.linkedAssetId).filter((id): id is string => !!id),
+  )
+  const subjectOptions = [
+    ...vehicles
+      .filter((v) => v.linkedAssetId && v.status !== 'retired')
+      .filter((v) => {
+        const a = assetMap[v.linkedAssetId as string]
+        return a && a.status !== 'disposed'
+      })
+      .map((v) => ({
+        value: v.linkedAssetId as string,
+        label: `🚛 ${v.plateNumber} · ${v.model}`,
+      })),
+    ...activeAssets
+      .filter((a) => !linkedAssetIds.has(a.id))
+      .map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` })),
+  ]
 
   return (
     <div>
@@ -457,7 +501,7 @@ export function WorkOrdersTab() {
           <Input label="Title *" {...register('title')} error={errors.title?.message} placeholder="e.g. Engine oil & filter service" />
           <Textarea label="Description" {...register('description')} rows={2} />
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Asset *" {...register('assetId')} error={errors.assetId?.message} placeholder="Select asset" options={activeAssets.map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` }))} />
+            <Select label="Asset / Vehicle *" {...register('assetId')} error={errors.assetId?.message} placeholder="Select asset or vehicle" options={subjectOptions} />
             <Select label="Technician *" {...register('assignedTo')} error={errors.assignedTo?.message} placeholder="Select technician" options={activeUsers.map((u) => ({ value: u.id, label: u.name }))} />
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -480,7 +524,13 @@ export function WorkOrdersTab() {
       <CompleteWorkOrderModal
         open={!!completingWO}
         wo={completingWO}
-        assetLabel={completingWO ? assetMap[completingWO.assetId]?.name ?? completingWO.assetId : ''}
+        assetLabel={
+          completingWO
+            ? (vehicleByAssetId[completingWO.assetId]
+                ? `${vehicleByAssetId[completingWO.assetId].plateNumber} · ${vehicleByAssetId[completingWO.assetId].model}`
+                : assetMap[completingWO.assetId]?.name ?? completingWO.assetId)
+            : ''
+        }
         loading={completeMutation.isPending}
         onClose={() => setCompletingWO(null)}
         onConfirm={(input) => completingWO && completeMutation.mutate({ wo: completingWO, input })}
