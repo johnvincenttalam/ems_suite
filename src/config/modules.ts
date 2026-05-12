@@ -117,6 +117,7 @@ export const modules: EmsModule[] = [
         title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'sdmsLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings', requiresRole: 'admin' },
         ],
       },
@@ -185,7 +186,7 @@ export const modules: EmsModule[] = [
         title: 'Administration',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'inventoryUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'inventoryLogs' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'inventoryLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'inventorySettings', requiresRole: 'admin' },
         ],
       },
@@ -236,7 +237,7 @@ export const modules: EmsModule[] = [
         title: 'Administration',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'assetsUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'assetsLogs' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'assetsLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'assetsSettings', requiresRole: 'admin' },
         ],
       },
@@ -295,7 +296,7 @@ export const modules: EmsModule[] = [
         title: 'Administration',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'fleetUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'fleetLogs' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'fleetLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'fleetSettings', requiresRole: 'admin' },
         ],
       },
@@ -346,7 +347,7 @@ export const modules: EmsModule[] = [
         title: 'Administration',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'procurementUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'procurementLogs' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'procurementLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'procurementSettings', requiresRole: 'admin' },
         ],
       },
@@ -413,7 +414,7 @@ export const modules: EmsModule[] = [
         title: 'Administration',
         items: [
           { label: 'Users', path: 'users', icon: UserCheck, feature: 'maintenanceUsers' },
-          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs' },
+          { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs', requiresRole: 'admin' },
           { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings', requiresRole: 'admin' },
         ],
       },

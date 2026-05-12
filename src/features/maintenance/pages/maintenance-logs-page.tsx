@@ -7,6 +7,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table'
 import { Activity } from 'lucide-react'
+import { ModuleAdminGuard } from '@/features/auth'
 import { format } from 'date-fns'
 import { useAuditLog } from '@/features/audit-log'
 import type { AuditAction, AuditEntry } from '@/features/audit-log/types'
@@ -37,6 +38,14 @@ const actionFilters: { value: AuditAction | 'all'; label: string }[] = [
 ]
 
 export function MaintenanceLogsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="maintenance" pageLabel="Maintenance Logs">
+      <MaintenanceLogsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function MaintenanceLogsPageInner() {
   const { data: allEntries = [], isLoading } = useAuditLog()
   const [globalFilter, setGlobalFilter] = useState('')
   const [actionFilter, setActionFilter] = useState<AuditAction | 'all'>('all')
