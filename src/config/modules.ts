@@ -362,6 +362,8 @@ export const modules: EmsModule[] = [
       {
         items: [
           { label: 'Dashboard', path: '', icon: LayoutDashboard, feature: 'dashboard' },
+          { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'misAlerts' },
+          { label: 'Custom Reports', path: 'reports', icon: ClipboardCheck, feature: 'misCustomReports' },
           { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
         ],
       },

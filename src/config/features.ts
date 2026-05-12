@@ -1,6 +1,8 @@
 export const features = {
   // EMS — Management Information System (executive overview)
   dashboard: true,
+  misAlerts: true,
+  misCustomReports: true,
 
   // EMS — operational modules
   inventory: true,

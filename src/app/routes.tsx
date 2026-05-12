@@ -11,6 +11,8 @@ import { modules, type EmsModule } from '@/config/modules'
 
 const featurePages: Record<FeatureKey, ComponentType> = {
   dashboard:           lazy(() => featureImports.dashboard().then((m: any) => ({ default: m.AdminDashboard }))),
+  misAlerts:           lazy(() => featureImports.misAlerts().then((m: any) => ({ default: m.MisAlertsPage }))),
+  misCustomReports:    lazy(() => featureImports.misCustomReports().then((m: any) => ({ default: m.MisCustomReportsPage }))),
   charts:              lazy(() => featureImports.charts().then((m: any) => ({ default: m.ChartsPage }))),
   table:               lazy(() => featureImports.table().then((m: any) => ({ default: m.AdvancedTablePage }))),
   forms:               lazy(() => featureImports.forms().then((m: any) => ({ default: m.FormsPage }))),

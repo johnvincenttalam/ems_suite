@@ -10,6 +10,8 @@ import type { FeatureKey } from './features'
  */
 export const featureImports: Record<FeatureKey, () => Promise<unknown>> = {
   dashboard:   () => import('@/features/dashboard'),
+  misAlerts:   () => import('@/features/mis'),
+  misCustomReports: () => import('@/features/mis'),
   charts:      () => import('@/features/charts'),
   table:       () => import('@/features/orders'),
   forms:       () => import('@/features/forms'),
