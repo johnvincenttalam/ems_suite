@@ -4,10 +4,17 @@ import { useAssets } from '@/features/assets'
 import { useRequests } from '@/features/procurement'
 import { useWorkOrders } from '@/features/maintenance'
 import { useDocuments } from '@/features/documents'
-import { useFuelLogs, useTrips } from '@/features/fleet'
+import { useFuelLogs, useTrips, useVehicles } from '@/features/fleet'
 import { useTrackingLogs } from '@/features/tracking'
 import { useAssignments } from '@/features/checklists'
+import { workOrderTotalCost } from '@/features/maintenance'
 import { groupByMonth, groupByWeek, monthLabel, sumBy, countBy, topN, pct, monthKey, weekKey } from '@/features/reports/utils/aggregate'
+
+/** % change from prior to current. Returns null when prior is 0 (can't compute). */
+function pctChange(now: number, prior: number): number | null {
+  if (prior === 0) return null
+  return Math.round(((now - prior) / prior) * 100)
+}
 
 export function useReportsData() {
   const { data: items = [], isLoading: itemsLoading } = useInventoryItems()
@@ -18,6 +25,7 @@ export function useReportsData() {
   const { data: documents = [] } = useDocuments()
   const { data: fuelLogs = [] } = useFuelLogs()
   const { data: trips = [] } = useTrips()
+  const { data: vehicles = [] } = useVehicles()
   const { data: scans = [] } = useTrackingLogs()
   const { data: checklistAssignments = [] } = useAssignments()
 
@@ -106,12 +114,77 @@ export function useReportsData() {
       checklistAssignments.length,
     )
 
+    // --- Period-over-period (MTD vs prior full month) -----------------------
+    const nowDate = new Date()
+    const thisMonthKey = monthKey(nowDate.toISOString())
+    const priorMonthKey = monthKey(
+      new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1).toISOString(),
+    )
+
+    // Procurement: approved this month vs prior, by approvedAt.
+    let procMTD = 0
+    let procPrior = 0
+    for (const r of requests) {
+      if (r.status !== 'approved' || !r.approvedAt) continue
+      const k = monthKey(r.approvedAt)
+      if (k === thisMonthKey) procMTD += r.totalAmount
+      else if (k === priorMonthKey) procPrior += r.totalAmount
+    }
+    const procDelta = pctChange(procMTD, procPrior)
+
+    // Maintenance: total cost of completed WOs by completedDate.
+    let maintMTD = 0
+    let maintPrior = 0
+    for (const w of workOrders) {
+      if (w.status !== 'completed' || !w.completedDate) continue
+      const k = monthKey(w.completedDate)
+      const cost = workOrderTotalCost(w)
+      if (k === thisMonthKey) maintMTD += cost
+      else if (k === priorMonthKey) maintPrior += cost
+    }
+    const maintDelta = pctChange(maintMTD, maintPrior)
+
+    // Fleet fuel: cost by fuel log date.
+    let fuelMTD = 0
+    let fuelPrior = 0
+    for (const f of fuelLogs) {
+      const k = monthKey(f.date)
+      if (k === thisMonthKey) fuelMTD += f.totalCost
+      else if (k === priorMonthKey) fuelPrior += f.totalCost
+    }
+
+    const operationalMTD = procMTD + maintMTD + fuelMTD
+    const operationalPrior = procPrior + maintPrior + fuelPrior
+    const operationalDelta = pctChange(operationalMTD, operationalPrior)
+
+    const activeVehicles = vehicles.filter((v) => v.status === 'active').length
+
+    // --- Cost Trend (last 6 months, procurement + maintenance) -------------
+    const trendBuckets: { key: string; month: string; procurement: number; maintenance: number; total: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(nowDate.getFullYear(), nowDate.getMonth() - i, 1)
+      trendBuckets.push({ key: monthKey(d.toISOString()), month: monthLabel(monthKey(d.toISOString())), procurement: 0, maintenance: 0, total: 0 })
+    }
+    const trendByKey = new Map(trendBuckets.map((b) => [b.key, b]))
+    for (const r of requests) {
+      if (r.status !== 'approved' || !r.approvedAt) continue
+      const b = trendByKey.get(monthKey(r.approvedAt))
+      if (b) b.procurement += r.totalAmount
+    }
+    for (const w of workOrders) {
+      if (w.status !== 'completed' || !w.completedDate) continue
+      const b = trendByKey.get(monthKey(w.completedDate))
+      if (b) b.maintenance += workOrderTotalCost(w)
+    }
+    for (const b of trendBuckets) b.total = b.procurement + b.maintenance
+
     return {
       isLoading,
       kpis: {
         lowStockCount,
         inventoryValue,
         activeAssets,
+        activeVehicles,
         assetsInMaintenance,
         pendingRequests,
         monthSpend,
@@ -119,7 +192,16 @@ export function useReportsData() {
         docsInReview,
         tripsInProgress,
         checklistsCompletedRate,
+        // MIS executive figures
+        procMTD,
+        procDelta,
+        maintMTD,
+        maintDelta,
+        fuelMTD,
+        operationalMTD,
+        operationalDelta,
       },
+      costTrend: trendBuckets,
       lowStockItems,
       assetStatusBreakdown,
       monthlySpend,

@@ -10,7 +10,23 @@ interface StatCardProps {
   icon: LucideIcon
   iconColor?: string
   iconBg?: string
-  trend?: { value: number; positive: boolean }
+  /**
+   * Period-over-period change indicator.
+   *  - `value`: signed percent (e.g. +12, -8). The sign in the display follows
+   *    this value's sign.
+   *  - `positive`: explicit color override. Use this when the sign of `value`
+   *    isn't enough to know whether the change is good.
+   *  - `goodWhen`: lets the card derive color from `value`. `'up'` (default)
+   *    treats positive values as good (e.g. revenue, active assets); `'down'`
+   *    treats negative values as good (e.g. cost, overdue counts).
+   *  - `label`: override "vs last month".
+   */
+  trend?: {
+    value: number
+    positive?: boolean
+    goodWhen?: 'up' | 'down'
+    label?: string
+  }
   index?: number
 }
 
@@ -62,14 +78,22 @@ export function StatCard({ title, value, subtitle, icon: Icon, iconBg = 'bg-zinc
           <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">{title}</p>
           <p className="text-2xl font-semibold text-zinc-900 tracking-tight">{formatAnimatedValue(value)}</p>
           {subtitle && <p className="text-xs text-zinc-400">{subtitle}</p>}
-          {trend && (
-            <div className="flex items-center gap-1.5 pt-0.5">
-              <span className={cn('w-1.5 h-1.5 rounded-full', trend.positive ? 'bg-emerald-500' : 'bg-red-500')} />
-              <span className="text-xs text-zinc-500">
-                {trend.positive ? '+' : '-'}{Math.abs(trend.value)}% vs last month
-              </span>
-            </div>
-          )}
+          {trend && (() => {
+            const sign = trend.value > 0 ? '+' : trend.value < 0 ? '-' : ''
+            // Color: explicit override wins; otherwise derive from goodWhen.
+            const goodWhen = trend.goodWhen ?? 'up'
+            const isGood = trend.positive !== undefined
+              ? trend.positive
+              : (goodWhen === 'up' ? trend.value >= 0 : trend.value <= 0)
+            return (
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className={cn('w-1.5 h-1.5 rounded-full', isGood ? 'bg-emerald-500' : 'bg-red-500')} />
+                <span className="text-xs text-zinc-500">
+                  {sign}{Math.abs(trend.value)}% {trend.label ?? 'vs last month'}
+                </span>
+              </div>
+            )
+          })()}
         </div>
         <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', iconBg)}>
           <Icon className={cn('w-[18px] h-[18px]', iconColor)} />

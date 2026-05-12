@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Boxes, Package, ShoppingCart, Wrench,
-  TrendingUp, ArrowRight,
+  ShoppingCart, Wrench,
+  ArrowRight, DollarSign, Truck,
 } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts'
 import { useReportsData } from '@/features/reports/hooks/use-reports-data'
 import { useIssues } from '@/features/issues'
@@ -79,10 +79,45 @@ export function AdminDashboard() {
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Inventory Value"  value={formatCompactCurrency(k.inventoryValue)} subtitle={`${k.lowStockCount} item${k.lowStockCount === 1 ? '' : 's'} below reorder`} icon={Boxes}        iconBg="bg-blue-50"    iconColor="text-blue-600"    index={0} />
-        <StatCard title="Active Assets"    value={k.activeAssets}                          subtitle={`${k.assetsInMaintenance} in maintenance`}                                        icon={Package}      iconBg="bg-emerald-50" iconColor="text-emerald-600" index={1} />
-        <StatCard title="Approved Spend"   value={formatCompactCurrency(k.monthSpend)}     subtitle={`${k.pendingRequests} pending approval`}                                          icon={ShoppingCart} iconBg="bg-violet-50"  iconColor="text-violet-500"  index={2} />
-        <StatCard title="Open Work Orders" value={k.overdueWorkOrders}                     subtitle={k.overdueWorkOrders > 0 ? 'Past scheduled date' : 'All on track'}                  icon={Wrench}       iconBg="bg-amber-50"   iconColor="text-amber-500"   index={3} />
+        <StatCard
+          title="Total Operational Cost"
+          value={formatCompactCurrency(k.operationalMTD)}
+          subtitle="Procurement + maintenance + fuel"
+          icon={DollarSign}
+          iconBg="bg-violet-50"
+          iconColor="text-violet-600"
+          trend={k.operationalDelta !== null ? { value: k.operationalDelta, goodWhen: 'down' } : undefined}
+          index={0}
+        />
+        <StatCard
+          title="Procurement Spend (MTD)"
+          value={formatCompactCurrency(k.procMTD)}
+          subtitle={`${k.pendingRequests} pending approval`}
+          icon={ShoppingCart}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
+          trend={k.procDelta !== null ? { value: k.procDelta, goodWhen: 'down' } : undefined}
+          index={1}
+        />
+        <StatCard
+          title="Maintenance Cost (MTD)"
+          value={formatCompactCurrency(k.maintMTD)}
+          subtitle={`${k.overdueWorkOrders} overdue work order${k.overdueWorkOrders === 1 ? '' : 's'}`}
+          icon={Wrench}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-600"
+          trend={k.maintDelta !== null ? { value: k.maintDelta, goodWhen: 'down' } : undefined}
+          index={2}
+        />
+        <StatCard
+          title="Active Assets / Vehicles"
+          value={k.activeAssets + k.activeVehicles}
+          subtitle={`${k.activeAssets} asset${k.activeAssets === 1 ? '' : 's'} · ${k.activeVehicles} vehicle${k.activeVehicles === 1 ? '' : 's'}`}
+          icon={Truck}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+          index={3}
+        />
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -129,22 +164,22 @@ export function AdminDashboard() {
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between flex">
-            <CardTitle>Monthly Procurement Spend</CardTitle>
-            <Link to="/module/procurement/reports" className="text-[12px] text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Full report
-            </Link>
+            <CardTitle>Cost Trend (Procurement + Maintenance)</CardTitle>
+            <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Last 6 months</span>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div style={{ width: '100%', height: 220 }}>
+            <div style={{ width: '100%', height: 240 }}>
               <ResponsiveContainer>
-                <BarChart data={data.monthlySpend}>
+                <LineChart data={data.costTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#a1a1aa' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatCurrency(Number(v)), 'Spend']} />
-                  <Bar dataKey="spend" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                </BarChart>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v ?? 0))} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="procurement" name="Procurement" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="maintenance" name="Maintenance" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="total" name="Total" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
