@@ -5,6 +5,8 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { useNotifications } from '@/shared/notifications'
 import type { NotificationSeverity } from '@/shared/notifications/types'
 import { modules, type ModuleKey } from '@/config/modules'
+import { useMisSettings } from '@/features/mis/store/mis-settings-store'
+import type { AlertCategory } from '@/features/mis/store/mis-settings-store'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { FilterChips } from '@/shared/ui/filter-chips'
@@ -50,8 +52,18 @@ const dotByType: Record<NotificationSeverity, string> = {
  * roll-up alongside it, not a replacement.
  */
 export function MisAlertsPage() {
-  const { notifications, markRead, markAllRead } = useNotifications()
+  const { notifications: allNotifications, markRead, markAllRead } = useNotifications()
   const navigate = useNavigate()
+  const enabledCategories = useMisSettings((s) => s.settings.enabledAlertCategories)
+
+  // Category-filter the cross-module roll-up. Notifications whose module
+  // isn't an enabled category are dropped from view here; the per-module
+  // alerts page for that module still shows them.
+  const enabledSet = useMemo(() => new Set<AlertCategory>(enabledCategories), [enabledCategories])
+  const notifications = useMemo(
+    () => allNotifications.filter((n) => (enabledSet.size === 0 ? true : enabledSet.has(n.module as AlertCategory))),
+    [allNotifications, enabledSet],
+  )
 
   const [severity, setSeverity] = useState<SeverityFilter>('all')
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('all')

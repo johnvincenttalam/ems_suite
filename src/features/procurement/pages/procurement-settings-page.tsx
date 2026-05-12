@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Settings as SettingsIcon, Bell, ListChecks, Building2, RotateCcw } from 'lucide-react'
+import { ModuleAdminGuard } from '@/features/auth'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -29,6 +30,14 @@ const CURRENCIES = [
 ]
 
 export function ProcurementSettingsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="procurement" pageLabel="Procurement Settings">
+      <ProcurementSettingsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function ProcurementSettingsPageInner() {
   const { settings, update, updateNotify, reset } = useProcurementSettings()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
 

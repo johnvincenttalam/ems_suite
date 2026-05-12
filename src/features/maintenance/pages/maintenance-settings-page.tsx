@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Settings as SettingsIcon, Bell, Wrench, ListChecks, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
+import { ModuleAdminGuard } from '@/features/auth'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Toggle } from '@/shared/ui/toggle'
@@ -20,6 +21,14 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['value']
 
 export function MaintenanceSettingsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="maintenance" pageLabel="Maintenance Settings">
+      <MaintenanceSettingsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function MaintenanceSettingsPageInner() {
   const { settings, update, updateNotify, reset } = useMaintenanceSettings()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
 

@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { Sidebar } from './sidebar'
 import { modules } from '@/config/modules'
+import { useAuthStore } from '@/features/auth/store/auth-store'
+import type { User } from '@/features/users/types'
 
 vi.mock('@/config/features', async () => {
   return {
@@ -49,6 +51,20 @@ vi.mock('@/config/features', async () => {
 })
 
 let enabledFlags: Record<string, boolean> = {}
+
+function signInAdminOf(...keys: Array<'inventory' | 'procurement' | 'mis' | 'sdms' | 'assets' | 'fleet' | 'maintenance'>) {
+  const moduleRoles: Record<string, 'admin'> = {}
+  for (const k of keys) moduleRoles[k] = 'admin'
+  const user: User = {
+    id: 'U-test',
+    name: 'Test Admin',
+    email: 'test@example.com',
+    status: 'active',
+    createdAt: '2025-01-01',
+    moduleRoles,
+  }
+  useAuthStore.setState({ user, isAuthenticated: true, isRestoring: false, selectedModule: null })
+}
 
 function renderSidebarFor(moduleKey: string, initialPath: string) {
   const module = modules.find((m) => m.key === moduleKey)!
@@ -97,6 +113,7 @@ describe('Sidebar', () => {
   })
 
   it('renders only the items in the selected module (Procurement)', () => {
+    signInAdminOf('procurement')
     renderSidebarFor('procurement', '/module/procurement')
     expect(screen.getByRole('link', { name: /requests/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /approvals/i })).toBeInTheDocument()

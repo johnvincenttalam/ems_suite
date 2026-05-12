@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Settings as SettingsIcon, Bell, Archive, PenLine, Workflow, RotateCcw } from 'lucide-react'
+import { ModuleAdminGuard } from '@/features/auth'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -20,6 +21,14 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['value']
 
 export function SdmsSettingsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="sdms" pageLabel="SDMS Settings">
+      <SdmsSettingsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function SdmsSettingsPageInner() {
   const { settings, update, updateNotify, reset } = useSdmsSettings()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
 

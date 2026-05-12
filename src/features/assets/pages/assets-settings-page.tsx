@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Settings as SettingsIcon, Bell, Tag, UserCheck, RotateCcw } from 'lucide-react'
+import { ModuleAdminGuard } from '@/features/auth'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -21,6 +22,14 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['value']
 
 export function AssetsSettingsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="assets" pageLabel="Assets Settings">
+      <AssetsSettingsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function AssetsSettingsPageInner() {
   const { settings, update, updateNotify, reset } = useAssetsSettings()
   const { data: warehouses = [] } = useWarehouses()
   const [activeTab, setActiveTab] = useState<TabKey>('general')

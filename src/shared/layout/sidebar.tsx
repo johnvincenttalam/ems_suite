@@ -7,6 +7,14 @@ import { isFeatureEnabled } from '@/config/features'
 import { prefetchFeature } from '@/config/feature-imports'
 import { getModulePath, type EmsModule } from '@/config/modules'
 import { SdmsTasksBadge } from '@/features/documents'
+import { useAuthStore } from '@/features/auth/store/auth-store'
+import { moduleRoleOf } from '@/features/auth'
+
+const ROLE_RANK: Record<'member' | 'manager' | 'admin', number> = {
+  member: 0,
+  manager: 1,
+  admin: 2,
+}
 
 interface SidebarProps {
   module: EmsModule
@@ -19,6 +27,9 @@ interface SidebarProps {
 export function Sidebar({ module, collapsed, mobileOpen, onToggleCollapse, onCloseMobile }: SidebarProps) {
   const location = useLocation()
   const ModuleIcon = module.icon
+  const user = useAuthStore((s) => s.user)
+  const currentRole = moduleRoleOf(user, module.key)
+  const currentRoleRank = currentRole ? ROLE_RANK[currentRole] : -1
 
   const groups = useMemo(
     () =>
@@ -27,10 +38,14 @@ export function Sidebar({ module, collapsed, mobileOpen, onToggleCollapse, onClo
           title: g.title,
           items: g.items
             .filter((i) => !i.hidden && isFeatureEnabled(i.feature))
+            .filter((i) => {
+              if (!i.requiresRole) return true
+              return currentRoleRank >= ROLE_RANK[i.requiresRole]
+            })
             .map((i) => ({ ...i, absolutePath: getModulePath(module.key, i.path) })),
         }))
         .filter((g) => g.items.length > 0),
-    [module],
+    [module, currentRoleRank],
   )
 
   const moduleRoot = getModulePath(module.key)

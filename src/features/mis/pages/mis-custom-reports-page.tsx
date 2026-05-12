@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
+import { format, parseISO, startOfMonth, startOfQuarter, startOfYear, subDays, subMonths } from 'date-fns'
 import { Download, FileText, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -12,6 +12,8 @@ import { useWorkOrders } from '@/features/maintenance'
 import { useRequests } from '@/features/procurement'
 import { useVehicles, useFuelLogs } from '@/features/fleet'
 import { useAuthStore } from '@/features/auth'
+import { useMisSettings } from '@/features/mis/store/mis-settings-store'
+import type { DefaultReportRange } from '@/features/mis/store/mis-settings-store'
 import { exportToXLSX } from '@/shared/utils/export-xlsx'
 import { exportToPDF } from '@/shared/utils/export-pdf'
 import {
@@ -45,6 +47,20 @@ interface SavedReport {
 
 let reportCounter = 0
 
+/** Map a DefaultReportRange to a concrete ISO date for the From input. */
+function rangeStart(range: DefaultReportRange): string {
+  const now = new Date()
+  const d =
+    range === '7d'  ? subDays(now, 7)
+    : range === '30d' ? subDays(now, 30)
+    : range === '90d' ? subDays(now, 90)
+    : range === 'mtd' ? startOfMonth(now)
+    : range === 'qtd' ? startOfQuarter(now)
+    : range === 'ytd' ? startOfYear(now)
+    : subMonths(now, 1)
+  return format(d, 'yyyy-MM-dd')
+}
+
 /**
  * Cross-module report builder. Each template is a pure derivation over the
  * already-fetched module queries — no new API calls. Generated reports are
@@ -59,11 +75,12 @@ export function MisCustomReportsPage() {
   const { data: fuelLogs = [] } = useFuelLogs()
   const currentUser = useAuthStore((s) => s.user)
 
+  const defaultRange = useMisSettings((s) => s.settings.defaultReportRange)
   const today = format(new Date(), 'yyyy-MM-dd')
-  const monthAgo = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+  const defaultFrom = useMemo(() => rangeStart(defaultRange), [defaultRange])
 
   const [templateKey, setTemplateKey] = useState<ReportTemplateKey>('procurement-spend')
-  const [from, setFrom] = useState(monthAgo)
+  const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(today)
   const [reportFormat, setReportFormat] = useState<ReportFormat>('excel')
   const [generating, setGenerating] = useState(false)
@@ -73,7 +90,7 @@ export function MisCustomReportsPage() {
 
   function resetForm() {
     setTemplateKey('procurement-spend')
-    setFrom(monthAgo)
+    setFrom(rangeStart(defaultRange))
     setTo(today)
     setReportFormat('excel')
   }

@@ -54,6 +54,13 @@ export interface ModuleNavItem {
   feature: FeatureKey
   /** Route exists, but the sidebar hides it. Useful for action pages reached from inside other pages. */
   hidden?: boolean
+  /**
+   * Minimum role within the module to see this nav item and open the route.
+   * Defaults to 'member' (any user with module access). Settings should set
+   * this to 'admin'. The route guard in the page itself is still required —
+   * this only controls sidebar visibility.
+   */
+  requiresRole?: 'admin' | 'manager' | 'member'
 }
 
 export interface ModuleNavGroup {
@@ -110,7 +117,7 @@ export const modules: EmsModule[] = [
         title: 'Admin',
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'sdmsUsers' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'sdmsSettings', requiresRole: 'admin' },
         ],
       },
       {
@@ -179,7 +186,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'inventoryUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'inventoryLogs' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'inventorySettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'inventorySettings', requiresRole: 'admin' },
         ],
       },
       {
@@ -230,7 +237,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'assetsUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'assetsLogs' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'assetsSettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'assetsSettings', requiresRole: 'admin' },
         ],
       },
       {
@@ -289,7 +296,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'fleetUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'fleetLogs' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'fleetSettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'fleetSettings', requiresRole: 'admin' },
         ],
       },
       {
@@ -340,7 +347,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Users', path: 'users', icon: Users, feature: 'procurementUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'procurementLogs' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'procurementSettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'procurementSettings', requiresRole: 'admin' },
         ],
       },
       {
@@ -365,6 +372,7 @@ export const modules: EmsModule[] = [
           { label: 'Alerts', path: 'alerts', icon: Bell, feature: 'misAlerts' },
           { label: 'Custom Reports', path: 'reports', icon: ClipboardCheck, feature: 'misCustomReports' },
           { label: 'Activity', path: 'activity', icon: Activity, feature: 'activity' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'misSettings', requiresRole: 'admin' },
         ],
       },
     ],
@@ -406,7 +414,7 @@ export const modules: EmsModule[] = [
         items: [
           { label: 'Users', path: 'users', icon: UserCheck, feature: 'maintenanceUsers' },
           { label: 'System Logs', path: 'logs', icon: ClipboardList, feature: 'maintenanceLogs' },
-          { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings' },
+          { label: 'Settings', path: 'settings', icon: Settings, feature: 'maintenanceSettings', requiresRole: 'admin' },
         ],
       },
       {

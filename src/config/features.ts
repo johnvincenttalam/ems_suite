@@ -3,6 +3,7 @@ export const features = {
   dashboard: true,
   misAlerts: true,
   misCustomReports: true,
+  misSettings: true,
 
   // EMS — operational modules
   inventory: true,

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Settings as SettingsIcon, Bell, ArrowLeftRight, AlertTriangle, RotateCcw, ScanLine, Sliders } from 'lucide-react'
+import { ModuleAdminGuard } from '@/features/auth'
 import { toast } from 'sonner'
 import { cn } from '@/shared/utils/cn'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -32,6 +33,14 @@ const CURRENCIES = [
 ]
 
 export function InventorySettingsPage() {
+  return (
+    <ModuleAdminGuard moduleKey="inventory" pageLabel="Inventory Settings">
+      <InventorySettingsPageInner />
+    </ModuleAdminGuard>
+  )
+}
+
+function InventorySettingsPageInner() {
   const { settings, update, updateNotify, reset } = useInventorySettings()
   const { data: warehouses = [] } = useWarehouses()
   const { data: uoms = [] } = useUom()
