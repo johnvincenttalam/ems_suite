@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { format, isToday, isPast, isThisWeek, parseISO } from 'date-fns'
-import { Calendar, AlertTriangle, Clock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Calendar, AlertTriangle, Clock, LayoutList, CalendarDays } from 'lucide-react'
+import { getModulePath } from '@/config/modules'
 import { useWorkOrders } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
 import { useVehicles } from '@/features/fleet/hooks/use-fleet'
@@ -10,6 +12,9 @@ import { Avatar } from '@/shared/ui/avatar'
 import { EmptyState } from '@/shared/ui/empty-state'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { cn } from '@/shared/utils/cn'
+import { ScheduleCalendar } from './schedule-calendar'
+
+type ViewMode = 'list' | 'calendar'
 
 const priorityStyles: Record<WorkOrderPriority, string> = {
   low: 'bg-zinc-100 text-zinc-600 border-zinc-200',
@@ -53,16 +58,23 @@ export function ScheduleTab() {
   const { data: assets = [] } = useAssets()
   const { data: vehicles = [] } = useVehicles()
   const { data: users = [] } = useUsers()
+  const [view, setView] = useState<ViewMode>('list')
+  const navigate = useNavigate()
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
   const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
 
+  const activeOrders = useMemo(
+    () => workOrders.filter((w) => w.status === 'pending' || w.status === 'ongoing'),
+    [workOrders],
+  )
+
   const buckets = useMemo(() => bucketize(workOrders), [workOrders])
 
   if (isLoading) return <TableSkeleton columns={3} rows={6} />
 
-  if (workOrders.filter((w) => w.status === 'pending' || w.status === 'ongoing').length === 0) {
+  if (activeOrders.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-zinc-200/60">
         <EmptyState
@@ -75,8 +87,19 @@ export function ScheduleTab() {
   }
 
   return (
-    <div className="space-y-6">
-      {buckets.map((bucket) => {
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        <div className="inline-flex items-center bg-zinc-100 rounded-lg p-0.5">
+          <ViewToggleButton active={view === 'list'} onClick={() => setView('list')} icon={LayoutList} label="List" />
+          <ViewToggleButton active={view === 'calendar'} onClick={() => setView('calendar')} icon={CalendarDays} label="Calendar" />
+        </div>
+      </div>
+
+      {view === 'calendar' ? (
+        <ScheduleCalendar workOrders={activeOrders} />
+      ) : (
+        <div className="space-y-6">
+          {buckets.map((bucket) => {
         if (bucket.orders.length === 0) return null
         const isOverdue = bucket.key === 'overdue'
         const Icon = isOverdue ? AlertTriangle : bucket.key === 'today' ? Clock : Calendar
@@ -97,10 +120,23 @@ export function ScheduleTab() {
                   ? `🚛 ${vehicle.plateNumber} · ${vehicle.model}`
                   : asset?.name ?? (wo.assetId ?? wo.vehicleId ?? '—')
                 return (
-                  <div key={wo.id} className={cn(
-                    'bg-white rounded-lg border px-4 py-3 flex items-center gap-4',
-                    isOverdue ? 'border-red-200/60' : 'border-zinc-200/60'
-                  )}>
+                  <div
+                    key={wo.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`${getModulePath('maintenance', 'work-orders')}?wo=${wo.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`${getModulePath('maintenance', 'work-orders')}?wo=${wo.id}`)
+                      }
+                    }}
+                    className={cn(
+                      'bg-white rounded-lg border px-4 py-3 flex items-center gap-4 cursor-pointer transition-colors',
+                      'hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/10',
+                      isOverdue ? 'border-red-200/60 hover:border-red-300' : 'border-zinc-200/60',
+                    )}
+                  >
                     <div className="flex-shrink-0 w-14 text-center">
                       <p className={cn('text-[11px] uppercase tracking-wider font-semibold', isOverdue ? 'text-red-600' : 'text-zinc-400')}>
                         {format(parseISO(wo.scheduledDate), 'MMM')}
@@ -130,6 +166,34 @@ export function ScheduleTab() {
           </div>
         )
       })}
+        </div>
+      )}
     </div>
+  )
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: typeof LayoutList
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] font-medium transition-colors',
+        active ? 'bg-white text-zinc-900' : 'text-zinc-500 hover:text-zinc-900',
+      )}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
   )
 }
