@@ -86,6 +86,12 @@ export const procurementApi = {
   create: async (input: CreateRequestInput): Promise<RequestWithItems> => {
     await delay(150)
     if (input.items.length === 0) throw new Error('At least one line item is required')
+    // Invariant: a requester can't sit in their own approval chain. Enforced at
+    // the API boundary so future template / department-default features can't
+    // accidentally reintroduce self-approval.
+    if (input.approvers?.includes(input.requesterId)) {
+      throw new Error('Requester cannot be an approver on their own request')
+    }
 
     const id = nextRequestId()
     const now = new Date().toISOString()

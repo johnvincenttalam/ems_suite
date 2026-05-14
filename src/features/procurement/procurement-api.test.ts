@@ -131,6 +131,17 @@ describe('procurementApi.create', () => {
     expect(created.currentApproverIndex).toBe(0)
     expect(created.approvals).toEqual([])
   })
+
+  it('throws when the requester is listed as an approver on their own request', async () => {
+    await expect(
+      procurementApi.create({
+        requesterId: 'U003',
+        departmentId: 'D001',
+        approvers: ['U002', 'U003', 'U001'],
+        items: [{ itemId: 'INV-1001', quantity: 1, unitCost: 5.0 }],
+      }),
+    ).rejects.toThrow(/requester cannot be an approver/i)
+  })
 })
 
 describe('procurementApi.approve — chain mode', () => {
