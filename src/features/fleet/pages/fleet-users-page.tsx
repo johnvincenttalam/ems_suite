@@ -147,6 +147,13 @@ export function FleetUsersPage() {
         ),
       },
       {
+        accessorKey: 'employeeId',
+        header: 'Employee ID',
+        cell: ({ getValue }) => (
+          <span className="font-mono text-[12px] text-zinc-600">{(getValue() as string) || '—'}</span>
+        ),
+      },
+      {
         accessorKey: 'tripsThisMonth',
         header: 'Trips (MTD)',
         cell: ({ getValue }) => {

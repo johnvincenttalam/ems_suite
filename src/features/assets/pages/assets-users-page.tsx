@@ -137,6 +137,13 @@ export function AssetsUsersPage() {
         ),
       },
       {
+        accessorKey: 'employeeId',
+        header: 'Employee ID',
+        cell: ({ getValue }) => (
+          <span className="font-mono text-[12px] text-zinc-600">{(getValue() as string) || '—'}</span>
+        ),
+      },
+      {
         accessorKey: 'openAssignments',
         header: 'Open',
         cell: ({ getValue }) => {

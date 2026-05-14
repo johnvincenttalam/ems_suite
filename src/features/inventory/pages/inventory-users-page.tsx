@@ -136,6 +136,13 @@ export function InventoryUsersPage() {
         ),
       },
       {
+        accessorKey: 'employeeId',
+        header: 'Employee ID',
+        cell: ({ getValue }) => (
+          <span className="font-mono text-[12px] text-zinc-600">{(getValue() as string) || '—'}</span>
+        ),
+      },
+      {
         accessorKey: 'movementsCount',
         header: 'Movements',
         cell: ({ getValue }) => {

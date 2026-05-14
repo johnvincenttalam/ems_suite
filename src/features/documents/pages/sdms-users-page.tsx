@@ -138,6 +138,13 @@ export function SdmsUsersPage() {
           ),
         },
         {
+          accessorKey: 'employeeId',
+          header: 'Employee ID',
+          cell: ({ getValue }) => (
+            <span className="font-mono text-[12px] text-zinc-600">{(getValue() as string) || '—'}</span>
+          ),
+        },
+        {
           accessorKey: 'phone',
           header: 'Phone',
           cell: ({ getValue }) => <span className="text-zinc-600 text-[13px]">{(getValue() as string) || '—'}</span>,
