@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -10,10 +10,12 @@ import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/i
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useWarehouses } from '@/features/warehouses'
 import { useUsers } from '@/features/users'
+import { useUom } from '@/features/uom'
 import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { Modal } from '@/shared/ui/modal'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -66,6 +68,7 @@ export function TransfersPage() {
   const { data: movements = [], isLoading } = useStockMovements()
   const { data: warehouses = [] } = useWarehouses()
   const { data: users = [] } = useUsers()
+  const { data: uoms = [] } = useUom()
   const settings = useInventorySettings((s) => s.settings)
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
@@ -73,6 +76,7 @@ export function TransfersPage() {
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
   const warehouseMap = useMemo(() => Object.fromEntries(warehouses.map((w) => [w.id, w])), [warehouses])
+  const uomMap = useMemo(() => Object.fromEntries(uoms.map((u) => [u.id, u])), [uoms])
 
   const transfers = useMemo(
     () => movements.filter((m) => m.type === 'transfer').slice(0, 30),
@@ -82,10 +86,13 @@ export function TransfersPage() {
   const [rejectTarget, setRejectTarget] = useState<StockMovement | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, control, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { itemId: '', sourceLocationId: '', destinationLocationId: '', approverId: '', reason: '' },
   })
+
+  const selectedItemId = watch('itemId')
+  const selectedUomSymbol = selectedItemId ? uomMap[itemMap[selectedItemId]?.uomId ?? '']?.symbol : undefined
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'movements'] })
@@ -163,12 +170,20 @@ export function TransfersPage() {
             <p className="text-[13px] font-semibold text-zinc-900">New Transfer</p>
           </div>
 
-          <Select
-            label="Item *"
-            placeholder="Select item"
-            options={itemOptions}
-            {...register('itemId')}
-            error={errors.itemId?.message}
+          <Controller
+            name="itemId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Item *"
+                placeholder="Select item"
+                searchPlaceholder="Search by SKU or name…"
+                options={itemOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.itemId?.message}
+              />
+            )}
           />
 
           <Select
@@ -187,14 +202,22 @@ export function TransfersPage() {
             error={errors.destinationLocationId?.message}
           />
 
-          <Input
-            label="Quantity *"
-            type="number"
-            min={1}
-            placeholder="0"
-            {...register('quantity', { valueAsNumber: true })}
-            error={errors.quantity?.message}
-          />
+          <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
+            <Input
+              label="Quantity *"
+              type="number"
+              min={1}
+              placeholder="0"
+              {...register('quantity', { valueAsNumber: true })}
+              error={errors.quantity?.message}
+            />
+            <div className="space-y-1.5">
+              <span className="block text-[13px] font-medium text-zinc-700">UOM</span>
+              <div className="h-10 px-3 inline-flex items-center min-w-[80px] bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-600">
+                {selectedUomSymbol ?? '—'}
+              </div>
+            </div>
+          </div>
 
           <Select
             label="Approving Authority *"

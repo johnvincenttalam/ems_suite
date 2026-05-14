@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -8,10 +8,11 @@ import { ArrowDownToLine, ArrowUpFromLine, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
+import { useUom } from '@/features/uom'
 import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { PageHeader } from '@/shared/ui/page-header'
 import { Tabs } from '@/shared/ui/tabs'
@@ -34,6 +35,7 @@ export function StockInOutPage() {
   const [mode, setMode] = useState<Mode>('in')
   const { data: items = [] } = useInventoryItems()
   const { data: movements = [], isLoading } = useStockMovements()
+  const { data: uoms = [] } = useUom()
   const settings = useInventorySettings((s) => s.settings)
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
@@ -52,6 +54,7 @@ export function StockInOutPage() {
   type FormValues = z.infer<typeof formSchema>
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
+  const uomMap = useMemo(() => Object.fromEntries(uoms.map((u) => [u.id, u])), [uoms])
 
   const recent = useMemo(
     () => movements.filter((m) => (m.type as StockMovementType) === mode).slice(0, 12),
@@ -66,6 +69,7 @@ export function StockInOutPage() {
   const watchedItemId = useWatch({ control, name: 'itemId' })
   const watchedQuantity = useWatch({ control, name: 'quantity' })
   const selectedItem = watchedItemId ? itemMap[watchedItemId] : undefined
+  const selectedUomSymbol = selectedItem ? uomMap[selectedItem.uomId ?? '']?.symbol : undefined
   const projectedAfter = selectedItem
     ? mode === 'in'
       ? selectedItem.quantity + (Number(watchedQuantity) || 0)
@@ -129,22 +133,38 @@ export function StockInOutPage() {
             <p className="text-[13px] font-semibold text-zinc-900">{mode === 'in' ? 'New Stock In' : 'New Stock Out'}</p>
           </div>
 
-          <Select
-            label="Item *"
-            placeholder="Select item"
-            options={itemOptions}
-            {...register('itemId')}
-            error={errors.itemId?.message}
+          <Controller
+            name="itemId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Item *"
+                placeholder="Select item"
+                searchPlaceholder="Search by SKU or name…"
+                options={itemOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.itemId?.message}
+              />
+            )}
           />
 
-          <Input
-            label="Quantity *"
-            type="number"
-            min={1}
-            placeholder="0"
-            {...register('quantity', { valueAsNumber: true })}
-            error={errors.quantity?.message}
-          />
+          <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
+            <Input
+              label="Quantity *"
+              type="number"
+              min={1}
+              placeholder="0"
+              {...register('quantity', { valueAsNumber: true })}
+              error={errors.quantity?.message}
+            />
+            <div className="space-y-1.5">
+              <span className="block text-[13px] font-medium text-zinc-700">UOM</span>
+              <div className="h-10 px-3 inline-flex items-center min-w-[80px] bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-600">
+                {selectedUomSymbol ?? '—'}
+              </div>
+            </div>
+          </div>
 
           {selectedItem && (
             <div className={cn(

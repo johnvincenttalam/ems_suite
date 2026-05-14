@@ -3,6 +3,7 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { Badge } from './badge'
 export { Input } from './input'
 export { Select } from './select'
+export { SearchableSelect, type SearchableSelectOption } from './searchable-select'
 export { Textarea } from './textarea'
 export { Modal } from './modal'
 export { Tabs } from './tabs'

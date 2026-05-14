@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -9,10 +9,12 @@ import { toast } from 'sonner'
 import { useInventoryItems, useStockMovements, inventoryApi } from '@/features/inventory'
 import { useInventorySettings } from '@/features/inventory/store/inventory-settings-store'
 import { useUsers } from '@/features/users'
+import { useUom } from '@/features/uom'
 import { useAuthStore, isModuleManagerOrAbove } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { Modal } from '@/shared/ui/modal'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -66,12 +68,14 @@ export function AdjustmentsPage() {
   const { data: items = [] } = useInventoryItems()
   const { data: movements = [], isLoading } = useStockMovements()
   const { data: users = [] } = useUsers()
+  const { data: uoms = [] } = useUom()
   const settings = useInventorySettings((s) => s.settings)
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const formSchema = buildSchema(settings.requireReasonOnAdjustment)
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
+  const uomMap = useMemo(() => Object.fromEntries(uoms.map((u) => [u.id, u])), [uoms])
 
   const adjustments = useMemo(
     () => movements.filter((m) => m.type === 'adjustment').slice(0, 30),
@@ -92,6 +96,7 @@ export function AdjustmentsPage() {
   const currentItem = watchedItemId ? itemMap[watchedItemId] : undefined
   const currentStock = currentItem?.quantity ?? 0
   const variance = (Number(watchedAdjusted) || 0) - currentStock
+  const selectedUomSymbol = currentItem ? uomMap[currentItem.uomId ?? '']?.symbol : undefined
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'movements'] })
@@ -169,12 +174,20 @@ export function AdjustmentsPage() {
             <p className="text-[13px] font-semibold text-zinc-900">New Adjustment</p>
           </div>
 
-          <Select
-            label="Item *"
-            placeholder="Select item"
-            options={itemOptions}
-            {...register('itemId')}
-            error={errors.itemId?.message}
+          <Controller
+            name="itemId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Item *"
+                placeholder="Select item"
+                searchPlaceholder="Search by SKU or name…"
+                options={itemOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.itemId?.message}
+              />
+            )}
           />
 
           <Select
@@ -185,7 +198,7 @@ export function AdjustmentsPage() {
             error={errors.reason?.message}
           />
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-[1fr_1.25fr_0.9fr_auto] gap-2">
             <Input
               label="Current Stock"
               value={currentItem ? currentStock : ''}
@@ -207,6 +220,12 @@ export function AdjustmentsPage() {
               disabled
               placeholder="—"
             />
+            <div className="space-y-1.5">
+              <span className="block text-[13px] font-medium text-zinc-700">UOM</span>
+              <div className="h-10 px-3 inline-flex items-center min-w-[60px] bg-zinc-50 border border-zinc-200 rounded-lg text-sm text-zinc-600">
+                {selectedUomSymbol ?? '—'}
+              </div>
+            </div>
           </div>
 
           <Select
