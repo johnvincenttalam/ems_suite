@@ -114,7 +114,7 @@ describe('cycleCountApi.finalizeSession', () => {
     const liveQty = startingQty - 2
     await cycleCountApi.recordCount(session.id, target.itemId, liveQty, 'John Smith')
 
-    await cycleCountApi.finalizeSession(session.id, 'Jane Doe')
+    await cycleCountApi.finalizeSession(session.id, 'John Smith')
 
     const items = await inventoryApi.listItems()
     const after = items.find((i) => i.id === target.itemId)!
@@ -134,7 +134,7 @@ describe('cycleCountApi.finalizeSession', () => {
     }
 
     const movementsBefore = (await inventoryApi.listMovements()).length
-    const finalized = await cycleCountApi.finalizeSession(session.id, 'Jane Doe')
+    const finalized = await cycleCountApi.finalizeSession(session.id, 'John Smith')
     const movementsAfter = (await inventoryApi.listMovements()).length
 
     expect(finalized.status).toBe('completed')
@@ -147,7 +147,7 @@ describe('cycleCountApi.finalizeSession', () => {
       scheduledDate: '2026-06-12',
       createdBy: 'Jane Doe',
     })
-    await expect(cycleCountApi.finalizeSession(session.id, 'Jane Doe')).rejects.toThrow(/no lines/i)
+    await expect(cycleCountApi.finalizeSession(session.id, 'John Smith')).rejects.toThrow(/no lines/i)
   })
 
   it('throws when session is already completed', async () => {
@@ -158,8 +158,21 @@ describe('cycleCountApi.finalizeSession', () => {
     })
     const target = session.lines[0]
     await cycleCountApi.recordCount(session.id, target.itemId, target.expectedQty, 'John Smith')
-    await cycleCountApi.finalizeSession(session.id, 'Jane Doe')
-    await expect(cycleCountApi.finalizeSession(session.id, 'Jane Doe')).rejects.toThrow(/already completed/i)
+    await cycleCountApi.finalizeSession(session.id, 'John Smith')
+    await expect(cycleCountApi.finalizeSession(session.id, 'John Smith')).rejects.toThrow(/already completed/i)
+  })
+
+  it('refuses to let the scheduler also finalize — separation of duties', async () => {
+    const session = await cycleCountApi.scheduleSession({
+      warehouseId: 'W001',
+      scheduledDate: '2026-06-20',
+      createdBy: 'Jane Doe',
+    })
+    const target = session.lines[0]
+    await cycleCountApi.recordCount(session.id, target.itemId, target.expectedQty, 'John Smith')
+    await expect(
+      cycleCountApi.finalizeSession(session.id, 'Jane Doe'),
+    ).rejects.toThrow(/scheduled the count cannot finalize/i)
   })
 })
 
@@ -191,7 +204,7 @@ describe('cycleCountApi.cancelSession', () => {
     })
     const target = session.lines[0]
     await cycleCountApi.recordCount(session.id, target.itemId, target.expectedQty, 'John Smith')
-    await cycleCountApi.finalizeSession(session.id, 'Jane Doe')
+    await cycleCountApi.finalizeSession(session.id, 'John Smith')
     await expect(cycleCountApi.cancelSession(session.id, 'Jane Doe', 'oops')).rejects.toThrow(/already completed/i)
   })
 })

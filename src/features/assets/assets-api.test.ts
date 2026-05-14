@@ -433,6 +433,28 @@ describe('assetsApi.submitDisposal / approveDisposal / rejectDisposal', () => {
     await expect(assetsApi.approveDisposal(created.id, 'Jane Doe')).rejects.toThrow(/not the assigned approver/i)
   })
 
+  it('refuses to let the submitter approve their own disposal', async () => {
+    const created = await assetsApi.create({
+      name: 'Self Approver',
+      serialNumber: `SN-SAP-${Date.now()}`,
+      categoryId: 'C001',
+      locationId: 'W001',
+      purchaseDate: '2026-05-01',
+      createdBy: 'Admin User',
+    })
+    await assetsApi.submitDisposal({
+      assetId: created.id,
+      type: 'sold',
+      reason: 'self-approval test',
+      disposedDate: '2026-05-08',
+      approverName: 'Jane Doe',
+      submittedBy: 'Jane Doe',
+    })
+    await expect(
+      assetsApi.approveDisposal(created.id, 'Jane Doe'),
+    ).rejects.toThrow(/cannot approve a disposal you submitted/i)
+  })
+
   it('blocks rejectors other than the named approver', async () => {
     const created = await assetsApi.create({
       name: 'Wrong Rejecter',

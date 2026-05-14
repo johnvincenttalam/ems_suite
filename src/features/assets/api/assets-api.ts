@@ -413,6 +413,9 @@ export const assetsApi = {
     if (asset.disposal.pendingApproverName && asset.disposal.pendingApproverName !== approverName) {
       throw new Error(`${approverName} is not the assigned approver for this disposal`)
     }
+    if (asset.disposal.disposedBy === approverName) {
+      throw new Error('You cannot approve a disposal you submitted yourself')
+    }
     const now = new Date().toISOString()
     asset.status = 'disposed'
     // Only force out_of_service for end-of-life dispositions; sold / donated /

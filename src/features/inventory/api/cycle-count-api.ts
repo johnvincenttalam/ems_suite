@@ -112,6 +112,12 @@ export const cycleCountApi = {
     if (!s) throw new Error(`Session ${sessionId} not found`)
     if (s.status === 'completed') throw new Error(`Session ${sessionId} is already completed`)
     if (s.status === 'cancelled') throw new Error(`Session ${sessionId} was cancelled`)
+    // Separation of duties: whoever scheduled the count can't also sign off
+    // on the variances. Forces a second pair of eyes before book-to-physical
+    // adjustments post (which auto-apply as 'approved' movements).
+    if (s.createdBy === finalizerName) {
+      throw new Error('The person who scheduled the count cannot finalize it — ask a different counter or supervisor to close out')
+    }
 
     const counted = s.lines.filter((l) => l.actualQty !== undefined)
     if (counted.length === 0) throw new Error('No lines have been counted yet')

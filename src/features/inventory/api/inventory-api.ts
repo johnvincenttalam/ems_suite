@@ -278,6 +278,9 @@ export const inventoryApi = {
     if (m.approverId && m.approverId !== approverName) {
       throw new Error(`${approverName} is not the assigned approver`)
     }
+    if (m.createdBy === approverName) {
+      throw new Error('You cannot approve a stock movement you submitted yourself')
+    }
 
     if (m.type === 'adjustment' && m.targetQuantity !== undefined) {
       const item = mockInventoryItems.find((i) => i.id === m.itemId)

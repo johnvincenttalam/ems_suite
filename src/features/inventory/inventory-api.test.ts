@@ -303,6 +303,26 @@ describe('inventoryApi.approveMovement / rejectMovement', () => {
     await expect(inventoryApi.approveMovement(submitted.id, 'Mike Thompson')).rejects.toThrow(/not the assigned approver/i)
   })
 
+  it('refuses to let the submitter approve their own movement', async () => {
+    const itemsBefore = await inventoryApi.listItems()
+    const target = itemsBefore[0]
+
+    const submitted = await inventoryApi.addMovement({
+      itemId: target.id,
+      type: 'transfer',
+      quantity: 1,
+      sourceLocationId: 'W001',
+      destinationLocationId: 'W002',
+      reason: 'self-approval test',
+      createdBy: 'Jane Doe',
+      approverId: 'Jane Doe',
+    })
+
+    await expect(
+      inventoryApi.approveMovement(submitted.id, 'Jane Doe'),
+    ).rejects.toThrow(/cannot approve a stock movement you submitted/i)
+  })
+
   it('throws when approving an already-applied movement', async () => {
     const itemsBefore = await inventoryApi.listItems()
     const target = itemsBefore[0]
