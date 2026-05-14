@@ -553,5 +553,76 @@ describe('workOrderTotalCost', () => {
   })
 })
 
+describe('maintenanceApi — authorization', () => {
+  // U001 admin everywhere; U002 maintenance admin; U003 member everywhere;
+  // U005 has no maintenance role; U006 maintenance manager.
+  it('rejects create from a caller with no maintenance role', async () => {
+    const asset = await newAsset('AUTH_NO_ACCESS')
+    await expect(
+      newWorkOrder(asset.id, { createdBy: 'U005' }),
+    ).rejects.toThrow(/maintenance module access required/i)
+  })
+
+  it('allows create from a maintenance member', async () => {
+    const asset = await newAsset('AUTH_MEMBER_CREATE')
+    const wo = await newWorkOrder(asset.id, { createdBy: 'U003' })
+    expect(wo.status).toBe('pending')
+  })
+
+  it('rejects start by a member when the WO is assigned to someone else', async () => {
+    const asset = await newAsset('AUTH_MEMBER_START_OTHER')
+    const wo = await newWorkOrder(asset.id, { assignedTo: 'U002' })
+    await expect(maintenanceApi.start(wo.id, 'U003')).rejects.toThrow(/assigned to you/i)
+  })
+
+  it('allows start by a member assigned to the WO', async () => {
+    const asset = await newAsset('AUTH_MEMBER_START_SELF')
+    const wo = await newWorkOrder(asset.id, { assignedTo: 'U003' })
+    const started = await maintenanceApi.start(wo.id, 'U003')
+    expect(started.status).toBe('ongoing')
+  })
+
+  it('rejects cancel by a member (manager+ only)', async () => {
+    const asset = await newAsset('AUTH_MEMBER_CANCEL')
+    const wo = await newWorkOrder(asset.id, { assignedTo: 'U003' })
+    await expect(
+      maintenanceApi.cancel(wo.id, 'U003', 'oops'),
+    ).rejects.toThrow(/manager or admin/i)
+  })
+
+  it('allows cancel by a maintenance manager', async () => {
+    const asset = await newAsset('AUTH_MGR_CANCEL')
+    const wo = await newWorkOrder(asset.id)
+    const cancelled = await maintenanceApi.cancel(wo.id, 'U006', 'duplicate')
+    expect(cancelled.status).toBe('cancelled')
+  })
+
+  it('rejects reassign and reschedule by a member (manager+ only)', async () => {
+    const asset = await newAsset('AUTH_MEMBER_REASSIGN')
+    const wo = await newWorkOrder(asset.id, { assignedTo: 'U003' })
+    await expect(
+      maintenanceApi.reassign(wo.id, 'U002', 'U003'),
+    ).rejects.toThrow(/manager or admin/i)
+    await expect(
+      maintenanceApi.reschedule(wo.id, '2026-09-01', 'U003'),
+    ).rejects.toThrow(/manager or admin/i)
+  })
+
+  it('allows the creator-member to edit their own pending WO metadata', async () => {
+    const asset = await newAsset('AUTH_MEMBER_EDIT_OWN')
+    const wo = await newWorkOrder(asset.id, { createdBy: 'U003', assignedTo: 'U002' })
+    const edited = await maintenanceApi.update(wo.id, { title: 'fixed typo' }, 'U003')
+    expect(edited.title).toBe('fixed typo')
+  })
+
+  it("rejects edit by a member who isn't the creator", async () => {
+    const asset = await newAsset('AUTH_MEMBER_EDIT_OTHER')
+    const wo = await newWorkOrder(asset.id, { createdBy: 'U002', assignedTo: 'U003' })
+    await expect(
+      maintenanceApi.update(wo.id, { title: 'sneak edit' }, 'U003'),
+    ).rejects.toThrow(/manager or admin/i)
+  })
+})
+
 // Suppress unused-import warning when running against the bare lifecycle suite.
 void mockUsers

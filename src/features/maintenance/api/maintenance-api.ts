@@ -2,6 +2,8 @@ import type { InspectionResult, WorkOrder, WorkOrderPart, WorkOrderPriority, Wor
 import { mockWorkOrders } from '@/features/maintenance/data/mock-maintenance'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 import { mockUsers } from '@/features/users/data/mock-users'
+import type { User } from '@/features/users/types'
+import { isModuleManagerOrAbove, moduleRoleOf } from '@/features/auth/lib/access'
 import { mockAssets } from '@/features/assets/data/mock-assets'
 import { mockVehicles } from '@/features/fleet/data/mock-fleet'
 import { assetsApi } from '@/features/assets/api/assets-api'
@@ -11,6 +13,38 @@ import { useInventorySettings } from '@/features/inventory/store/inventory-setti
 import { attachmentAdapter } from '@/shared/attachments'
 import type { Attachment } from '@/shared/attachments'
 // import { http } from '@/shared/lib/http'
+
+/** Caller must have any role in maintenance — for actions any member can take
+ * (e.g. create a WO, list, attach a file). */
+function assertMaintenanceAccess(actorId: string): User {
+  const actor = mockUsers.find((u) => u.id === actorId)
+  if (!actor) throw new Error(`Actor ${actorId} not found`)
+  if (!moduleRoleOf(actor, 'maintenance')) {
+    throw new Error('Maintenance module access required')
+  }
+  return actor
+}
+
+/** Caller must be manager or admin in maintenance — destructive / oversight
+ * actions only (cancel, update metadata, reassign, reschedule). */
+function assertMaintenanceManager(actorId: string): User {
+  const actor = assertMaintenanceAccess(actorId)
+  if (!isModuleManagerOrAbove(actor, 'maintenance')) {
+    throw new Error('Manager or admin access required for this action')
+  }
+  return actor
+}
+
+/** Caller can act on this WO directly: manager+ for any WO, member only on
+ * a WO assigned to them. Used for start/complete/attachments. */
+function assertCanActOnWorkOrder(actorId: string, wo: WorkOrder): User {
+  const actor = assertMaintenanceAccess(actorId)
+  if (isModuleManagerOrAbove(actor, 'maintenance')) return actor
+  if (wo.assignedTo !== actorId) {
+    throw new Error('You can only act on work orders assigned to you')
+  }
+  return actor
+}
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 400 + 250))
@@ -117,6 +151,7 @@ export const maintenanceApi = {
 
   create: async (input: CreateWorkOrderInput): Promise<WorkOrder> => {
     await delay(150)
+    assertMaintenanceAccess(input.createdBy)
     if (!input.assetId && !input.vehicleId) {
       throw new Error('Work order must target either an asset or a vehicle')
     }
@@ -156,6 +191,7 @@ export const maintenanceApi = {
     const wo = mockWorkOrders.find((w) => w.id === id)
     if (!wo) throw new Error(`Work order ${id} not found`)
     if (wo.status !== 'pending') throw new Error(`Work order ${id} is not pending`)
+    assertCanActOnWorkOrder(byUserId, wo)
 
     const actor = userName(byUserId)
     // Cross-module: flip asset to maintenance status BEFORE we mutate the WO,
@@ -191,6 +227,7 @@ export const maintenanceApi = {
     const wo = mockWorkOrders.find((w) => w.id === id)
     if (!wo) throw new Error(`Work order ${id} not found`)
     if (wo.status !== 'ongoing') throw new Error(`Work order ${id} is not in progress`)
+    assertCanActOnWorkOrder(byUserId, wo)
 
     if (options.laborHours !== undefined && options.laborHours < 0) {
       throw new Error('Labor hours cannot be negative')
@@ -276,6 +313,7 @@ export const maintenanceApi = {
     if (wo.status === 'completed') throw new Error(`Work order ${id} is already completed`)
     if (wo.status === 'cancelled') throw new Error(`Work order ${id} is already cancelled`)
     if (!reason.trim()) throw new Error(`Cancellation reason is required`)
+    assertMaintenanceManager(byUserId)
 
     const actor = userName(byUserId)
     const wasOngoing = wo.status === 'ongoing'
@@ -323,6 +361,9 @@ export const maintenanceApi = {
     const wo = mockWorkOrders.find((w) => w.id === id)
     if (!wo) throw new Error(`Work order ${id} not found`)
     if (wo.status !== 'pending') throw new Error(`Work order ${id} is not pending`)
+    // Creator can edit their own pending WO; otherwise manager+ only.
+    if (wo.createdBy !== byUserId) assertMaintenanceManager(byUserId)
+    else assertMaintenanceAccess(byUserId)
 
     const changes: string[] = []
     if (patch.title !== undefined && patch.title !== wo.title) {
@@ -368,6 +409,7 @@ export const maintenanceApi = {
     if (wo.assignedTo === newAssigneeUserId) {
       throw new Error(`Work order is already assigned to that technician`)
     }
+    assertMaintenanceManager(byUserId)
 
     const previousAssignee = wo.assignedTo
     wo.assignedTo = newAssigneeUserId
@@ -390,6 +432,7 @@ export const maintenanceApi = {
     }
     if (!newDate) throw new Error(`New schedule date is required`)
     if (wo.scheduledDate === newDate) return wo
+    assertMaintenanceManager(byUserId)
 
     const previousDate = wo.scheduledDate
     wo.scheduledDate = newDate
@@ -416,6 +459,7 @@ export const maintenanceApi = {
     if (!wo) throw new Error(`Work order ${id} not found`)
     if (wo.status === 'cancelled') throw new Error(`Cannot attach files to a cancelled work order`)
     if (attachments.length === 0) return wo
+    assertCanActOnWorkOrder(byUserId, wo)
 
     wo.attachments = [...(wo.attachments ?? []), ...attachments]
 
@@ -434,6 +478,7 @@ export const maintenanceApi = {
     if (!wo) throw new Error(`Work order ${id} not found`)
     const target = (wo.attachments ?? []).find((a) => a.id === attachmentId)
     if (!target) throw new Error(`Attachment ${attachmentId} not found on ${wo.id}`)
+    assertCanActOnWorkOrder(byUserId, wo)
 
     wo.attachments = (wo.attachments ?? []).filter((a) => a.id !== attachmentId)
 
