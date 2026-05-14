@@ -6,7 +6,7 @@ import {
   getPaginationRowModel,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { Archive, BookmarkPlus, ChevronRight, FileText, GitBranch, Lock, Pencil, Plus, Upload } from 'lucide-react'
+import { Archive, BookmarkPlus, FileText, GitBranch, Lock, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getModulePath } from '@/config/modules'
@@ -16,6 +16,13 @@ import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { useDepartments } from '@/features/departments'
 import { documentsApi } from '@/features/documents/api/documents-api'
+import {
+  canDeleteDocument,
+  canEditDocument,
+  canUpload,
+} from '@/features/documents/lib/sdms-permissions'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import {
   CATEGORY_LABEL,
   CONFIDENTIALITY_LABEL,
@@ -81,11 +88,15 @@ export function DocumentsTab() {
   const [priorityFilter, setPriorityFilter] = useState<DocumentPriority | 'all'>('all')
   const [confidentialityFilter, setConfidentialityFilter] = useState<DocumentConfidentiality | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
+  const [mineOnly, setMineOnly] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [classifyTarget, setClassifyTarget] = useState<AppDocument | null>(null)
   const [workflowTarget, setWorkflowTarget] = useState<AppDocument | null>(null)
   const [storageTarget, setStorageTarget] = useState<AppDocument | null>(null)
   const [finalizeTarget, setFinalizeTarget] = useState<AppDocument | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AppDocument | null>(null)
+
+  const canUploadDoc = canUpload(user)
 
   const urlStatus = searchParams.get('status')
   useEffect(() => {
@@ -125,11 +136,30 @@ export function DocumentsTab() {
     onError: (err) => toast.error('Archive failed', { description: err instanceof Error ? err.message : 'Unknown' }),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: (doc: AppDocument) => {
+      if (!user) throw new Error('Not signed in')
+      return documentsApi.deleteDocument(doc.id, user.id)
+    },
+    onSuccess: (_, doc) => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+      setDeleteTarget(null)
+      toast.success(`Deleted ${doc.trackingNumber ?? doc.id}`)
+    },
+    onError: (err) => toast.error('Delete failed', { description: err instanceof Error ? err.message : 'Unknown' }),
+  })
+
   const statusCounts = useMemo(() => {
     const counts: Record<DocumentStatus, number> = { draft: 0, in_review: 0, approved: 0, rejected: 0, archived: 0 }
     for (const d of documents) counts[d.status]++
     return counts
   }, [documents])
+
+  const mineCount = useMemo(
+    () => (user ? documents.filter((d) => d.createdBy === user.id).length : 0),
+    [documents, user],
+  )
 
   const filtered = useMemo(() => {
     return documents
@@ -138,7 +168,8 @@ export function DocumentsTab() {
       .filter((d) => priorityFilter === 'all' || d.priority === priorityFilter)
       .filter((d) => confidentialityFilter === 'all' || d.confidentiality === confidentialityFilter)
       .filter((d) => departmentFilter === 'all' || d.departmentId === departmentFilter)
-  }, [documents, statusFilter, categoryFilter, priorityFilter, confidentialityFilter, departmentFilter])
+      .filter((d) => !mineOnly || (user && d.createdBy === user.id))
+  }, [documents, statusFilter, categoryFilter, priorityFilter, confidentialityFilter, departmentFilter, mineOnly, user])
 
   const columns = useMemo<ColumnDef<AppDocument>[]>(() => [
     {
@@ -149,15 +180,28 @@ export function DocumentsTab() {
     {
       accessorKey: 'title',
       header: 'Document',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <FileIcon type={row.original.fileType} size="sm" />
-          <div className="min-w-0">
-            <p className="font-medium text-zinc-900 truncate">{row.original.title}</p>
-            <p className="text-[11px] text-zinc-400 truncate font-mono">{row.original.fileName}</p>
+      cell: ({ row }) => {
+        const isMine = !!user && row.original.createdBy === user.id
+        return (
+          <div className="flex items-center gap-3">
+            <FileIcon type={row.original.fileType} size="sm" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p className="font-medium text-zinc-900 truncate">{row.original.title}</p>
+                {isMine && (
+                  <span
+                    title="Created by you"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200 flex-shrink-0"
+                  >
+                    You
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400 truncate font-mono">{row.original.fileName}</p>
+            </div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       accessorKey: 'category',
@@ -203,59 +247,63 @@ export function DocumentsTab() {
       cell: ({ row }) => {
         const doc = row.original
         const phase = getLifecyclePhase(doc)
+        const mayEdit = canEditDocument(user, doc)
+        const mayDelete = canDeleteDocument(user, doc)
+        const items: ActionMenuItem[] = [
+          doc.status === 'draft' && mayEdit && {
+            key: 'edit',
+            label: 'Edit',
+            icon: Pencil,
+            onClick: () => navigate(`${getModulePath('sdms', 'create-document')}?edit=${doc.id}`),
+          },
+          phase === 'inbox' && {
+            key: 'classify',
+            label: 'Classify',
+            icon: FileText,
+            onClick: () => setClassifyTarget(doc),
+          },
+          phase === 'classified' && {
+            key: 'start',
+            label: 'Start workflow',
+            icon: GitBranch,
+            onClick: () => setWorkflowTarget(doc),
+          },
+          doc.status === 'approved' && !doc.finalizedAt && {
+            key: 'finalize',
+            label: 'Finalize',
+            icon: Lock,
+            onClick: () => setFinalizeTarget(doc),
+          },
+          doc.status === 'approved' && doc.finalizedAt && {
+            key: 'archive',
+            label: 'Archive',
+            icon: Archive,
+            description: 'Lock with retention metadata',
+            onClick: () => archiveMutation.mutate(doc),
+            disabled: archiveMutation.isPending && archiveMutation.variables?.id === doc.id,
+          },
+          {
+            key: 'storage',
+            label: 'Add to Storage',
+            icon: BookmarkPlus,
+            onClick: () => setStorageTarget(doc),
+          },
+          mayDelete && {
+            key: 'delete',
+            label: 'Delete',
+            icon: Trash2,
+            danger: true,
+            onClick: () => setDeleteTarget(doc),
+          },
+        ].filter(Boolean) as ActionMenuItem[]
         return (
-          <div className="flex items-center gap-1 justify-end">
-            {doc.status === 'draft' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<Pencil className="w-3.5 h-3.5" />}
-                onClick={(e) => { e.stopPropagation(); navigate(`${getModulePath('sdms', 'create-document')}?edit=${doc.id}`) }}
-              >
-                Edit
-              </Button>
-            )}
-            {phase === 'inbox' && (
-              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setClassifyTarget(doc) }}>
-                Classify
-              </Button>
-            )}
-            {phase === 'classified' && (
-              <Button size="sm" variant="ghost" leftIcon={<GitBranch className="w-3.5 h-3.5" />} onClick={(e) => { e.stopPropagation(); setWorkflowTarget(doc) }}>
-                Start
-              </Button>
-            )}
-            {doc.status === 'approved' && !doc.finalizedAt && (
-              <Button size="sm" variant="ghost" leftIcon={<Lock className="w-3.5 h-3.5" />} onClick={(e) => { e.stopPropagation(); setFinalizeTarget(doc) }}>
-                Finalize
-              </Button>
-            )}
-            {doc.status === 'approved' && doc.finalizedAt && (
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<Archive className="w-3.5 h-3.5" />}
-                loading={archiveMutation.isPending && archiveMutation.variables?.id === doc.id}
-                onClick={(e) => { e.stopPropagation(); archiveMutation.mutate(doc) }}
-              >
-                Archive
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              leftIcon={<BookmarkPlus className="w-3.5 h-3.5" />}
-              onClick={(e) => { e.stopPropagation(); setStorageTarget(doc) }}
-              title="Add to Storage"
-            >
-              Storage
-            </Button>
-            <ChevronRight className="w-4 h-4 text-zinc-300" />
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <ActionMenu items={items} />
           </div>
         )
       },
     },
-  ], [archiveMutation, navigate])
+  ], [archiveMutation, navigate, user])
 
   const table = useReactTable({
     data: filtered,
@@ -294,19 +342,37 @@ export function DocumentsTab() {
             { key: 'createdAt', label: 'Created' },
           ]}
         />
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => navigate(getModulePath('sdms', 'create-document'))}>Create Document</Button>
-        <Button variant="ghost" leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
+        {canUploadDoc && (
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => navigate(getModulePath('sdms', 'create-document'))}>Create Document</Button>
+        )}
+        {canUploadDoc && (
+          <Button variant="ghost" leftIcon={<Upload className="w-4 h-4" />} onClick={() => setShowUpload(true)}>Upload</Button>
+        )}
       </ListToolbar>
 
       <div className="mb-4 flex flex-col gap-3">
-        <FilterChips
-          options={statusFilters.map((f) => ({
-            ...f,
-            count: f.value === 'all' ? documents.length : statusCounts[f.value],
-          }))}
-          value={statusFilter}
-          onChange={handleStatusChange}
-        />
+        <div className="flex items-center gap-3 flex-wrap">
+          <FilterChips
+            options={statusFilters.map((f) => ({
+              ...f,
+              count: f.value === 'all' ? documents.length : statusCounts[f.value],
+            }))}
+            value={statusFilter}
+            onChange={handleStatusChange}
+          />
+          {user && (
+            <label className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-zinc-200 bg-white text-[12.5px] text-zinc-700 cursor-pointer hover:border-zinc-300 transition-colors">
+              <input
+                type="checkbox"
+                checked={mineOnly}
+                onChange={(e) => setMineOnly(e.target.checked)}
+                className="accent-zinc-900"
+              />
+              <span>Only mine</span>
+              <span className="text-zinc-400 tabular-nums">({mineCount})</span>
+            </label>
+          )}
+        </div>
         <div className="flex gap-2 flex-wrap">
           <Select
             className="h-9 text-[13px]"
@@ -360,6 +426,21 @@ export function DocumentsTab() {
       <StartWorkflowModal document={workflowTarget} onClose={() => setWorkflowTarget(null)} />
       <FinalizeModal document={finalizeTarget} onClose={() => setFinalizeTarget(null)} />
       <AddToStorageModal document={storageTarget} onClose={() => setStorageTarget(null)} />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.title ?? ''}"?`}
+        message={
+          deleteTarget?.status === 'draft'
+            ? 'This draft will be removed permanently. The audit log keeps a record of the deletion.'
+            : `This ${deleteTarget?.status} document will be removed permanently. This action cannot be undone — the audit log keeps a record of the deletion.`
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        busy={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
     </div>
   )
 }

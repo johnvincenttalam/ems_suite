@@ -18,6 +18,8 @@ import type {
   SignatureSlot,
 } from '@/features/documents/types'
 import { mockDocuments } from '@/features/documents/data/mock-documents'
+import { mockUsers } from '@/features/users/data/mock-users'
+import { canEditDocument, canDeleteDocument } from '@/features/documents/lib/sdms-permissions'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
 
@@ -28,6 +30,13 @@ const delay = (ms?: number) =>
  * sign time. Used to distinguish ephemeral placements from admin/template
  * slots so we can clean them up on revoke. */
 const AD_HOC_SLOT_PREFIX = 'placed_'
+
+/** Look up the actor record so permission helpers can read their SDMS role.
+ * Returns null when the actor isn't a registered user — caller decides whether
+ * to refuse the action. */
+function actor(userId: string) {
+  return mockUsers.find((u) => u.id === userId) ?? null
+}
 
 interface RegisterReceiptInput {
   title: string
@@ -419,6 +428,9 @@ export const documentsApi = {
     await delay(150)
     const doc = findOrThrow(docId)
     if (doc.status !== 'draft') throw new Error(`Only drafts can be edited (got status: ${doc.status})`)
+    if (!canEditDocument(actor(updaterId), doc)) {
+      throw new Error('You do not have permission to edit this draft')
+    }
 
     if (patch.title !== undefined) doc.title = patch.title
     if (patch.description !== undefined) doc.description = patch.description
@@ -868,6 +880,34 @@ export const documentsApi = {
     })
 
     return doc
+  },
+
+  /**
+   * Hard-delete a document. Permission policy (see sdms-permissions.ts):
+   *   - draft: owner OR manager+
+   *   - approved/rejected/archived: admin only
+   *   - in_review: refused regardless of role (signatures in flight)
+   *
+   * Removes the record from the mock store entirely. Emits one audit entry
+   * before removal so the deletion is traceable in the log.
+   */
+  deleteDocument: async (docId: string, actorId: string): Promise<void> => {
+    await delay(150)
+    const doc = findOrThrow(docId)
+    if (doc.status === 'in_review') {
+      throw new Error('Cannot delete a document that is in review — cancel the workflow first')
+    }
+    if (!canDeleteDocument(actor(actorId), doc)) {
+      throw new Error('You do not have permission to delete this document')
+    }
+    recordAudit({
+      userId: actorId,
+      action: 'delete',
+      module: 'Documents',
+      detail: `Deleted ${doc.status} document "${doc.title}" (${doc.id})`,
+    })
+    const idx = mockDocuments.findIndex((d) => d.id === doc.id)
+    if (idx >= 0) mockDocuments.splice(idx, 1)
   },
 }
 

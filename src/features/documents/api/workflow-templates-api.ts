@@ -1,5 +1,14 @@
 import type { DocumentCategory, SignatureSlot, WorkflowTemplate } from '../types'
 import { mockWorkflowTemplates } from '../data/mock-workflow-templates'
+import { mockUsers } from '@/features/users/data/mock-users'
+import { canManageWorkflowTemplates } from '../lib/sdms-permissions'
+
+function assertCanManage(actorId: string): void {
+  const actor = mockUsers.find((u) => u.id === actorId) ?? null
+  if (!canManageWorkflowTemplates(actor)) {
+    throw new Error('You do not have permission to manage workflow templates')
+  }
+}
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 200 + 100))
@@ -42,8 +51,9 @@ export const workflowTemplatesApi = {
     return [...mockWorkflowTemplates]
   },
 
-  create: async (input: CreateTemplateInput): Promise<WorkflowTemplate> => {
+  create: async (input: CreateTemplateInput, actorId: string): Promise<WorkflowTemplate> => {
     await delay(120)
+    assertCanManage(actorId)
     if (input.approverIds.length === 0) throw new Error('At least one approver is required')
     if (!input.name.trim()) throw new Error('Name is required')
     const t: WorkflowTemplate = {
@@ -59,8 +69,9 @@ export const workflowTemplatesApi = {
     return t
   },
 
-  update: async (id: string, patch: UpdateTemplateInput): Promise<WorkflowTemplate> => {
+  update: async (id: string, patch: UpdateTemplateInput, actorId: string): Promise<WorkflowTemplate> => {
     await delay(120)
+    assertCanManage(actorId)
     const t = findOrThrow(id)
     if (patch.approverIds !== undefined && patch.approverIds.length === 0) {
       throw new Error('At least one approver is required')
@@ -80,8 +91,9 @@ export const workflowTemplatesApi = {
     return t
   },
 
-  delete: async (id: string): Promise<void> => {
+  delete: async (id: string, actorId: string): Promise<void> => {
     await delay(100)
+    assertCanManage(actorId)
     const idx = mockWorkflowTemplates.findIndex((x) => x.id === id)
     if (idx < 0) throw new Error(`Workflow template ${id} not found`)
     mockWorkflowTemplates.splice(idx, 1)

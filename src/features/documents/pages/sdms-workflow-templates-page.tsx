@@ -9,6 +9,8 @@ import { useUsers, UserInfoPopover } from '@/features/users'
 import { useWorkflowTemplates } from '@/features/documents/hooks/use-workflow-templates'
 import { useDocuments } from '@/features/documents/hooks/use-documents'
 import { workflowTemplatesApi } from '@/features/documents/api/workflow-templates-api'
+import { canManageWorkflowTemplates } from '@/features/documents/lib/sdms-permissions'
+import { useAuthStore } from '@/features/auth/store/auth-store'
 import {
   CATEGORY_LABEL,
   type DocumentCategory,
@@ -48,6 +50,9 @@ export function SdmsWorkflowTemplatesPage() {
   const { data: users = [] } = useUsers()
   const { data: documents = [] } = useDocuments()
   const queryClient = useQueryClient()
+  const { user: currentUser } = useAuthStore()
+
+  const canManage = canManageWorkflowTemplates(currentUser)
 
   const [editTarget, setEditTarget] = useState<WorkflowTemplate | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -75,7 +80,10 @@ export function SdmsWorkflowTemplatesPage() {
   }
 
   const deleteMutation = useMutation({
-    mutationFn: workflowTemplatesApi.delete,
+    mutationFn: (id: string) => {
+      if (!currentUser) throw new Error('Not signed in')
+      return workflowTemplatesApi.delete(id, currentUser.id)
+    },
     onSuccess: () => {
       toast.success(`Template deleted`)
       invalidate()
@@ -93,9 +101,11 @@ export function SdmsWorkflowTemplatesPage() {
           title="Workflow Templates"
           subtitle="Reusable approver chains. Pick one when creating a document to skip approver setup."
         />
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
-          New Template
-        </Button>
+        {canManage && (
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
+            New Template
+          </Button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
@@ -107,9 +117,11 @@ export function SdmsWorkflowTemplatesPage() {
             title="No templates yet"
             description="Create your first workflow template to standardize approver chains across teams."
             action={
-              <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
-                New Template
-              </Button>
+              canManage ? (
+                <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
+                  New Template
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -175,24 +187,28 @@ export function SdmsWorkflowTemplatesPage() {
                       <p className="text-[10.5px] text-zinc-400">document{usageMap.get(t.id) === 1 ? '' : 's'}</p>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setEditTarget(t)}
-                          className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(t)}
-                          className="p-1.5 rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {canManage ? (
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditTarget(t)}
+                            className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(t)}
+                            className="p-1.5 rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="block text-right text-[11px] text-zinc-300">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -250,6 +266,7 @@ interface TemplateFormModalProps {
 
 function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateFormModalProps) {
   const { data: users = [] } = useUsers()
+  const { user: currentUser } = useAuthStore()
   const [approvers, setApprovers] = useState<string[]>([])
   const [approversTouched, setApproversTouched] = useState(false)
   const [referenceUrl, setReferenceUrl] = useState<string>('')
@@ -284,6 +301,7 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
 
   const saveMutation = useMutation({
     mutationFn: (values: FormValues) => {
+      if (!currentUser) throw new Error('Not signed in')
       const payload = {
         name: values.name,
         description: values.description,
@@ -293,8 +311,8 @@ function TemplateFormModal({ open, mode, template, onClose, onSaved }: TemplateF
         referenceUrl: referenceUrl,
       }
       return mode === 'create'
-        ? workflowTemplatesApi.create(payload)
-        : workflowTemplatesApi.update(template!.id, payload)
+        ? workflowTemplatesApi.create(payload, currentUser.id)
+        : workflowTemplatesApi.update(template!.id, payload, currentUser.id)
     },
     onSuccess: () => {
       toast.success(mode === 'create' ? 'Template created' : 'Template updated')
