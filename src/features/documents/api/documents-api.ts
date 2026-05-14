@@ -20,6 +20,7 @@ import type {
 import { mockDocuments } from '@/features/documents/data/mock-documents'
 import { mockUsers } from '@/features/users/data/mock-users'
 import { canEditDocument, canDeleteDocument } from '@/features/documents/lib/sdms-permissions'
+import { isModuleAdmin } from '@/features/auth'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
 
@@ -427,9 +428,17 @@ export const documentsApi = {
   ): Promise<AppDocument> => {
     await delay(150)
     const doc = findOrThrow(docId)
-    if (doc.status !== 'draft') throw new Error(`Only drafts can be edited (got status: ${doc.status})`)
+    // Drafts are always editable. Revision-requested rejections are also
+    // editable — the author needs to upload the corrected file before
+    // resubmitting; treating that state as locked traps them.
+    const isEditable =
+      doc.status === 'draft' ||
+      (doc.status === 'rejected' && doc.rejectionType === 'revision_request')
+    if (!isEditable) {
+      throw new Error(`This document is not editable (status: ${doc.status})`)
+    }
     if (!canEditDocument(actor(updaterId), doc)) {
-      throw new Error('You do not have permission to edit this draft')
+      throw new Error('You do not have permission to edit this document')
     }
 
     if (patch.title !== undefined) doc.title = patch.title
@@ -908,6 +917,50 @@ export const documentsApi = {
     })
     const idx = mockDocuments.findIndex((d) => d.id === doc.id)
     if (idx >= 0) mockDocuments.splice(idx, 1)
+  },
+
+  /**
+   * Reopen a rejected document back into the workflow. Recovery path for
+   * accidental disapprove or for cases where business circumstances change.
+   *
+   * - Caller must be an SDMS admin.
+   * - Document must be in 'rejected' status.
+   * - Status flips back to 'in_review'; the rejection metadata is cleared.
+   * - Approver pointer is reset to the rejector's index so the chain resumes
+   *   exactly where it stopped (the rejector gets another turn).
+   * - Existing signatures from earlier approvers are preserved.
+   */
+  reopen: async (docId: string, actorId: string): Promise<AppDocument> => {
+    await delay(150)
+    const doc = findOrThrow(docId)
+    if (doc.status !== 'rejected') {
+      throw new Error(`Only rejected documents can be reopened (status: ${doc.status})`)
+    }
+    if (!isModuleAdmin(actor(actorId), 'sdms')) {
+      throw new Error('Only SDMS admins can reopen rejected documents')
+    }
+
+    const previousRejectionType = doc.rejectionType
+    const previousRejectedBy = doc.rejectedBy
+    const rejectorIndex = previousRejectedBy
+      ? doc.approvers.findIndex((a) => a === previousRejectedBy)
+      : -1
+
+    doc.status = 'in_review'
+    doc.rejectedAt = undefined
+    doc.rejectedBy = undefined
+    doc.rejectedReason = undefined
+    doc.rejectionType = undefined
+    doc.currentApproverIndex = rejectorIndex >= 0 ? rejectorIndex : 0
+
+    recordAudit({
+      userId: actorId,
+      action: 'update',
+      module: 'Documents',
+      detail: `Reopened "${doc.title}" — was ${previousRejectionType === 'revision_request' ? 'awaiting revision' : 'disapproved'}, resumed at approver ${doc.currentApproverIndex + 1}`,
+    })
+
+    return doc
   },
 }
 

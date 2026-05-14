@@ -48,14 +48,18 @@ export function canDownload(user: User | null | undefined): boolean {
 }
 
 /**
- * Edit a document. Members can only edit their own drafts; manager+ can edit
- * anyone's draft. Non-drafts are blocked by the existing lifecycle rule and
- * we don't override it here.
+ * Edit a document. Members can only edit their own editable docs; manager+
+ * can edit anyone's. "Editable" = `draft` OR `rejected` with
+ * `rejectionType === 'revision_request'` — the author needs to attach the
+ * corrected file before resubmitting, so we don't lock that state.
  */
 export function canEditDocument(user: User | null | undefined, doc: AppDocument): boolean {
   const scope = sdmsScope(user)
   if (!scope) return false
-  if (doc.status !== 'draft') return false
+  const isEditableStatus =
+    doc.status === 'draft' ||
+    (doc.status === 'rejected' && doc.rejectionType === 'revision_request')
+  if (!isEditableStatus) return false
   if (isManagerOrAbove(scope)) return true
   return isOwner(user, doc)
 }

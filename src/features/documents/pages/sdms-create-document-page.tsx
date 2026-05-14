@@ -90,11 +90,30 @@ export function SdmsCreateDocumentPage() {
   const [searchParams] = useSearchParams()
 
   const editId = searchParams.get('edit')
-  const editingDoc = editId ? allDocuments.find((d) => d.id === editId) : undefined
+  // Duplicate mode: pre-fill the form from a source doc but always create a
+  // NEW draft on submit. Triggered by the "Start a new document" button on a
+  // finally-disapproved doc, so the author doesn't retype everything.
+  const duplicateId = searchParams.get('duplicate')
+  const sourceId = editId ?? duplicateId
+  const sourceDoc = sourceId ? allDocuments.find((d) => d.id === sourceId) : undefined
   const isEditMode = !!editId
-  const editLoading = isEditMode && allDocuments.length === 0
-  const editNotFound = isEditMode && allDocuments.length > 0 && !editingDoc
-  const editLocked = isEditMode && !!editingDoc && editingDoc.status !== 'draft'
+  const isDuplicateMode = !!duplicateId && !isEditMode
+  const editingDoc = isEditMode ? sourceDoc : undefined
+  const editLoading = !!sourceId && allDocuments.length === 0
+  const editNotFound = !!sourceId && allDocuments.length > 0 && !sourceDoc
+  // Drafts and revision-requested rejections are editable in this page.
+  // Anything else (in_review / approved / final disapproval / archived) stays
+  // locked.
+  const isResubmitMode =
+    isEditMode &&
+    !!editingDoc &&
+    editingDoc.status === 'rejected' &&
+    editingDoc.rejectionType === 'revision_request'
+  const editLocked =
+    isEditMode &&
+    !!editingDoc &&
+    editingDoc.status !== 'draft' &&
+    !isResubmitMode
 
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -132,33 +151,49 @@ export function SdmsCreateDocumentPage() {
 
   const fileName = watch('fileName')
 
-  // Reset prefill flag whenever the target draft changes — prevents the form
-  // from sticking to a previous draft's values when navigating ?edit=A → ?edit=B.
+  // Reset prefill flag whenever the target source changes — prevents the form
+  // from sticking to a previous draft's values when navigating between sources.
   useEffect(() => {
     editPrefilledRef.current = false
-  }, [editId])
+  }, [sourceId])
 
-  // Prefill the form once from the editing doc when it arrives.
+  // Prefill the form once from the source doc when it arrives. Used by both
+  // ?edit (modify in place) and ?duplicate (clone into a fresh draft).
   useEffect(() => {
-    if (!isEditMode || !editingDoc || editPrefilledRef.current) return
+    if (!sourceDoc || editPrefilledRef.current) return
+    if (!isEditMode && !isDuplicateMode) return
     editPrefilledRef.current = true
-    setValue('title', editingDoc.title)
-    setValue('description', editingDoc.description ?? '')
-    setValue('fileName', editingDoc.fileName)
-    if (editingDoc.category) setValue('category', editingDoc.category)
-    if (editingDoc.priority) setValue('priority', editingDoc.priority)
-    if (editingDoc.confidentiality) setValue('confidentiality', editingDoc.confidentiality)
-    if (editingDoc.departmentId) setValue('departmentId', editingDoc.departmentId)
-    setTags(editingDoc.tags ?? [])
-    setSignatureSlots(editingDoc.signatureSlots ?? [])
+    setValue('title', isDuplicateMode ? sourceDoc.title : sourceDoc.title)
+    setValue('description', sourceDoc.description ?? '')
+    // In duplicate mode, the original file isn't re-attached — the author
+    // must pick a fresh file (likely a revised version). Leave the field blank.
+    if (isEditMode) setValue('fileName', sourceDoc.fileName)
+    if (sourceDoc.category) setValue('category', sourceDoc.category)
+    if (sourceDoc.priority) setValue('priority', sourceDoc.priority)
+    if (sourceDoc.confidentiality) setValue('confidentiality', sourceDoc.confidentiality)
+    if (sourceDoc.departmentId) setValue('departmentId', sourceDoc.departmentId)
+    setTags(sourceDoc.tags ?? [])
+    setSignatureSlots(sourceDoc.signatureSlots ?? [])
+    // Approvers only travel with the doc post-submission. In edit mode they
+    // aren't set yet (draft), but in resubmit mode the chain is on the record
+    // already — preload it so the form is ready to resubmit without re-picking.
+    // Strip the current user defensively in case a legacy chain contains them.
+    if (isResubmitMode) {
+      const chain = sourceDoc.approvers ?? []
+      setApprovers(user ? chain.filter((id) => id !== user.id) : chain)
+    }
     // Blob URLs from a prior session don't survive page reload — treat them
-    // as missing and force the user to re-pick the file.
-    const url = editingDoc.assetUrl
-    setExistingAssetUrl(url && !url.startsWith('blob:') ? url : undefined)
-    if (url?.startsWith('blob:')) {
+    // as missing and force the user to re-pick the file. Duplicate mode also
+    // forces a fresh file pick since the new doc is logically independent.
+    const url = sourceDoc.assetUrl
+    setExistingAssetUrl(isEditMode && url && !url.startsWith('blob:') ? url : undefined)
+    if (isEditMode && url?.startsWith('blob:')) {
       toast.info('Original file is no longer available — pick the file again to preview it.')
     }
-  }, [isEditMode, editingDoc, setValue])
+    if (isDuplicateMode) {
+      toast.info(`Drafting a new document from ${sourceDoc.trackingNumber ?? sourceDoc.id}. Pick the (revised) file to continue.`)
+    }
+  }, [isEditMode, isDuplicateMode, isResubmitMode, sourceDoc, setValue])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['documents'] })
@@ -197,7 +232,7 @@ export function SdmsCreateDocumentPage() {
     onSuccess: (doc) => {
       invalidate()
       toast.success(`Submitted ${doc.trackingNumber ?? doc.id} — workflow started`)
-      navigate(getModulePath('sdms', 'my-tasks'))
+      navigate(getModulePath('sdms', 'documents'))
     },
     onError: (err) => {
       toast.error('Submit failed', { description: err instanceof Error ? err.message : 'Unknown error' })
@@ -213,10 +248,30 @@ export function SdmsCreateDocumentPage() {
     onSuccess: (doc) => {
       invalidate()
       toast.success(`Submitted ${doc.trackingNumber ?? doc.id} — workflow started`)
-      navigate(getModulePath('sdms', 'my-tasks'))
+      navigate(getModulePath('sdms', 'documents'))
     },
     onError: (err) => {
       toast.error('Submit failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    },
+  })
+
+  // Resubmit-after-revision flow: persist the author's edits (new file or
+  // updated fields) and then push the doc back into the workflow at step 1
+  // with a bumped version. Approvers are preserved on the doc record, so
+  // we don't take them as input here.
+  const updateAndResubmitMutation = useMutation({
+    mutationFn: async ({ docId, patch }: { docId: string; patch: Parameters<typeof documentsApi.updateDraft>[1] }) => {
+      if (!user) throw new Error('Not signed in')
+      await documentsApi.updateDraft(docId, patch, user.id)
+      return documentsApi.resubmitRevision(docId, user.id)
+    },
+    onSuccess: (doc) => {
+      invalidate()
+      toast.success(`Resubmitted ${doc.trackingNumber ?? doc.id} — now v${doc.version}, back in review`)
+      navigate(getModulePath('sdms', 'documents'))
+    },
+    onError: (err) => {
+      toast.error('Resubmit failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     },
   })
 
@@ -327,7 +382,12 @@ export function SdmsCreateDocumentPage() {
     }
     const t = templates.find((x) => x.id === templateId)
     if (!t) return
-    setApprovers(t.approverIds)
+    // An author can't approve their own document. If the template lists the
+    // current user as an approver, drop them from the chain and warn so the
+    // author knows to add a substitute.
+    const droppedSelf = !!user && t.approverIds.includes(user.id)
+    const filteredApprovers = user ? t.approverIds.filter((id) => id !== user.id) : t.approverIds
+    setApprovers(filteredApprovers)
     setSignatureSlots(t.signatureSlots ?? [])
     if (t.category) setValue('category', t.category)
     // Only seed the filename from the template if the user hasn't picked a file.
@@ -339,6 +399,11 @@ export function SdmsCreateDocumentPage() {
       ? ` · ${t.signatureSlots.length} signature slot${t.signatureSlots.length === 1 ? '' : 's'} preset`
       : ''
     toast.success(`Applied template: ${t.name}${slotSuffix}`)
+    if (droppedSelf) {
+      toast.warning("You were listed as an approver in this template", {
+        description: "Removed from the chain — authors can't approve their own document. Add a substitute approver before submitting.",
+      })
+    }
   }
 
   const removeTag = (t: string) => setTags(tags.filter((x) => x !== t))
@@ -387,6 +452,12 @@ export function SdmsCreateDocumentPage() {
       toast.error('Add at least one approver before submitting')
       return
     }
+    if (approvers.includes(user.id)) {
+      toast.error("You're listed as an approver", {
+        description: "Authors can't approve their own document. Remove yourself from the approver chain before submitting.",
+      })
+      return
+    }
     const bodyText =
       extractedBodyText ?? (isEditMode ? editingDoc?.bodyText : undefined)
     const sharedFields = {
@@ -404,14 +475,16 @@ export function SdmsCreateDocumentPage() {
       assetUrl: effectiveAssetUrl,
       bodyText,
     }
-    if (isEditMode && editingDoc) {
+    if (isResubmitMode && editingDoc) {
+      updateAndResubmitMutation.mutate({ docId: editingDoc.id, patch: sharedFields })
+    } else if (isEditMode && editingDoc) {
       updateAndStartMutation.mutate({ docId: editingDoc.id, patch: sharedFields, approverIds: approvers })
     } else {
       submitMutation.mutate({ ...sharedFields, approvers, createdBy: user.id })
     }
   }
 
-  const busy = draftMutation.isPending || submitMutation.isPending || updateDraftMutation.isPending || updateAndStartMutation.isPending
+  const busy = draftMutation.isPending || submitMutation.isPending || updateDraftMutation.isPending || updateAndStartMutation.isPending || updateAndResubmitMutation.isPending
   const activeUsers = users.filter((u) => u.status === 'active' && u.id !== user?.id)
   const departmentNameById = new Map(departments.map((d) => [d.id, d.name]))
 
@@ -734,10 +807,10 @@ export function SdmsCreateDocumentPage() {
                 type="button"
                 fullWidth
                 disabled={busy}
-                loading={submitMutation.isPending || updateAndStartMutation.isPending}
+                loading={submitMutation.isPending || updateAndStartMutation.isPending || updateAndResubmitMutation.isPending}
                 onClick={handleSubmit(onSubmitForApproval)}
               >
-                Submit for Approval
+                {isResubmitMode ? 'Update & Resubmit' : 'Submit for Approval'}
               </Button>
               <Button
                 type="button"

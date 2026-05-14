@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -11,7 +11,6 @@ import {
   FileText,
   Move,
   RotateCcw,
-  Send,
   ShieldOff,
   X,
   XCircle,
@@ -36,6 +35,8 @@ import type { User } from '@/features/users/types'
 import { useDepartments } from '@/features/departments'
 import { useAuditLog } from '@/features/audit-log'
 import { useAuthStore } from '@/features/auth/store/auth-store'
+import { isModuleAdmin } from '@/features/auth'
+import { getModulePath } from '@/config/modules'
 import { Tabs } from '@/shared/ui/tabs'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { Spinner } from '@/shared/ui/spinner'
@@ -72,7 +73,9 @@ export function SdmsDocumentViewerPage() {
   const [tab, setTab] = useState<ViewerTab>('preview')
   const [comment, setComment] = useState('')
   const [commentError, setCommentError] = useState<string | null>(null)
+  const commentRef = useRef<HTMLTextAreaElement>(null)
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false)
+  const [disapproveConfirmOpen, setDisapproveConfirmOpen] = useState(false)
   const [signatureModalOpen, setSignatureModalOpen] = useState(false)
   const [revokeOpen, setRevokeOpen] = useState(false)
   const [addToStorageOpen, setAddToStorageOpen] = useState(false)
@@ -282,18 +285,38 @@ export function SdmsDocumentViewerPage() {
     setPlacementSlot(null)
   }
 
+  const focusCommentField = () => {
+    // Defer one tick so the layout has settled (commentError just rendered)
+    // before we steal focus. Scrolls into view too for tall viewports.
+    requestAnimationFrame(() => {
+      commentRef.current?.focus()
+      commentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
   const onDisapprove = () => {
     if (comment.trim().length < 2) {
       setCommentError('Add a reason before disapproving.')
+      focusCommentField()
       return
     }
     setCommentError(null)
-    rejectMutation.mutate({ docId: doc.id, reason: comment.trim() })
+    // Disapprove is terminal — gate the action behind an explicit confirm so
+    // a mis-click on the red button doesn't kill the workflow with no recovery.
+    setDisapproveConfirmOpen(true)
+  }
+
+  const onConfirmDisapprove = () => {
+    rejectMutation.mutate(
+      { docId: doc.id, reason: comment.trim() },
+      { onSettled: () => setDisapproveConfirmOpen(false) },
+    )
   }
 
   const onRequestRevision = () => {
     if (comment.trim().length < 2) {
       setCommentError('Describe what needs to change.')
+      focusCommentField()
       return
     }
     setCommentError(null)
@@ -310,9 +333,34 @@ export function SdmsDocumentViewerPage() {
     })
   }
 
-  const actionsBusy = signMutation.isPending || rejectMutation.isPending || revisionMutation.isPending || resubmitMutation.isPending
   const isAuthor = !!user && doc.createdBy === user.id
   const canResubmit = doc.status === 'rejected' && doc.rejectionType === 'revision_request' && isAuthor
+  // Admin-only recovery path: reopen a rejected doc back into the workflow.
+  // Covers the "Disapprove was clicked by accident" case where there's no
+  // other way to undo a terminal rejection.
+  const canReopen = doc.status === 'rejected' && isModuleAdmin(user, 'sdms')
+  // Author's recovery path after a *final* disapproval — no resubmit, but they
+  // can clone the metadata into a fresh draft so they don't retype everything.
+  const canStartNew = isAuthor && doc.status === 'rejected' && doc.rejectionType === 'final'
+
+  const reopenMutation = useMutation({
+    mutationFn: () => {
+      if (!user) throw new Error('Not signed in')
+      return documentsApi.reopen(doc.id, user.id)
+    },
+    onSuccess: (next) => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+      toast.success(`Reopened ${next.trackingNumber ?? next.id}`)
+    },
+    onError: (err) => toast.error('Reopen failed', { description: err instanceof Error ? err.message : 'Unknown error' }),
+  })
+
+  const actionsBusy = signMutation.isPending || rejectMutation.isPending || revisionMutation.isPending || resubmitMutation.isPending || reopenMutation.isPending
+
+  const onStartNew = () => {
+    navigate(`${getModulePath('sdms', 'create-document')}?duplicate=${doc.id}`)
+  }
 
   return (
     <motion.div
@@ -382,6 +430,9 @@ export function SdmsDocumentViewerPage() {
             {tab === 'preview' && (
               <>
                 {placementMode && (
+                  // Inline guidance — only shown while placing. Includes a
+                  // Cancel as a fallback for non-PDF docs where the paginator
+                  // (which hosts the primary Cancel) doesn't render.
                   <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-emerald-200 bg-emerald-50 text-[12px] text-emerald-800">
                     <span>
                       {repositioningSlotKey ? (
@@ -399,7 +450,7 @@ export function SdmsDocumentViewerPage() {
                     <button
                       type="button"
                       onClick={cancelPlacement}
-                      className="text-[12px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+                      className="text-[12px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2 flex-shrink-0"
                     >
                       Cancel
                     </button>
@@ -410,6 +461,19 @@ export function SdmsDocumentViewerPage() {
                   userMap={userMap}
                   placementMode={placementMode}
                   onSlotPlaced={onSlotPlaced}
+                  toolbarRightSlot={
+                    placementMode ? (
+                      <button
+                        type="button"
+                        onClick={cancelPlacement}
+                        title="Cancel signature placement"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors text-[12px] font-medium"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Cancel placement
+                      </button>
+                    ) : undefined
+                  }
                 />
               </>
             )}
@@ -419,33 +483,97 @@ export function SdmsDocumentViewerPage() {
           </div>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start">
-          <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} departmentNameById={departmentNameById} />
-
+        <aside
+          // Self-scrolling sidebar so a long approver chain never pushes the
+          // Actions panel below the fold. The aside still sticks to the top
+          // of the page; its own internal scroll handles the height overflow.
+          className="space-y-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start lg:max-h-[calc(100vh-var(--topbar-h)-2rem)] lg:overflow-y-auto lg:pr-1"
+        >
+          {/* Actions card only renders when the viewer has something they can
+              actually do — current approver, author of a revision-requested
+              doc, author of a finally-disapproved doc (Start-new recovery),
+              or an SDMS admin viewing a rejected doc (Reopen recovery).
+              Otherwise (future approver waiting their turn, plain observer)
+              the card would just be visual noise. */}
+          {(isCurrentApprover || canResubmit || canStartNew || canReopen) && (
           <div className="bg-white rounded-xl border border-zinc-200/60 p-4 space-y-3">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Actions</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Actions</p>
+              {doc.status === 'in_review' && doc.approvers.length > 0 && (
+                <p className="text-[11px] text-zinc-400">
+                  Step <span className="tabular-nums text-zinc-700 font-medium">{(doc.currentApproverIndex ?? 0) + 1}</span> of{' '}
+                  <span className="tabular-nums">{doc.approvers.length}</span>
+                </p>
+              )}
+            </div>
 
             {canResubmit && (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 space-y-2">
                 <p className="text-[12px] text-amber-800">
-                  Revision was requested. Edit the document, then resubmit to restart the workflow.
+                  Revision was requested. Edit the document to upload your revised file or update fields, then resubmit.
                 </p>
                 {doc.rejectedReason && (
                   <p className="text-[11px] text-amber-700">Reason: {doc.rejectedReason}</p>
                 )}
                 <button
                   type="button"
-                  onClick={onResubmit}
+                  onClick={() => navigate(`${getModulePath('sdms', 'create-document')}?edit=${doc.id}`)}
                   disabled={actionsBusy}
                   className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 text-white text-[13px] font-medium hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  Resubmit for Approval
+                  <FileText className="w-4 h-4" />
+                  Edit document
+                </button>
+                <button
+                  type="button"
+                  onClick={onResubmit}
+                  disabled={actionsBusy}
+                  className="block w-full text-center text-[11.5px] text-amber-700 hover:text-amber-900 underline underline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  or resubmit as-is (no changes)
                 </button>
               </div>
             )}
 
-            {!isCurrentApprover && !canResubmit && (
+            {canStartNew && (
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 space-y-2">
+                <p className="text-[12px] text-zinc-700">
+                  This document was disapproved and can&rsquo;t be revised. Start a new draft with the same content so you don&rsquo;t have to retype everything.
+                </p>
+                {doc.rejectedReason && (
+                  <p className="text-[11px] text-zinc-500">Reason: {doc.rejectedReason}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={onStartNew}
+                  disabled={actionsBusy}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[13px] font-medium hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Start a new document
+                </button>
+              </div>
+            )}
+
+            {canReopen && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-2">
+                <p className="text-[12px] text-blue-900">
+                  Admin recovery: reopen this rejected document. It returns to{' '}
+                  <span className="font-medium">In Review</span> at the approver who rejected it, and prior signatures are preserved.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => reopenMutation.mutate()}
+                  disabled={actionsBusy}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reopen workflow
+                </button>
+              </div>
+            )}
+
+            {!isCurrentApprover && !canResubmit && !canStartNew && !canReopen && (
               <p className="text-[12px] text-zinc-500 bg-zinc-50 border border-zinc-100 rounded-md px-3 py-2">
                 {finalized
                   ? 'Document is finalized — actions are locked.'
@@ -465,6 +593,24 @@ export function SdmsDocumentViewerPage() {
               <p className="text-[11.5px] text-zinc-500 bg-zinc-50 border border-zinc-100 rounded-md px-3 py-2">
                 No signature placement defined — you&rsquo;ll be asked to place it on the document before signing.
               </p>
+            )}
+
+            {isCurrentApprover && (
+              // Single comment input — attaches to whichever action button you
+              // click next. Lives inside the Actions card so the input → action
+              // flow is one vertical motion (and there's no misleading "Sign
+              // & Send" sitting below an unrelated comment box).
+              <div className="space-y-1">
+                <textarea
+                  ref={commentRef}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add a comment (required for Disapprove / Request Revision)"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-[13px] text-zinc-900 placeholder:text-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-400"
+                />
+                {commentError && <p className="text-[11.5px] text-red-600">{commentError}</p>}
+              </div>
             )}
 
             <div className="flex gap-2">
@@ -498,16 +644,11 @@ export function SdmsDocumentViewerPage() {
               Request Revision
             </button>
           </div>
+          )}
 
-          <CommentsPanel
-            doc={doc}
-            userMap={userMap}
-            comment={comment}
-            setComment={setComment}
-            error={commentError}
-            disabled={!isCurrentApprover}
-            onSubmit={onApprove}
-          />
+          <CommentsPanel doc={doc} userMap={userMap} />
+
+          <WorkflowProgress doc={doc} userMap={userMap} currentUserId={user?.id} departmentNameById={departmentNameById} />
         </aside>
       </div>
 
@@ -524,6 +665,28 @@ export function SdmsDocumentViewerPage() {
         confirmLabel="Resubmit"
         tone="warning"
         busy={resubmitMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={disapproveConfirmOpen}
+        onCancel={() => setDisapproveConfirmOpen(false)}
+        onConfirm={onConfirmDisapprove}
+        title="Disapprove this document?"
+        message={
+          <>
+            <p>
+              This is <span className="font-semibold text-red-700">final</span> — the document cannot be revised or resubmitted.
+              The author would need to create a new document from scratch.
+            </p>
+            <p className="mt-2 text-zinc-500">
+              If you want the author to fix and try again instead, cancel here and click{' '}
+              <span className="font-medium text-zinc-700">Request Revision</span>.
+            </p>
+          </>
+        }
+        confirmLabel="Disapprove permanently"
+        tone="danger"
+        busy={rejectMutation.isPending}
       />
 
       <SignatureModal
@@ -548,9 +711,11 @@ interface PreviewAreaProps {
   userMap: Record<string, User | undefined>
   placementMode?: boolean
   onSlotPlaced?: (slot: Omit<SignatureSlot, 'key'>) => void
+  /** Forwarded to PdfViewer — renders alongside the sticky paginator. */
+  toolbarRightSlot?: React.ReactNode
 }
 
-function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaProps) {
+function PreviewArea({ doc, userMap, placementMode, onSlotPlaced, toolbarRightSlot }: PreviewAreaProps) {
   const safeUrl = safeAssetUrl(doc.assetUrl)
   const isImage = (doc.fileType === 'png' || doc.fileType === 'jpg') && !!safeUrl
   if (isImage && safeUrl) {
@@ -574,7 +739,7 @@ function PreviewArea({ doc, userMap, placementMode, onSlotPlaced }: PreviewAreaP
   if (doc.fileType === 'pdf' && safeUrl) {
     return (
       <Suspense fallback={<div className="rounded-lg border border-zinc-200/60 bg-zinc-50/50 min-h-[480px] flex items-center justify-center"><Spinner size="lg" /></div>}>
-        <PdfViewer doc={doc} url={safeUrl} userMap={userMap} placementMode={placementMode} onSlotPlaced={onSlotPlaced} />
+        <PdfViewer doc={doc} url={safeUrl} userMap={userMap} placementMode={placementMode} onSlotPlaced={onSlotPlaced} toolbarRightSlot={toolbarRightSlot} />
       </Suspense>
     )
   }
@@ -907,14 +1072,14 @@ function WorkflowProgress({ doc, userMap, currentUserId, departmentNameById }: W
 interface CommentsPanelProps {
   doc: AppDocument
   userMap: Record<string, User | undefined>
-  comment: string
-  setComment: (s: string) => void
-  error: string | null
-  disabled: boolean
-  onSubmit: () => void
 }
 
-function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onSubmit }: CommentsPanelProps) {
+/**
+ * Read-only thread of prior signature notes + rejection reasons. The composer
+ * for *new* comments lives inside the Actions card so the input pairs visually
+ * with whichever action button uses it.
+ */
+function CommentsPanel({ doc, userMap }: CommentsPanelProps) {
   const thread = useMemo(() => {
     const items: { who: string; whoUser?: User; text: string; when: string; tone: 'sig' | 'rejection' }[] = []
     for (const s of doc.signatures) {
@@ -940,50 +1105,29 @@ function CommentsPanel({ doc, userMap, comment, setComment, error, disabled, onS
     return items.sort((a, b) => a.when.localeCompare(b.when))
   }, [doc, userMap])
 
+  if (thread.length === 0) return null
+
   return (
     <div className="bg-white rounded-xl border border-zinc-200/60 p-4 space-y-3">
       <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Comments</p>
-      {thread.length > 0 && (
-        <ul className="space-y-2">
-          {thread.map((c, i) => (
-            <li key={i} className={cn(
-              'rounded-md px-3 py-2 text-[12px]',
-              c.tone === 'rejection' ? 'bg-red-50 border border-red-200' : 'bg-zinc-50 border border-zinc-100',
-            )}>
-              <div className={cn('font-medium', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-900')}>
-                {c.whoUser ? (
-                  <UserInfoPopover user={c.whoUser}>
-                    <span className="hover:underline underline-offset-2">{c.who}</span>
-                  </UserInfoPopover>
-                ) : c.who}
-              </div>
-              <p className={cn('mt-0.5', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-700')}>{c.text}</p>
-              <p className="text-[10.5px] text-zinc-400 mt-1">{formatDistanceToNow(parseISO(c.when), { addSuffix: true })}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="space-y-2">
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder={disabled ? 'Comments locked — you are not the current approver.' : 'Add a comment…'}
-          rows={3}
-          disabled={disabled}
-          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-[13px] text-zinc-900 placeholder:text-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-400 disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={disabled || !comment.trim()}
-          title="Approve the document with this comment attached"
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-fg text-[13px] font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <Send className="w-4 h-4" />
-          Sign &amp; Send
-        </button>
-      </div>
-      {error && <p className="text-[11.5px] text-red-600">{error}</p>}
+      <ul className="space-y-2">
+        {thread.map((c, i) => (
+          <li key={i} className={cn(
+            'rounded-md px-3 py-2 text-[12px]',
+            c.tone === 'rejection' ? 'bg-red-50 border border-red-200' : 'bg-zinc-50 border border-zinc-100',
+          )}>
+            <div className={cn('font-medium', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-900')}>
+              {c.whoUser ? (
+                <UserInfoPopover user={c.whoUser}>
+                  <span className="hover:underline underline-offset-2">{c.who}</span>
+                </UserInfoPopover>
+              ) : c.who}
+            </div>
+            <p className={cn('mt-0.5', c.tone === 'rejection' ? 'text-red-700' : 'text-zinc-700')}>{c.text}</p>
+            <p className="text-[10.5px] text-zinc-400 mt-1">{formatDistanceToNow(parseISO(c.when), { addSuffix: true })}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
