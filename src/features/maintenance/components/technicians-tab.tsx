@@ -3,6 +3,7 @@ import { Users as UsersIcon } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useWorkOrders } from '@/features/maintenance'
 import { useUsers } from '@/features/users'
+import { hasModuleAccess, moduleRoleOf } from '@/features/auth'
 import type { WorkOrder, WorkOrderPriority } from '@/features/maintenance/types'
 import { Avatar } from '@/shared/ui/avatar'
 import { EmptyState } from '@/shared/ui/empty-state'
@@ -21,22 +22,49 @@ export function TechniciansTab() {
   const { data: users = [] } = useUsers()
 
   const grouped = useMemo(() => {
-    const map = new Map<string, WorkOrder[]>()
+    // Start with the full Maintenance roster — every active user with module
+    // access, even if they have zero assigned WOs. That way the page doubles
+    // as a roster (capacity slack is visible) instead of only surfacing
+    // already-busy technicians.
+    const technicians = users.filter((u) => u.status === 'active' && hasModuleAccess(u, 'maintenance'))
+
+    const ordersByUser = new Map<string, WorkOrder[]>()
     for (const wo of workOrders) {
-      if (!map.has(wo.assignedTo)) map.set(wo.assignedTo, [])
-      map.get(wo.assignedTo)!.push(wo)
+      if (!ordersByUser.has(wo.assignedTo)) ordersByUser.set(wo.assignedTo, [])
+      ordersByUser.get(wo.assignedTo)!.push(wo)
     }
-    return Array.from(map.entries())
-      .map(([userId, orders]) => ({
-        userId,
-        user: users.find((u) => u.id === userId),
-        pending: orders.filter((o) => o.status === 'pending').length,
-        ongoing: orders.filter((o) => o.status === 'ongoing').length,
-        completed: orders.filter((o) => o.status === 'completed').length,
-        active: orders.filter((o) => o.status === 'pending' || o.status === 'ongoing').sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
-      }))
-      .filter((g) => g.user)
-      .sort((a, b) => (b.pending + b.ongoing) - (a.pending + a.ongoing))
+
+    // Also surface any user holding WOs even if their module role was removed
+    // — they still appear in the audit trail, and the supervisor needs to see
+    // the dangling assignment to reassign it.
+    const orphanIds = Array.from(ordersByUser.keys()).filter(
+      (id) => !technicians.some((t) => t.id === id),
+    )
+    const orphans = orphanIds
+      .map((id) => users.find((u) => u.id === id))
+      .filter((u): u is NonNullable<typeof u> => !!u)
+
+    return [...technicians, ...orphans]
+      .map((user) => {
+        const orders = ordersByUser.get(user.id) ?? []
+        return {
+          userId: user.id,
+          user,
+          role: moduleRoleOf(user, 'maintenance'),
+          isOrphan: !technicians.some((t) => t.id === user.id),
+          pending: orders.filter((o) => o.status === 'pending').length,
+          ongoing: orders.filter((o) => o.status === 'ongoing').length,
+          completed: orders.filter((o) => o.status === 'completed').length,
+          active: orders
+            .filter((o) => o.status === 'pending' || o.status === 'ongoing')
+            .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
+        }
+      })
+      // Busy first, then free, orphans last (highlighted so they get attention).
+      .sort((a, b) => {
+        if (a.isOrphan !== b.isOrphan) return a.isOrphan ? 1 : -1
+        return (b.pending + b.ongoing) - (a.pending + a.ongoing)
+      })
   }, [workOrders, users])
 
   if (isLoading) return <TableSkeleton columns={3} rows={4} />
@@ -46,8 +74,8 @@ export function TechniciansTab() {
       <div className="bg-white rounded-xl border border-zinc-200/60">
         <EmptyState
           icon={UsersIcon}
-          title="No technicians assigned"
-          description="Create a work order and assign a technician to see workload here."
+          title="No technicians yet"
+          description="Grant a user Maintenance access (member, manager, or admin) under Maintenance → Users to add them to the roster."
         />
       </div>
     )
@@ -55,13 +83,39 @@ export function TechniciansTab() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {grouped.map((g) => (
-        <div key={g.userId} className="bg-white rounded-xl border border-zinc-200/60 p-5">
+      {grouped.map((g) => {
+        const totalActive = g.pending + g.ongoing
+        const isFree = totalActive === 0 && !g.isOrphan
+        return (
+        <div
+          key={g.userId}
+          className={cn(
+            'bg-white rounded-xl border p-5',
+            g.isOrphan ? 'border-amber-200/80' : 'border-zinc-200/60',
+          )}
+        >
           <div className="flex items-center gap-3 mb-4">
-            <Avatar name={g.user!.name} size="md" />
+            <Avatar name={g.user.name} size="md" />
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-zinc-900 truncate">{g.user!.name}</p>
-              <p className="text-[12px] text-zinc-400 truncate">{g.user!.email}</p>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p className="text-[13px] font-medium text-zinc-900 truncate">{g.user.name}</p>
+                {g.role && !g.isOrphan && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-zinc-100 text-zinc-600 text-[10px] font-medium capitalize">
+                    {g.role}
+                  </span>
+                )}
+                {g.isOrphan && (
+                  <span title="Has work orders but no longer has Maintenance access" className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium border border-amber-200">
+                    No access
+                  </span>
+                )}
+                {isFree && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
+                    Available
+                  </span>
+                )}
+              </div>
+              <p className="text-[12px] text-zinc-400 truncate">{g.user.email}</p>
             </div>
           </div>
 
@@ -80,7 +134,7 @@ export function TechniciansTab() {
             </div>
           </div>
 
-          {g.active.length > 0 && (
+          {g.active.length > 0 ? (
             <div className="border-t border-zinc-100 pt-3 space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Active queue</p>
               {g.active.slice(0, 4).map((wo) => (
@@ -94,9 +148,14 @@ export function TechniciansTab() {
                 <p className="text-[11px] text-zinc-400">+ {g.active.length - 4} more</p>
               )}
             </div>
+          ) : (
+            <div className="border-t border-zinc-100 pt-3">
+              <p className="text-[12px] text-zinc-400 italic">No active work orders</p>
+            </div>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
