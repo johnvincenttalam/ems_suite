@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { UserCheck, Plus, Undo2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -20,7 +20,7 @@ import { PageHeader } from '@/shared/ui/page-header'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { Modal } from '@/shared/ui/modal'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
@@ -68,7 +68,7 @@ export function FleetAssignmentsPage() {
     return assignments.filter((a) => !!a.returnedDate)
   }, [assignments, statusFilter])
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<AssignForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<AssignForm>({
     resolver: zodResolver(assignSchema),
   })
 
@@ -247,21 +247,37 @@ export function FleetAssignmentsPage() {
               No vehicles available to assign — every active vehicle currently has a driver. Return one first.
             </div>
           )}
-          <Select
-            label="Vehicle *"
-            {...register('vehicleId')}
-            error={errors.vehicleId?.message}
-            placeholder="Select vehicle"
-            options={assignableVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+          <Controller
+            name="vehicleId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Vehicle *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.vehicleId?.message}
+                placeholder="Select vehicle"
+                searchPlaceholder="Search by plate or model…"
+                options={assignableVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+              />
+            )}
           />
-          <Select
-            label="Driver *"
-            {...register('driverId')}
-            error={errors.driverId?.message}
-            placeholder="Select driver"
-            options={drivers
-              .filter((d) => d.status === 'active')
-              .map((d) => ({ value: d.id, label: d.name }))}
+          <Controller
+            name="driverId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Driver *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.driverId?.message}
+                placeholder="Select driver"
+                searchPlaceholder="Search drivers…"
+                options={drivers
+                  .filter((d) => d.status === 'active')
+                  .map((d) => ({ value: d.id, label: d.name }))}
+              />
+            )}
           />
           <Textarea label="Notes" rows={3} {...register('notes')} placeholder="e.g. Permanent assignment for Site Alpha runs" />
         </form>

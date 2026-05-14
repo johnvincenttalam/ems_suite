@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Tag as TagIcon, Download, Plus, QrCode, Radio, Satellite } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { exportToCSV } from '@/shared/utils/export-csv'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
@@ -108,7 +109,7 @@ export function TagsTab({ entityFilter }: TagsTabProps = {}) {
   })
 
   const defaultBoundType: TrackingEntityType = entityFilter ?? 'item'
-  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<TagForm>({
+  const { register, handleSubmit, formState: { errors }, reset, watch, control } = useForm<TagForm>({
     resolver: zodResolver(tagSchema),
     defaultValues: { type: 'qr', boundEntityType: defaultBoundType },
   })
@@ -184,7 +185,21 @@ export function TagsTab({ entityFilter }: TagsTabProps = {}) {
               ]}
             />
           </div>
-          <Select label="Entity *" {...register('boundEntityId')} error={errors.boundEntityId?.message} placeholder="Select entity" options={entityOptions} />
+          <Controller
+            name="boundEntityId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Entity *"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.boundEntityId?.message}
+                placeholder="Select entity"
+                searchPlaceholder="Search entities…"
+                options={entityOptions}
+              />
+            )}
+          />
         </form>
       </Modal>
     </div>

@@ -3,7 +3,7 @@ import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowMo
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ClipboardCheck, Plus, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
 import { format, parseISO, startOfMonth, isAfter } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -21,6 +21,7 @@ import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
@@ -97,7 +98,7 @@ export function FleetInspectionsPage() {
     },
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<InspectionForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<InspectionForm>({
     resolver: zodResolver(inspectionSchema),
     defaultValues: {
       date: format(new Date(), 'yyyy-MM-dd'),
@@ -261,26 +262,42 @@ export function FleetInspectionsPage() {
       >
         <form id="record-inspection-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Vehicle *"
-              {...register('vehicleId')}
-              error={errors.vehicleId?.message}
-              placeholder="Select vehicle"
-              options={vehicles
-                .filter((v) => v.status !== 'retired')
-                .map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+            <Controller
+              name="vehicleId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Vehicle *"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.vehicleId?.message}
+                  placeholder="Select vehicle"
+                  searchPlaceholder="Search by plate or model…"
+                  options={vehicles
+                    .filter((v) => v.status !== 'retired')
+                    .map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+                />
+              )}
             />
             <Input label="Date *" type="date" {...register('date')} error={errors.date?.message} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Inspector"
-              {...register('inspectorDriverId')}
-              placeholder="(optional)"
-              options={drivers
-                .filter((d) => d.status === 'active')
-                .map((d) => ({ value: d.id, label: d.name }))}
+            <Controller
+              name="inspectorDriverId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Inspector"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  placeholder="(optional)"
+                  searchPlaceholder="Search inspectors…"
+                  options={drivers
+                    .filter((d) => d.status === 'active')
+                    .map((d) => ({ value: d.id, label: d.name }))}
+                />
+              )}
             />
             <Select
               label="Result *"

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { Modal } from '@/shared/ui/modal'
 import { Input } from '@/shared/ui/input'
 import { Textarea } from '@/shared/ui/textarea'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Button } from '@/shared/ui/button'
 import { useAuthStore } from '@/features/auth'
 import { useVehicles } from '@/features/fleet'
@@ -50,7 +51,7 @@ export function ReportIssueModal({ open, onClose, target, restrictToKind }: Repo
     targetId: target?.id ?? '',
   }
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: defaults,
   })
@@ -120,16 +121,24 @@ export function ReportIssueModal({ open, onClose, target, restrictToKind }: Repo
                 ]}
               />
             )}
-            <Select
-              label={targetKind === 'vehicle' ? 'Vehicle *' : 'Asset *'}
-              {...register('targetId')}
-              error={errors.targetId?.message}
-              placeholder={targetKind === 'vehicle' ? 'Select vehicle' : 'Select asset'}
-              options={
-                targetKind === 'vehicle'
-                  ? vehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))
-                  : assets.map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))
-              }
+            <Controller
+              name="targetId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label={targetKind === 'vehicle' ? 'Vehicle *' : 'Asset *'}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.targetId?.message}
+                  placeholder={targetKind === 'vehicle' ? 'Select vehicle' : 'Select asset'}
+                  searchPlaceholder={targetKind === 'vehicle' ? 'Search by plate or model…' : 'Search by code or name…'}
+                  options={
+                    targetKind === 'vehicle'
+                      ? vehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))
+                      : assets.map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))
+                  }
+                />
+              )}
             />
           </>
         )}

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { Upload, X } from 'lucide-react'
 import { Modal } from '@/shared/ui/modal'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Button } from '@/shared/ui/button'
 import { useAuthStore } from '@/features/auth'
 import { useDrivers } from '@/features/drivers'
@@ -234,12 +235,20 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Select
-            label="Assigned Driver"
-            {...register('assignedDriverId')}
-            error={errors.assignedDriverId?.message}
-            placeholder="Unassigned"
-            options={driverOptions}
+          <Controller
+            name="assignedDriverId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Assigned Driver"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.assignedDriverId?.message}
+                placeholder="Unassigned"
+                searchPlaceholder="Search drivers…"
+                options={driverOptions}
+              />
+            )}
           />
           <Input
             label="Next Service Date"
@@ -250,12 +259,20 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
           />
         </div>
         <div>
-          <Select
-            label="Pre-trip Checklist"
-            {...register('checklistId')}
-            error={errors.checklistId?.message}
-            placeholder="None"
-            options={templateOptions}
+          <Controller
+            name="checklistId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Pre-trip Checklist"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.checklistId?.message}
+                placeholder="None"
+                searchPlaceholder="Search checklists…"
+                options={templateOptions}
+              />
+            )}
           />
           <p className="text-[11px] text-zinc-400 mt-1">
             Enables the pre-trip inspection action.

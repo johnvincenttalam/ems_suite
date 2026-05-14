@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { ClipboardList, CheckCircle2, ChevronRight, Lock, Plus, X } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Lock, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   useInventoryItems,
@@ -18,6 +18,7 @@ import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -70,7 +71,7 @@ export function CycleCountPage() {
     return sessions.find((s) => s.status === 'in_progress') ?? sessions[0] ?? null
   }, [sessions, selectedId])
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ScheduleForm>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<ScheduleForm>({
     resolver: zodResolver(scheduleSchema),
     defaultValues: { warehouseId: '', categoryId: '', scheduledDate: format(new Date(), 'yyyy-MM-dd') },
   })
@@ -159,12 +160,20 @@ export function CycleCountPage() {
             <p className="text-[13px] font-semibold text-zinc-900">Schedule New Count</p>
           </div>
 
-          <Select
-            label="Warehouse *"
-            placeholder="Select warehouse"
-            options={warehouseOptions}
-            {...register('warehouseId')}
-            error={errors.warehouseId?.message}
+          <Controller
+            name="warehouseId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Warehouse *"
+                placeholder="Select warehouse"
+                searchPlaceholder="Search warehouses…"
+                options={warehouseOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.warehouseId?.message}
+              />
+            )}
           />
 
           <Select
@@ -657,7 +666,3 @@ function FinalizePreview({ session, itemMap }: { session: CycleCountSession; ite
     </div>
   )
 }
-
-// Re-export for the placeholder cycle-count-tab that's no longer used; kept so
-// any orphan imports don't break.
-export { ClipboardList }

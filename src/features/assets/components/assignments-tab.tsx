@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { ClipboardList, Plus, Undo2 } from 'lucide-react'
 import { format } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -15,7 +15,7 @@ import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { Modal } from '@/shared/ui/modal'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { FilterChips } from '@/shared/ui/filter-chips'
@@ -250,24 +250,40 @@ export function AssignmentsTab() {
             </p>
           ) : (
             <>
-              <Select
-                label="Asset *"
-                {...assignForm.register('assetId')}
-                error={assignForm.formState.errors.assetId?.message}
-                placeholder="Select asset"
-                options={assignableAssets.map((a) => ({
-                  value: a.id,
-                  label: `${a.name} · ${a.serialNumber}`,
-                }))}
+              <Controller
+                name="assetId"
+                control={assignForm.control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    label="Asset *"
+                    placeholder="Select asset"
+                    searchPlaceholder="Search by name or serial…"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={assignForm.formState.errors.assetId?.message}
+                    options={assignableAssets.map((a) => ({
+                      value: a.id,
+                      label: `${a.name} · ${a.serialNumber}`,
+                    }))}
+                  />
+                )}
               />
-              <Select
-                label="Assign To *"
-                {...assignForm.register('assignedTo')}
-                error={assignForm.formState.errors.assignedTo?.message}
-                placeholder="Select user"
-                options={users
-                  .filter((u) => u.status === 'active')
-                  .map((u) => ({ value: u.id, label: u.name }))}
+              <Controller
+                name="assignedTo"
+                control={assignForm.control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    label="Assign To *"
+                    placeholder="Select user"
+                    searchPlaceholder="Search users…"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={assignForm.formState.errors.assignedTo?.message}
+                    options={users
+                      .filter((u) => u.status === 'active')
+                      .map((u) => ({ value: u.id, label: u.name }))}
+                  />
+                )}
               />
               <Textarea label="Notes" {...assignForm.register('notes')} rows={3} />
             </>

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { Boxes, Plus, AlertTriangle, Trash2, MapPin, Pencil } from 'lucide-react'
 import { TrackingPanel } from '@/shared/tracking'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -18,6 +18,7 @@ import { ExportMenu } from '@/shared/ui/export-menu'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
@@ -106,7 +107,7 @@ export function ItemsTab() {
     onSuccess: invalidate,
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<ItemForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<ItemForm>({
     resolver: zodResolver(itemSchema),
     defaultValues: formDefaults,
   })
@@ -312,9 +313,37 @@ export function ItemsTab() {
           </div>
           <Textarea label="Description" {...register('description')} rows={2} />
           <div className="grid grid-cols-3 gap-3">
-            <Select label="Category *" {...register('categoryId')} error={errors.categoryId?.message} placeholder="Select category" options={inventoryCategories.map((c) => ({ value: c.id, label: c.name }))} />
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Category *"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.categoryId?.message}
+                  placeholder="Select category"
+                  searchPlaceholder="Search categories…"
+                  options={inventoryCategories.map((c) => ({ value: c.id, label: c.name }))}
+                />
+              )}
+            />
             <Select label="UOM *" {...register('uomId')} error={errors.uomId?.message} placeholder="Select UOM" options={uom.map((u) => ({ value: u.id, label: `${u.name} (${u.symbol})` }))} />
-            <Select label="Warehouse *" {...register('warehouseId')} error={errors.warehouseId?.message} placeholder="Select warehouse" options={warehouses.filter((w) => w.type === 'warehouse').map((w) => ({ value: w.id, label: w.name }))} />
+            <Controller
+              name="warehouseId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Warehouse *"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.warehouseId?.message}
+                  placeholder="Select warehouse"
+                  searchPlaceholder="Search warehouses…"
+                  options={warehouses.filter((w) => w.type === 'warehouse').map((w) => ({ value: w.id, label: w.name }))}
+                />
+              )}
+            />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Input label="Quantity *" type="number" {...register('quantity', { valueAsNumber: true })} error={errors.quantity?.message} />

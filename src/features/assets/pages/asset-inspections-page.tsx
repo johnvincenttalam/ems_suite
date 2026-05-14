@@ -13,6 +13,7 @@ import type { Asset, Inspection, InspectionResult } from '@/features/assets/type
 import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { FilterChips } from '@/shared/ui/filter-chips'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
@@ -229,11 +230,12 @@ export function AssetInspectionsPage() {
           <p className="text-[13px] text-zinc-500">
             Pick the asset to inspect — the asset's detail drawer opens to the Inspections tab where you can log the checklist.
           </p>
-          <Select
+          <SearchableSelect
             label="Asset *"
             value={recordAssetId}
-            onChange={(e) => setRecordAssetId(e.target.value)}
+            onChange={setRecordAssetId}
             placeholder="Select asset"
+            searchPlaceholder="Search by code or name…"
             options={assets
               .filter((a) => a.status !== 'disposed')
               .map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))}

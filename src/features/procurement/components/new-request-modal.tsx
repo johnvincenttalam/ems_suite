@@ -1,4 +1,4 @@
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,7 +12,7 @@ import { useAuthStore } from '@/features/auth'
 import { procurementApi } from '@/features/procurement/api/procurement-api'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { formatCurrency } from '@/shared/utils/format'
@@ -107,8 +107,36 @@ export function NewRequestModal({ open, onClose }: NewRequestModalProps) {
     >
       <form id="new-request-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <Select label="Department *" {...register('departmentId')} error={errors.departmentId?.message} placeholder="Select department" options={departments.map((d) => ({ value: d.id, label: d.name }))} />
-          <Select label="Preferred Supplier" {...register('supplierId')} error={errors.supplierId?.message} placeholder="Optional" options={suppliers.filter((s) => s.status === 'active').map((s) => ({ value: s.id, label: s.name }))} />
+          <Controller
+            name="departmentId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Department *"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.departmentId?.message}
+                placeholder="Select department"
+                searchPlaceholder="Search departments…"
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            )}
+          />
+          <Controller
+            name="supplierId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Preferred Supplier"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.supplierId?.message}
+                placeholder="Optional"
+                searchPlaceholder="Search suppliers…"
+                options={suppliers.filter((s) => s.status === 'active').map((s) => ({ value: s.id, label: s.name }))}
+              />
+            )}
+          />
         </div>
 
         <div>
@@ -125,7 +153,20 @@ export function NewRequestModal({ open, onClose }: NewRequestModalProps) {
               const symbol = itemId ? uomMap[itemMap[itemId]?.uomId ?? '']?.symbol : ''
               return (
                 <div key={field.id} className="grid grid-cols-[1fr_90px_110px_36px] gap-2 items-start">
-                  <Select {...register(`items.${idx}.itemId`)} placeholder="Select item" options={items.map((i) => ({ value: i.id, label: `${i.sku} — ${i.name}` }))} error={errors.items?.[idx]?.itemId?.message} />
+                  <Controller
+                    name={`items.${idx}.itemId` as const}
+                    control={control}
+                    render={({ field: itemField }) => (
+                      <SearchableSelect
+                        value={itemField.value}
+                        onChange={itemField.onChange}
+                        placeholder="Select item"
+                        searchPlaceholder="Search by SKU or name…"
+                        options={items.map((i) => ({ value: i.id, label: `${i.sku} — ${i.name}` }))}
+                        error={errors.items?.[idx]?.itemId?.message}
+                      />
+                    )}
+                  />
                   <div>
                     <Input type="number" {...register(`items.${idx}.quantity`, { valueAsNumber: true })} error={errors.items?.[idx]?.quantity?.message} placeholder="Qty" />
                     {symbol && <p className="text-[10px] text-zinc-400 mt-1 text-center font-mono">{symbol}</p>}

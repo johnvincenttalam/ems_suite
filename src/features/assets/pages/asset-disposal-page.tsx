@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -22,6 +22,7 @@ import { PageHeader } from '@/shared/ui/page-header'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { Tabs } from '@/shared/ui/tabs'
@@ -459,7 +460,7 @@ function SubmitDisposalModal({
 }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SubmitForm>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<SubmitForm>({
     resolver: zodResolver(submitSchema),
     defaultValues: {
       type: 'sold',
@@ -528,12 +529,20 @@ function SubmitDisposalModal({
         <p className="text-[13px] text-zinc-500">
           Submitting moves the asset to <span className="font-medium text-zinc-700">Retiring</span>. The named approver finalizes the disposal — only on approval is the status flipped to Disposed.
         </p>
-        <Select
-          label="Asset *"
-          {...register('assetId')}
-          error={errors.assetId?.message}
-          placeholder="Select asset"
-          options={eligibleAssets}
+        <Controller
+          name="assetId"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Asset *"
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.assetId?.message}
+              placeholder="Select asset"
+              searchPlaceholder="Search by name or code…"
+              options={eligibleAssets}
+            />
+          )}
         />
         <div className="grid grid-cols-2 gap-3">
           <Select
@@ -563,12 +572,20 @@ function SubmitDisposalModal({
             {...register('disposedTo')}
           />
         </div>
-        <Select
-          label="Approving Authority *"
-          {...register('approverName')}
-          placeholder="Select approver"
-          options={approverOptions}
-          error={errors.approverName?.message}
+        <Controller
+          name="approverName"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Approving Authority *"
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="Select approver"
+              searchPlaceholder="Search approvers…"
+              options={approverOptions}
+              error={errors.approverName?.message}
+            />
+          )}
         />
         <Textarea
           label="Reason *"

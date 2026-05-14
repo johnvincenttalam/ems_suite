@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -13,7 +13,7 @@ import {
 } from '@/features/purchase-orders'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { Checkbox } from '@/shared/ui/checkbox'
@@ -164,16 +164,24 @@ export function CreatePOModal({ open, onClose, requisitionId }: CreatePOModalPro
     >
       <form id="create-po-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {!requisitionId && (
-          <Select
-            label="Approved Requisition *"
-            {...register('requisitionId')}
-            error={errors.requisitionId?.message}
-            placeholder={eligibleRequests.length === 0 ? 'No approved requisitions available' : 'Select a requisition'}
-            disabled={eligibleRequests.length === 0}
-            options={eligibleRequests.map((r) => ({
-              value: r.id,
-              label: `${r.id} · ${r.items.length} line${r.items.length === 1 ? '' : 's'} · ${formatCurrency(r.totalAmount)}`,
-            }))}
+          <Controller
+            name="requisitionId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Approved Requisition *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.requisitionId?.message}
+                placeholder={eligibleRequests.length === 0 ? 'No approved requisitions available' : 'Select a requisition'}
+                searchPlaceholder="Search by REQ id…"
+                disabled={eligibleRequests.length === 0}
+                options={eligibleRequests.map((r) => ({
+                  value: r.id,
+                  label: `${r.id} · ${r.items.length} line${r.items.length === 1 ? '' : 's'} · ${formatCurrency(r.totalAmount)}`,
+                }))}
+              />
+            )}
           />
         )}
 
@@ -185,12 +193,20 @@ export function CreatePOModal({ open, onClose, requisitionId }: CreatePOModalPro
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Select
-            label="Supplier *"
-            {...register('supplierId')}
-            error={errors.supplierId?.message}
-            placeholder="Select supplier"
-            options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+          <Controller
+            name="supplierId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Supplier *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.supplierId?.message}
+                placeholder="Select supplier"
+                searchPlaceholder="Search suppliers…"
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              />
+            )}
           />
           <Input
             label="Expected Delivery"

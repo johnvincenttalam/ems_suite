@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { Fuel, Plus } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -14,12 +14,13 @@ import { ExportMenu } from '@/shared/ui/export-menu'
 import { formatCurrency } from '@/shared/utils/format'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { ListToolbar } from '@/shared/ui/list-toolbar'
 import { DataTable } from '@/shared/ui/data-table'
+import { Avatar } from '@/shared/ui/avatar'
 
 const fuelSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle is required'),
@@ -60,8 +61,16 @@ export function FuelLogsTab() {
       return v ? <span className="font-mono text-[12px] text-zinc-700">{v.plateNumber}</span> : <span className="text-zinc-400">{getValue() as string}</span>
     }},
     { accessorKey: 'driverId', header: 'Driver', cell: ({ getValue }) => {
-      const v = getValue() as string | undefined
-      return v ? (driverMap[v]?.name ?? '—') : <span className="text-zinc-400">—</span>
+      const id = getValue() as string | undefined
+      if (!id) return <span className="text-zinc-400">—</span>
+      const driver = driverMap[id]
+      if (!driver) return <span className="text-zinc-400">—</span>
+      return (
+        <div className="flex items-center gap-2">
+          <Avatar name={driver.name} imageUrl={driver.photoUrl} size="sm" />
+          <span className="text-[13px] text-zinc-700 truncate">{driver.name}</span>
+        </div>
+      )
     }},
     { accessorKey: 'liters', header: 'Liters', cell: ({ getValue }) => <span className="tabular-nums text-zinc-700">{(getValue() as number).toFixed(1)} L</span> },
     { accessorKey: 'costPerLiter', header: '₱/L', cell: ({ getValue }) => <span className="tabular-nums text-zinc-500">{formatCurrency(getValue() as number)}</span> },
@@ -75,7 +84,7 @@ export function FuelLogsTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<FuelForm>({ resolver: zodResolver(fuelSchema) })
+  const { register, handleSubmit, formState: { errors }, reset, watch, control } = useForm<FuelForm>({ resolver: zodResolver(fuelSchema) })
 
   const liters = watch('liters')
   const costPerLiter = watch('costPerLiter')
@@ -168,8 +177,36 @@ export function FuelLogsTab() {
       >
         <form id="log-fuel-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={vehicles.filter((v) => v.fuelType !== 'electric').map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
-            <Select label="Driver" {...register('driverId')} error={errors.driverId?.message} placeholder="Optional" options={drivers.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name }))} />
+            <Controller
+              name="vehicleId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Vehicle *"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.vehicleId?.message}
+                  placeholder="Select vehicle"
+                  searchPlaceholder="Search by plate or model…"
+                  options={vehicles.filter((v) => v.fuelType !== 'electric').map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+                />
+              )}
+            />
+            <Controller
+              name="driverId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Driver"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.driverId?.message}
+                  placeholder="Optional"
+                  searchPlaceholder="Search drivers…"
+                  options={drivers.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name }))}
+                />
+              )}
+            />
           </div>
           <Input label="Date *" type="date" {...register('date')} error={errors.date?.message} />
           <div className="grid grid-cols-3 gap-3">

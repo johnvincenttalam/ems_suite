@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
@@ -8,10 +8,11 @@ import { preventiveSchedulesApi } from '@/features/preventive-maintenance/api/pr
 import type { PreventiveSchedule } from '@/features/preventive-maintenance/types'
 import { useAssets } from '@/features/assets'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, hasModuleAccess } from '@/features/auth'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 
@@ -140,7 +141,8 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
   const onSubmit = (data: ScheduleForm) => saveMutation.mutate(data)
 
   const activeAssets = assets.filter((a) => a.status !== 'disposed')
-  const activeUsers = users.filter((u) => u.status === 'active')
+  // Default technician picker is restricted to users with Maintenance access.
+  const technicians = users.filter((u) => u.status === 'active' && hasModuleAccess(u, 'maintenance'))
 
   const subjectOptions = activeAssets.map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` }))
 
@@ -168,13 +170,21 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
           error={errors.title?.message}
           placeholder="e.g. Engine oil & filter service"
         />
-        <Select
-          label="Asset *"
-          {...register('assetId')}
-          error={errors.assetId?.message}
-          placeholder="Select asset"
-          disabled={isEditing}
-          options={subjectOptions}
+        <Controller
+          name="assetId"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Asset *"
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.assetId?.message}
+              placeholder="Select asset"
+              searchPlaceholder="Search by name or serial…"
+              disabled={isEditing}
+              options={subjectOptions}
+            />
+          )}
         />
         <div className="grid grid-cols-3 gap-3">
           <Input
@@ -227,12 +237,20 @@ export function ScheduleFormModal({ open, onClose, schedule, onSaved }: Schedule
               { value: 'critical', label: 'Critical' },
             ]}
           />
-          <Select
-            label="Default Technician *"
-            {...register('defaultAssigneeId')}
-            error={errors.defaultAssigneeId?.message}
-            placeholder="Select technician"
-            options={activeUsers.map((u) => ({ value: u.id, label: u.name }))}
+          <Controller
+            name="defaultAssigneeId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Default Technician *"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.defaultAssigneeId?.message}
+                placeholder="Select technician"
+                searchPlaceholder="Search technicians…"
+                options={technicians.map((u) => ({ value: u.id, label: u.name }))}
+              />
+            )}
           />
         </div>
         <Textarea label="Notes" {...register('notes')} rows={2} />

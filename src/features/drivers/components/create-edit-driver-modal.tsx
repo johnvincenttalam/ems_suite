@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import type { Driver } from '@/features/drivers/types'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Textarea } from '@/shared/ui/textarea'
 import { Modal } from '@/shared/ui/modal'
 import { Avatar } from '@/shared/ui/avatar'
@@ -227,11 +228,19 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
         <fieldset className="space-y-3">
           <legend className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold mb-1">Assignment</legend>
           <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Department"
-              placeholder="Select department"
-              {...register('departmentId')}
-              options={departmentOptions}
+            <Controller
+              name="departmentId"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Department"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  placeholder="Select department"
+                  searchPlaceholder="Search departments…"
+                  options={departmentOptions}
+                />
+              )}
             />
             <Select
               label="Status *"
@@ -243,10 +252,19 @@ export function CreateEditDriverModal({ open, onClose, driver, onSaved }: Create
               error={errors.status?.message}
             />
           </div>
-          <Select
-            label="System Login (optional)"
-            {...register('userId')}
-            options={userOptions}
+          <Controller
+            name="userId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="System Login (optional)"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                placeholder="No system login"
+                searchPlaceholder="Search users…"
+                options={userOptions}
+              />
+            )}
           />
           <p className="text-[11px] text-zinc-400 -mt-1">
             Link to a User account if this driver also signs in to manage trips, fuel, or maintenance.

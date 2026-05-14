@@ -3,7 +3,7 @@ import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowMo
 import { Route, Plus, MapPin, Loader2, ClipboardList, AlertCircle, CheckSquare, Ban } from 'lucide-react'
 import { ChecklistPanel } from '@/shared/checklists'
 import { format, formatDistanceStrict, parseISO } from 'date-fns'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -18,7 +18,7 @@ import { ExportMenu } from '@/shared/ui/export-menu'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
@@ -155,7 +155,7 @@ export function TripsTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<TripForm>({ resolver: zodResolver(tripSchema) })
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<TripForm>({ resolver: zodResolver(tripSchema) })
 
   const endTripForm = useForm<EndTripForm>({ resolver: zodResolver(endTripSchema) })
 
@@ -325,8 +325,36 @@ export function TripsTab() {
         }
       >
         <form id="start-trip-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Select label="Vehicle *" {...register('vehicleId')} error={errors.vehicleId?.message} placeholder="Select vehicle" options={activeVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))} />
-          <Select label="Driver *" {...register('driverId')} error={errors.driverId?.message} placeholder="Select driver" options={drivers.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name }))} />
+          <Controller
+            name="vehicleId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Vehicle *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.vehicleId?.message}
+                placeholder="Select vehicle"
+                searchPlaceholder="Search by plate or model…"
+                options={activeVehicles.map((v) => ({ value: v.id, label: `${v.plateNumber} — ${v.model}` }))}
+              />
+            )}
+          />
+          <Controller
+            name="driverId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="Driver *"
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                error={errors.driverId?.message}
+                placeholder="Select driver"
+                searchPlaceholder="Search drivers…"
+                options={drivers.filter((d) => d.status === 'active').map((d) => ({ value: d.id, label: d.name }))}
+              />
+            )}
+          />
           <Input label="Starting Odometer *" type="number" {...register('startOdometer', { valueAsNumber: true })} error={errors.startOdometer?.message} helperText="km" />
           <Textarea label="Purpose" {...register('purpose')} rows={2} placeholder="e.g. Site Alpha — supply run" />
         </form>

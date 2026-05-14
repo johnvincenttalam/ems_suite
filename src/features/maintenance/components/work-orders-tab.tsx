@@ -4,7 +4,7 @@ import { Wrench, Plus, Play, CheckCircle2, ClipboardList, XCircle, AlertCircle, 
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui/action-menu'
 import { ChecklistPanel } from '@/shared/checklists'
 import { useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -14,7 +14,7 @@ import { useWorkOrders, maintenanceApi } from '@/features/maintenance'
 import { useAssets } from '@/features/assets'
 import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import { useUsers } from '@/features/users'
-import { useAuthStore } from '@/features/auth'
+import { useAuthStore, hasModuleAccess } from '@/features/auth'
 import { issuesApi } from '@/features/issues'
 import type { InspectionResult, WorkOrder, WorkOrderPart, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance/types'
 import { CompleteWorkOrderModal } from './complete-work-order-modal'
@@ -25,6 +25,7 @@ import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select } from '@/shared/ui/select'
+import { SearchableSelect } from '@/shared/ui/searchable-select'
 import { Modal } from '@/shared/ui/modal'
 import { Textarea } from '@/shared/ui/textarea'
 import { StatusBadge } from '@/shared/ui/status-badge'
@@ -373,7 +374,7 @@ export function WorkOrdersTab() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<WorkOrderForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<WorkOrderForm>({
     resolver: zodResolver(workOrderSchema),
     defaultValues: { type: 'preventive', priority: 'medium' },
   })
@@ -383,7 +384,9 @@ export function WorkOrdersTab() {
   if (isLoading) return <TableSkeleton columns={8} rows={6} />
 
   const activeAssets = assets.filter((a) => a.status !== 'disposed')
-  const activeUsers = users.filter((u) => u.status === 'active')
+  // Technician picker is restricted to users with Maintenance access — anyone
+  // else couldn't actually work the WO since the module isn't in their nav.
+  const technicians = users.filter((u) => u.status === 'active' && hasModuleAccess(u, 'maintenance'))
 
   const subjectOptions = [
     ...vehicles
@@ -487,8 +490,36 @@ export function WorkOrdersTab() {
           <Input label="Title *" {...register('title')} error={errors.title?.message} placeholder="e.g. Engine oil & filter service" />
           <Textarea label="Description" {...register('description')} rows={2} />
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Asset / Vehicle *" {...register('subjectRef')} error={errors.subjectRef?.message} placeholder="Select asset or vehicle" options={subjectOptions} />
-            <Select label="Technician *" {...register('assignedTo')} error={errors.assignedTo?.message} placeholder="Select technician" options={activeUsers.map((u) => ({ value: u.id, label: u.name }))} />
+            <Controller
+              name="subjectRef"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Asset / Vehicle *"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.subjectRef?.message}
+                  placeholder="Select asset or vehicle"
+                  searchPlaceholder="Search by name, plate, or serial…"
+                  options={subjectOptions}
+                />
+              )}
+            />
+            <Controller
+              name="assignedTo"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  label="Technician *"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.assignedTo?.message}
+                  placeholder="Select technician"
+                  searchPlaceholder="Search technicians…"
+                  options={technicians.map((u) => ({ value: u.id, label: u.name }))}
+                />
+              )}
+            />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Select label="Type *" {...register('type')} error={errors.type?.message} options={[
