@@ -1,5 +1,10 @@
 import type { TrackingTag, TrackingLog } from '@/features/tracking/types'
 
+// Helper for "recent" mock timestamps — keeps the Live Map demo realistic
+// regardless of when the app is loaded. Absolute dates stay where the value is
+// historical (older history pings).
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+
 export const mockTrackingTags: TrackingTag[] = [
   // GPS units on vehicles
   { id: 'TAG-G001', code: 'GPS-VEH-V001', type: 'gps',  boundEntityType: 'vehicle', boundEntityId: 'V001', status: 'active', lastSeenAt: '2026-04-27T08:42:00Z', createdAt: '2025-01-10' },
@@ -22,13 +27,13 @@ export const mockTrackingTags: TrackingTag[] = [
 
 export const mockTrackingLogs: TrackingLog[] = [
   // Vehicle GPS — Toyota Hilux V001: BGC HQ → Clark Freeport supply run via NLEX
-  { id: 'TL-001', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 14.5547, longitude: 121.0509, locationName: 'BGC, Taguig',                  source: 'gps', timestamp: '2026-04-27T07:30:00Z' },
-  { id: 'TL-002', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 14.8136, longitude: 120.8794, locationName: 'NLEX — Marilao, Bulacan',      source: 'gps', timestamp: '2026-04-27T08:12:00Z' },
-  { id: 'TL-003', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 15.1684, longitude: 120.5868, locationName: 'Clark Freeport, Pampanga',     source: 'gps', timestamp: '2026-04-27T08:42:00Z' },
+  { id: 'TL-001', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 14.5547, longitude: 121.0509, locationName: 'BGC, Taguig',                  source: 'gps', timestamp: minutesAgo(90) },
+  { id: 'TL-002', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 14.8136, longitude: 120.8794, locationName: 'NLEX — Marilao, Bulacan',      source: 'gps', timestamp: minutesAgo(45) },
+  { id: 'TL-003', tagId: 'TAG-G001', entityType: 'vehicle', entityId: 'V001', latitude: 15.1684, longitude: 120.5868, locationName: 'Clark Freeport, Pampanga',     source: 'gps', timestamp: minutesAgo(3) },
 
   // Vehicle GPS — Hyundai Staria V003: Makati ↔ Ortigas shuttle
-  { id: 'TL-004', tagId: 'TAG-G002', entityType: 'vehicle', entityId: 'V003', latitude: 14.5547, longitude: 121.0244, locationName: 'Ayala Triangle, Makati',       source: 'gps', timestamp: '2026-04-27T08:14:00Z' },
-  { id: 'TL-005', tagId: 'TAG-G002', entityType: 'vehicle', entityId: 'V003', latitude: 14.5879, longitude: 121.0654, locationName: 'Ortigas Center, Pasig',        source: 'gps', timestamp: '2026-04-27T08:38:00Z' },
+  { id: 'TL-004', tagId: 'TAG-G002', entityType: 'vehicle', entityId: 'V003', latitude: 14.5547, longitude: 121.0244, locationName: 'Ayala Triangle, Makati',       source: 'gps', timestamp: minutesAgo(50) },
+  { id: 'TL-005', tagId: 'TAG-G002', entityType: 'vehicle', entityId: 'V003', latitude: 14.5879, longitude: 121.0654, locationName: 'Ortigas Center, Pasig',        source: 'gps', timestamp: minutesAgo(22) },
 
   // Vehicle GPS — Tesla V004: investor site visit
   { id: 'TL-006', tagId: 'TAG-G003', entityType: 'vehicle', entityId: 'V004', latitude: 14.6510, longitude: 121.0489, locationName: 'Quezon City Memorial Circle',  source: 'gps', timestamp: '2026-04-27T07:55:00Z' },

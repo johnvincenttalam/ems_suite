@@ -380,4 +380,20 @@
   .dark .logo-invert {
     filter: invert(1) hue-rotate(180deg);
   }
+
+  /* Leaflet popups default to a white wrapper + light tip; in dark mode they
+     blend with the dark UI text that bleeds through our overrides. Force a
+     dark popup chrome so text inside stays legible. */
+  .dark .leaflet-popup-content-wrapper,
+  .dark .leaflet-popup-tip {
+    background-color: #18181b !important;
+    color: #e4e4e7 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+  }
+  .dark .leaflet-popup-close-button {
+    color: #a1a1aa !important;
+  }
+  .dark .leaflet-popup-close-button:hover {
+    color: #fafafa !important;
+  }
 }
