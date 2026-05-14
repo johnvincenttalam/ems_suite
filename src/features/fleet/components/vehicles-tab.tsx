@@ -18,6 +18,7 @@ import { DataTable } from '@/shared/ui/data-table'
 import { VehicleFormModal } from '@/features/fleet/components/vehicle-form-modal'
 import { VehicleDetailDrawer } from '@/features/fleet/components/vehicle-detail-drawer'
 import { VehicleThumbnail } from '@/features/fleet/components/vehicle-thumbnail'
+import { Avatar } from '@/shared/ui/avatar'
 
 const statusFilters: { value: VehicleStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -99,8 +100,16 @@ export function VehiclesTab() {
     }},
     { accessorKey: 'currentOdometer', header: 'Odometer', cell: ({ getValue }) => <span className="tabular-nums text-zinc-700">{(getValue() as number).toLocaleString()} km</span> },
     { accessorKey: 'assignedDriverId', header: 'Driver', cell: ({ getValue }) => {
-      const v = getValue() as string | undefined
-      return v ? (driverMap[v]?.name ?? '—') : <span className="text-zinc-400">Unassigned</span>
+      const id = getValue() as string | undefined
+      if (!id) return <span className="text-zinc-400">Unassigned</span>
+      const driver = driverMap[id]
+      if (!driver) return <span className="text-zinc-400">—</span>
+      return (
+        <div className="flex items-center gap-2">
+          <Avatar name={driver.name} imageUrl={driver.photoUrl} size="sm" />
+          <span className="text-[13px] text-zinc-700 truncate">{driver.name}</span>
+        </div>
+      )
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
     { accessorKey: 'createdAt', header: 'Registered', cell: ({ getValue }) => format(parseISO(getValue() as string), 'MMM yyyy') },

@@ -46,6 +46,7 @@ import { QualityStrip } from '@/shared/qms'
 import { StatCard } from '@/shared/ui/stat-card'
 import { DashboardGreeting } from '@/shared/ui/dashboard-greeting'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card'
+import { Avatar } from '@/shared/ui/avatar'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 import { formatCompactCurrency, formatCurrency } from '@/shared/utils/format'
 import type { Vehicle, VehicleStatus, FuelType } from '@/features/fleet'
@@ -573,9 +574,17 @@ export function FleetDashboard() {
                               {badgeLabel}
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">
-                            {driver?.name ?? t.driverId} · {t.distance.toLocaleString()} km
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {driver ? (
+                              <>
+                                <Avatar name={driver.name} imageUrl={driver.photoUrl} size="sm" className="w-4 h-4 text-[8px]" />
+                                <span className="text-[11px] text-zinc-400">{driver.name}</span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-zinc-400">{t.driverId}</span>
+                            )}
+                            <span className="text-[11px] text-zinc-400">· {t.distance.toLocaleString()} km</span>
+                          </div>
                         </div>
                         <span className="text-[11px] text-zinc-400 whitespace-nowrap">
                           {formatDistanceToNow(parseISO(t.startTime), { addSuffix: true })}
