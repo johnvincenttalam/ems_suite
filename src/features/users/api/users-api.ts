@@ -1,8 +1,22 @@
 import type { ModuleRole, User } from '@/features/users/types'
 import type { ModuleKey } from '@/config/modules'
 import { mockUsers } from '@/features/users/data/mock-users'
+import { isModuleAdmin } from '@/features/auth/lib/access'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 // import { http } from '@/shared/lib/http'
+
+function findActor(actorId: string): User {
+  const actor = mockUsers.find((u) => u.id === actorId)
+  if (!actor) throw new Error(`Caller ${actorId} not found`)
+  return actor
+}
+
+function assertAdminOfModule(actorId: string, moduleKey: ModuleKey): void {
+  const actor = findActor(actorId)
+  if (!isModuleAdmin(actor, moduleKey)) {
+    throw new Error(`You must be an admin of ${moduleKey} to perform this action`)
+  }
+}
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? Math.random() * 500 + 300))
@@ -96,6 +110,23 @@ export const usersApi = {
       }
     }
     const { updatedBy, ...patch } = input
+    // Privilege-escalation gate: any change to moduleRoles requires the caller
+    // to be admin of every module whose role is actually changing. The UI sends
+    // the full map (modules the caller can't admin are unchanged passthroughs),
+    // so we diff and only enforce on real deltas.
+    if (patch.moduleRoles) {
+      const existing = mockUsers[idx].moduleRoles ?? {}
+      const next = patch.moduleRoles
+      const allModuleKeys = new Set<ModuleKey>([
+        ...(Object.keys(existing) as ModuleKey[]),
+        ...(Object.keys(next) as ModuleKey[]),
+      ])
+      for (const moduleKey of allModuleKeys) {
+        if ((existing[moduleKey] ?? null) !== (next[moduleKey] ?? null)) {
+          assertAdminOfModule(updatedBy, moduleKey)
+        }
+      }
+    }
     const updated: User = {
       ...mockUsers[idx],
       ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)),
@@ -114,7 +145,7 @@ export const usersApi = {
     const idx = mockUsers.findIndex((u) => u.id === id)
     if (idx === -1) throw new Error(`User ${id} not found`)
     const removed = mockUsers[idx]
-    if (removed.name === deletedBy) throw new Error('You cannot delete your own account')
+    if (removed.id === deletedBy) throw new Error('You cannot delete your own account')
     mockUsers.splice(idx, 1)
     recordAudit({
       userId: deletedBy,
@@ -140,6 +171,7 @@ export const usersApi = {
     invitedBy: string
   }): Promise<{ user: User; created: boolean }> => {
     await delay(120)
+    assertAdminOfModule(input.invitedBy, input.moduleKey)
     const role: ModuleRole = input.role ?? 'member'
     const existing = mockUsers.find((u) => u.email.toLowerCase() === input.email.toLowerCase())
     if (existing) {
@@ -189,6 +221,7 @@ export const usersApi = {
     byId: string
   }): Promise<User> => {
     await delay(120)
+    assertAdminOfModule(input.byId, input.moduleKey)
     const idx = mockUsers.findIndex((u) => u.id === input.userId)
     if (idx === -1) throw new Error(`User ${input.userId} not found`)
     const u = mockUsers[idx]
