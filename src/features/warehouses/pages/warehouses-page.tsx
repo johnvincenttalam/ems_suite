@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type ColumnDef } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Warehouse as WarehouseIcon, Building, MapPin, Download, Plus, Trash2, Eye, Pencil } from 'lucide-react'
+import { Warehouse as WarehouseIcon, Building, MapPin, Download, Plus, Trash2, Pencil } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -119,7 +119,6 @@ export function WarehousesPage() {
       header: '',
       cell: ({ row }) => {
         const items: ActionMenuItem[] = [
-          { key: 'view', label: 'View', icon: Eye, onClick: () => toast.info('View details coming soon') },
           { key: 'edit', label: 'Edit', icon: Pencil, onClick: () => openEdit(row.original) },
           { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onClick: () => setDeleteCandidate(row.original) },
         ]

@@ -1,8 +1,6 @@
-import { Award, FileSpreadsheet, Plus } from 'lucide-react'
+import { Award, FileSpreadsheet } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { toast } from 'sonner'
 import { useQmsTemplates, useQmsReports } from '@/features/qms'
-import { Button } from '@/shared/ui/button'
 import { EmptyState } from '@/shared/ui/empty-state'
 import { TableSkeleton } from '@/shared/ui/table-skeleton'
 
@@ -16,10 +14,7 @@ export function TemplatesTab() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-[13px] text-zinc-500">Reusable report definitions. New reports inherit the template's sections and KPI targets.</p>
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => toast.info('Template editor coming soon')}>New Template</Button>
-      </div>
+      <p className="mb-4 text-[13px] text-zinc-500">Reusable report definitions. New reports inherit the template's sections and KPI targets.</p>
 
       {templates.length === 0 ? (
         <div className="bg-white rounded-xl border border-zinc-200/60">
