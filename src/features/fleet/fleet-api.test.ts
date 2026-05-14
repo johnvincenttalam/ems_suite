@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fleetApi, FleetValidationError } from './api/fleet-api'
 import { mockDrivers } from '@/features/drivers'
-import { mockAssets } from '@/features/assets'
 import { mockVehicles, mockTrips, mockFuelLogs } from './data/mock-fleet'
 import { mockAuditLog } from '@/features/audit-log/data/mock-audit'
 
@@ -21,12 +20,6 @@ describe('fleetApi.listVehicles', () => {
     const result = await fleetApi.listVehicles()
     const driverIds = new Set(mockDrivers.map((d) => d.id))
     expect(result.every((v) => !v.assignedDriverId || driverIds.has(v.assignedDriverId))).toBe(true)
-  })
-
-  it('every linkedAssetId, when present, references a known asset', async () => {
-    const result = await fleetApi.listVehicles()
-    const assetIds = new Set(mockAssets.map((a) => a.id))
-    expect(result.every((v) => !v.linkedAssetId || assetIds.has(v.linkedAssetId))).toBe(true)
   })
 
   it('electric vehicles have fuelCapacityLiters of 0', async () => {
@@ -249,16 +242,13 @@ describe('fleetApi.updateVehicle', () => {
       fuelType: 'diesel',
       currentOdometer: 0,
       assignedDriverId: 'DRV-002',
-      linkedAssetId: 'AST-001',
       createdBy: 'U001',
     })
     const updated = await fleetApi.updateVehicle(vehicle.id, {
       assignedDriverId: null,
-      linkedAssetId: null,
       updatedBy: 'U001',
     })
     expect(updated.assignedDriverId).toBeUndefined()
-    expect(updated.linkedAssetId).toBeUndefined()
     cleanup()
   })
 

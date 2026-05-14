@@ -53,11 +53,7 @@ export function InspectionsTab() {
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
-  const vehicleByAssetId = useMemo(() => {
-    const map: Record<string, typeof vehicles[number]> = {}
-    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
-    return map
-  }, [vehicles])
+  const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
 
   const [globalFilter, setGlobalFilter] = useState('')
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
@@ -105,27 +101,27 @@ export function InspectionsTab() {
         ),
       },
       {
-        accessorKey: 'assetId',
+        id: 'subject',
         header: 'Asset / Vehicle',
-        cell: ({ getValue }) => {
-          const id = getValue() as string
-          const vehicle = vehicleByAssetId[id]
-          if (vehicle) {
-            return (
+        cell: ({ row }) => {
+          const wo = row.original
+          if (wo.vehicleId) {
+            const v = vehicleMap[wo.vehicleId]
+            return v ? (
               <div>
-                <p className="text-[13px] text-zinc-700 font-mono">{vehicle.plateNumber}</p>
-                <p className="text-[11px] text-zinc-400">{vehicle.model}</p>
+                <p className="text-[13px] text-zinc-700 font-mono">{v.plateNumber}</p>
+                <p className="text-[11px] text-zinc-400">{v.model}</p>
               </div>
-            )
+            ) : <span className="text-zinc-400">{wo.vehicleId}</span>
           }
-          const asset = assetMap[id]
-          return asset ? (
+          const a = wo.assetId ? assetMap[wo.assetId] : undefined
+          return a ? (
             <div>
-              <p className="text-[13px] text-zinc-700">{asset.name}</p>
-              <p className="text-[11px] font-mono text-zinc-400">{asset.serialNumber}</p>
+              <p className="text-[13px] text-zinc-700">{a.name}</p>
+              <p className="text-[11px] font-mono text-zinc-400">{a.serialNumber}</p>
             </div>
           ) : (
-            <span className="text-zinc-400">{id}</span>
+            <span className="text-zinc-400">{wo.assetId ?? '—'}</span>
           )
         },
       },
@@ -184,7 +180,7 @@ export function InspectionsTab() {
         },
       },
     ],
-    [assetMap, userMap, vehicleByAssetId],
+    [assetMap, userMap, vehicleMap],
   )
 
   const table = useReactTable({
@@ -216,7 +212,9 @@ export function InspectionsTab() {
           rows={inspections.map((w) => ({
             id: w.id,
             title: w.title,
-            asset: assetMap[w.assetId]?.name ?? w.assetId,
+            asset: w.vehicleId
+              ? (vehicleMap[w.vehicleId] ? `${vehicleMap[w.vehicleId].plateNumber} · ${vehicleMap[w.vehicleId].model}` : w.vehicleId)
+              : (w.assetId ? (assetMap[w.assetId]?.name ?? w.assetId) : '—'),
             inspector: userMap[w.assignedTo]?.name ?? w.assignedTo,
             status: w.status,
             result: w.inspectionResult ?? '',

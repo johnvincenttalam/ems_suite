@@ -3,6 +3,7 @@ import { mockWorkOrders } from '@/features/maintenance/data/mock-maintenance'
 import { recordAudit } from '@/features/audit-log/lib/audit-emitter'
 import { mockUsers } from '@/features/users/data/mock-users'
 import { mockAssets } from '@/features/assets/data/mock-assets'
+import { mockVehicles } from '@/features/fleet/data/mock-fleet'
 import { assetsApi } from '@/features/assets/api/assets-api'
 import { inventoryApi } from '@/features/inventory/api/inventory-api'
 import { mockInventoryItems } from '@/features/inventory/data/mock-inventory'
@@ -34,21 +35,28 @@ function userName(userId: string): string {
   return mockUsers.find((u) => u.id === userId)?.name ?? userId
 }
 
-/** Resolve an asset ID to a "Name (CODE)" string for audit-log narration. */
-function assetLabel(assetId: string): string {
-  const a = mockAssets.find((x) => x.id === assetId)
-  return a ? `${a.name} (${a.assetCode})` : assetId
+/** Resolve a WO's target (asset or vehicle) to a label for audit-log narration. */
+function workOrderTargetLabel(wo: Pick<WorkOrder, 'assetId' | 'vehicleId'>): string {
+  if (wo.vehicleId) {
+    const v = mockVehicles.find((x) => x.id === wo.vehicleId)
+    return v ? `${v.model} (${v.plateNumber})` : wo.vehicleId
+  }
+  if (wo.assetId) {
+    const a = mockAssets.find((x) => x.id === wo.assetId)
+    return a ? `${a.name} (${a.assetCode})` : wo.assetId
+  }
+  return 'unknown target'
 }
 
-/** Returns true if the given asset has any other open (pending/ongoing) WOs
- * besides the one excluded by `excludeId`. Used by complete/cancel to decide
- * whether to flip the asset back to 'active'. */
-function hasOtherOpenWorkOrders(assetId: string, excludeId: string): boolean {
+/** Returns true if the same target (asset OR vehicle) has any other open
+ * (pending/ongoing) WOs besides the one excluded by `excludeId`. */
+function hasOtherOpenWorkOrders(wo: WorkOrder, excludeId: string): boolean {
   return mockWorkOrders.some(
-    (wo) =>
-      wo.assetId === assetId &&
-      wo.id !== excludeId &&
-      (wo.status === 'pending' || wo.status === 'ongoing'),
+    (other) =>
+      other.id !== excludeId &&
+      (other.status === 'pending' || other.status === 'ongoing') &&
+      ((wo.assetId && other.assetId === wo.assetId) ||
+        (wo.vehicleId && other.vehicleId === wo.vehicleId)),
   )
 }
 
@@ -78,7 +86,9 @@ function preflightPartsAvailability(parts: WorkOrderPart[]): void {
 interface CreateWorkOrderInput {
   title: string
   description?: string
-  assetId: string
+  /** Exactly one of `assetId` or `vehicleId` must be set. */
+  assetId?: string
+  vehicleId?: string
   assignedTo: string
   type?: WorkOrderType
   priority: WorkOrderPriority
@@ -107,10 +117,17 @@ export const maintenanceApi = {
 
   create: async (input: CreateWorkOrderInput): Promise<WorkOrder> => {
     await delay(150)
+    if (!input.assetId && !input.vehicleId) {
+      throw new Error('Work order must target either an asset or a vehicle')
+    }
+    if (input.assetId && input.vehicleId) {
+      throw new Error('Work order cannot target both an asset and a vehicle')
+    }
     const now = new Date().toISOString()
     const workOrder: WorkOrder = {
       id: nextWorkOrderId(),
       assetId: input.assetId,
+      vehicleId: input.vehicleId,
       title: input.title,
       description: input.description,
       type: input.type ?? (input.sourceIssueId ? 'corrective' : 'preventive'),
@@ -129,7 +146,7 @@ export const maintenanceApi = {
       userId: userName(input.createdBy),
       action: 'create',
       module: 'Maintenance',
-      detail: `Created ${workOrder.id} — ${workOrder.title} on ${assetLabel(workOrder.assetId)}`,
+      detail: `Created ${workOrder.id} — ${workOrder.title} on ${workOrderTargetLabel(workOrder)}`,
     })
     return workOrder
   },
@@ -142,8 +159,11 @@ export const maintenanceApi = {
 
     const actor = userName(byUserId)
     // Cross-module: flip asset to maintenance status BEFORE we mutate the WO,
-    // so a thrown asset error (e.g. disposed) leaves the WO untouched.
-    assetsApi.markMaintenanceStarted(wo.assetId, actor)
+    // so a thrown asset error (e.g. disposed) leaves the WO untouched. Vehicle-
+    // targeted WOs skip this — vehicle status is managed by Fleet directly.
+    if (wo.assetId) {
+      assetsApi.markMaintenanceStarted(wo.assetId, actor)
+    }
 
     wo.status = 'ongoing'
 
@@ -228,7 +248,7 @@ export const maintenanceApi = {
       }
     }
 
-    if (!hasOtherOpenWorkOrders(wo.assetId, wo.id)) {
+    if (wo.assetId && !hasOtherOpenWorkOrders(wo, wo.id)) {
       try {
         assetsApi.markMaintenanceEnded(wo.assetId, actor)
       } catch {
@@ -264,7 +284,7 @@ export const maintenanceApi = {
     wo.cancelledBy = actor
     wo.cancelledReason = reason
 
-    if (wasOngoing && !hasOtherOpenWorkOrders(wo.assetId, wo.id)) {
+    if (wasOngoing && wo.assetId && !hasOtherOpenWorkOrders(wo, wo.id)) {
       try {
         assetsApi.markMaintenanceEnded(wo.assetId, actor)
       } catch {

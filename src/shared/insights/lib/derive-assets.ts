@@ -28,6 +28,7 @@ export function deriveAssetInsights(
   const costByAsset = new Map<string, number>()
   for (const w of workOrders) {
     if (w.status !== 'completed') continue
+    if (!w.assetId) continue
     const cost = workOrderTotalCost(w)
     if (cost === 0) continue
     costByAsset.set(w.assetId, (costByAsset.get(w.assetId) ?? 0) + cost)

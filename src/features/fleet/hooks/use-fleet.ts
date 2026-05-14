@@ -38,7 +38,6 @@ export function useCreateVehicle() {
       currentOdometer: number
       fuelCapacityLiters?: number
       assignedDriverId?: string
-      linkedAssetId?: string
       checklistId?: string
       nextServiceDate?: string
       photoUrl?: string
@@ -62,7 +61,6 @@ export function useUpdateVehicle() {
         currentOdometer?: number
         fuelCapacityLiters?: number
         assignedDriverId?: string | null
-        linkedAssetId?: string | null
         checklistId?: string | null
         nextServiceDate?: string | null
         photoUrl?: string | null

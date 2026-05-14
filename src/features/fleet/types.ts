@@ -12,7 +12,6 @@ export interface Vehicle {
   currentOdometer: number
   fuelCapacityLiters?: number
   assignedDriverId?: string
-  linkedAssetId?: string
   /** Optional checklist template — used for pre-trip inspection. */
   checklistId?: string
   /** Next scheduled service date (ISO yyyy-mm-dd). Used by the dashboard's
@@ -22,6 +21,13 @@ export interface Vehicle {
    *  upload (≤ 2 MB). The VehicleThumbnail component falls back to a Car
    *  icon if missing or unreachable. */
   photoUrl?: string
+  vendor?: string
+  purchaseDate?: string
+  purchaseCost?: number
+  warrantyExpiry?: string
+  usefulLifeMonths?: number
+  salvageValue?: number
+  description?: string
   createdAt: string
 }
 

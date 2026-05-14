@@ -223,19 +223,8 @@ export const issuesApi = {
   },
 
   /**
-   * Escalate an issue into a maintenance work order.
-   *
-   * Resolves the asset to attach the WO to:
-   *   - asset target  → `target.id`
-   *   - vehicle target → vehicle.linkedAssetId (throws if absent)
-   *
-   * Side-effects (atomic from the caller's view; errors roll back nothing
-   * because the only persistent step is the WO create — failures earlier
-   * throw before that):
-   *   1. validate issue + resolve asset
-   *   2. maintenanceApi.create with severity → priority mapping
-   *   3. stamp Issue.workOrderId, transition to 'in_progress' if open/monitor
-   *   4. emit one audit entry under "Issues"
+   * Escalate an issue into a maintenance work order. Asset targets create an
+   * asset-WO; vehicle targets create a vehicle-WO.
    */
   createWorkOrder: async (params: {
     issueId: string
@@ -254,11 +243,11 @@ export const issuesApi = {
     if (!params.scheduledDate) throw new IssueValidationError('Scheduled date is required')
     if (!params.assigneeUserId) throw new IssueValidationError('Technician assignment is required')
 
-    const assetId = resolveAssetId(issue.target)
-    if (!assetId) {
-      throw new IssueValidationError(
-        'This vehicle is not linked to an asset — link it first to escalate to maintenance.',
-      )
+    if (issue.target.kind === 'vehicle') {
+      const vehicle = mockVehicles.find((v) => v.id === issue.target.id)
+      if (!vehicle) {
+        throw new IssueValidationError(`Vehicle ${issue.target.id} not found`)
+      }
     }
 
     const wo = await maintenanceApi.create({
@@ -266,7 +255,8 @@ export const issuesApi = {
       description: issue.description
         ? `${issue.description}\n\nEscalated from issue ${issue.id}.`
         : `Escalated from issue ${issue.id}.`,
-      assetId,
+      assetId: issue.target.kind === 'asset' ? issue.target.id : undefined,
+      vehicleId: issue.target.kind === 'vehicle' ? issue.target.id : undefined,
       assignedTo: params.assigneeUserId,
       priority: severityToWorkOrderPriority(issue.severity),
       scheduledDate: params.scheduledDate,
@@ -285,20 +275,9 @@ export const issuesApi = {
       userId: params.actorUserId,
       action: 'create',
       module: 'Issues',
-      detail: `Escalated ${issue.id} to work order ${wo.id} on asset ${assetId}`,
+      detail: `Escalated ${issue.id} to work order ${wo.id} on ${issue.target.kind} ${issue.target.id}`,
     })
 
     return { issue, workOrder: wo }
   },
-}
-
-/**
- * Resolve the maintenance-target asset for an issue. Asset targets pass
- * through directly; vehicle targets dereference `linkedAssetId`. Returns
- * null when a vehicle lacks the link — callers turn that into a UX error.
- */
-function resolveAssetId(target: IssueTarget): string | null {
-  if (target.kind === 'asset') return target.id
-  const vehicle = mockVehicles.find((v) => v.id === target.id)
-  return vehicle?.linkedAssetId ?? null
 }

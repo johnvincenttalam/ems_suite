@@ -37,7 +37,8 @@ import { cn } from '@/shared/utils/cn'
 const workOrderSchema = z.object({
   title: z.string().min(2, 'Title is required'),
   description: z.string().optional(),
-  assetId: z.string().min(1, 'Asset is required'),
+  /** Encoded as "asset:<id>" or "vehicle:<id>" so a single picker can pick either. */
+  subjectRef: z.string().min(1, 'Asset or vehicle is required'),
   assignedTo: z.string().min(1, 'Technician is required'),
   type: z.enum(['preventive', 'corrective', 'inspection']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
@@ -89,14 +90,7 @@ export function WorkOrdersTab() {
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
-  // Reverse-lookup: WO.assetId → vehicle when that asset is a linked-vehicle's
-  // backing record. Lets the table show "SGX 5482 K · Toyota Hilux" instead of
-  // the underlying asset name for fleet WOs.
-  const vehicleByAssetId = useMemo(() => {
-    const map: Record<string, typeof vehicles[number]> = {}
-    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
-    return map
-  }, [vehicles])
+  const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
 
   const [searchParams] = useSearchParams()
   const [globalFilter, setGlobalFilter] = useState(searchParams.get('wo') ?? '')
@@ -242,10 +236,12 @@ export function WorkOrdersTab() {
   const createMutation = useMutation({
     mutationFn: (data: WorkOrderForm) => {
       if (!currentUser) throw new Error('Not signed in')
+      const [kind, id] = data.subjectRef.split(':')
       return maintenanceApi.create({
         title: data.title,
         description: data.description,
-        assetId: data.assetId,
+        assetId: kind === 'asset' ? id : undefined,
+        vehicleId: kind === 'vehicle' ? id : undefined,
         assignedTo: data.assignedTo,
         type: data.type,
         priority: data.priority,
@@ -287,24 +283,24 @@ export function WorkOrdersTab() {
         {row.original.description && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{row.original.description}</p>}
       </div>
     )},
-    { accessorKey: 'assetId', header: 'Asset / Vehicle', cell: ({ getValue }) => {
-      const id = getValue() as string
-      const vehicle = vehicleByAssetId[id]
-      if (vehicle) {
-        return (
+    { id: 'subject', header: 'Asset / Vehicle', cell: ({ row }) => {
+      const wo = row.original
+      if (wo.vehicleId) {
+        const v = vehicleMap[wo.vehicleId]
+        return v ? (
           <div>
-            <p className="text-[13px] text-zinc-700 font-mono">{vehicle.plateNumber}</p>
-            <p className="text-[11px] text-zinc-400">{vehicle.model}</p>
+            <p className="text-[13px] text-zinc-700 font-mono">{v.plateNumber}</p>
+            <p className="text-[11px] text-zinc-400">{v.model}</p>
           </div>
-        )
+        ) : <span className="text-zinc-400">{wo.vehicleId}</span>
       }
-      const asset = assetMap[id]
-      return asset ? (
+      const a = wo.assetId ? assetMap[wo.assetId] : undefined
+      return a ? (
         <div>
-          <p className="text-[13px] text-zinc-700">{asset.name}</p>
-          <p className="text-[11px] font-mono text-zinc-400">{asset.serialNumber}</p>
+          <p className="text-[13px] text-zinc-700">{a.name}</p>
+          <p className="text-[11px] font-mono text-zinc-400">{a.serialNumber}</p>
         </div>
-      ) : <span className="text-zinc-400">{id}</span>
+      ) : <span className="text-zinc-400">{wo.assetId ?? '—'}</span>
     }},
     { accessorKey: 'priority', header: 'Priority', cell: ({ getValue }) => {
       const v = getValue() as WorkOrderPriority
@@ -370,7 +366,7 @@ export function WorkOrdersTab() {
         </div>
       )
     }},
-  ], [assetMap, userMap, vehicleByAssetId, startMutation])
+  ], [assetMap, userMap, vehicleMap, startMutation])
 
   const table = useReactTable({
     data: filtered, columns, state: { globalFilter }, onGlobalFilterChange: setGlobalFilter,
@@ -389,28 +385,14 @@ export function WorkOrdersTab() {
   const activeAssets = assets.filter((a) => a.status !== 'disposed')
   const activeUsers = users.filter((u) => u.status === 'active')
 
-  // Subject picker = assets + vehicles (resolved to their linked asset). A
-  // vehicle without a linkedAssetId is intentionally absent — surfacing one
-  // here would let users create a WO with no maintenance target. The asset
-  // backing a linked vehicle is hidden from the picker so the same target
-  // isn't selectable two ways.
-  const linkedAssetIds = new Set(
-    vehicles.map((v) => v.linkedAssetId).filter((id): id is string => !!id),
-  )
   const subjectOptions = [
     ...vehicles
-      .filter((v) => v.linkedAssetId && v.status !== 'retired')
-      .filter((v) => {
-        const a = assetMap[v.linkedAssetId as string]
-        return a && a.status !== 'disposed'
-      })
+      .filter((v) => v.status !== 'retired')
       .map((v) => ({
-        value: v.linkedAssetId as string,
+        value: `vehicle:${v.id}`,
         label: `🚛 ${v.plateNumber} · ${v.model}`,
       })),
-    ...activeAssets
-      .filter((a) => !linkedAssetIds.has(a.id))
-      .map((a) => ({ value: a.id, label: `${a.name} (${a.serialNumber})` })),
+    ...activeAssets.map((a) => ({ value: `asset:${a.id}`, label: `${a.name} (${a.serialNumber})` })),
   ]
 
   return (
@@ -474,7 +456,11 @@ export function WorkOrdersTab() {
             <p className="text-[12px] text-zinc-400 mb-4">
               {inspectionWO.title}
               {' · '}
-              {assetMap[inspectionWO.assetId]?.name ?? inspectionWO.assetId}
+              {inspectionWO.vehicleId
+                ? (vehicleMap[inspectionWO.vehicleId]
+                    ? `${vehicleMap[inspectionWO.vehicleId].plateNumber} · ${vehicleMap[inspectionWO.vehicleId].model}`
+                    : inspectionWO.vehicleId)
+                : (inspectionWO.assetId ? (assetMap[inspectionWO.assetId]?.name ?? inspectionWO.assetId) : '—')}
             </p>
             <ChecklistPanel
               templateId={inspectionWO.checklistId}
@@ -501,7 +487,7 @@ export function WorkOrdersTab() {
           <Input label="Title *" {...register('title')} error={errors.title?.message} placeholder="e.g. Engine oil & filter service" />
           <Textarea label="Description" {...register('description')} rows={2} />
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Asset / Vehicle *" {...register('assetId')} error={errors.assetId?.message} placeholder="Select asset or vehicle" options={subjectOptions} />
+            <Select label="Asset / Vehicle *" {...register('subjectRef')} error={errors.subjectRef?.message} placeholder="Select asset or vehicle" options={subjectOptions} />
             <Select label="Technician *" {...register('assignedTo')} error={errors.assignedTo?.message} placeholder="Select technician" options={activeUsers.map((u) => ({ value: u.id, label: u.name }))} />
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -526,9 +512,11 @@ export function WorkOrdersTab() {
         wo={completingWO}
         assetLabel={
           completingWO
-            ? (vehicleByAssetId[completingWO.assetId]
-                ? `${vehicleByAssetId[completingWO.assetId].plateNumber} · ${vehicleByAssetId[completingWO.assetId].model}`
-                : assetMap[completingWO.assetId]?.name ?? completingWO.assetId)
+            ? (completingWO.vehicleId
+                ? (vehicleMap[completingWO.vehicleId]
+                    ? `${vehicleMap[completingWO.vehicleId].plateNumber} · ${vehicleMap[completingWO.vehicleId].model}`
+                    : completingWO.vehicleId)
+                : (completingWO.assetId ? (assetMap[completingWO.assetId]?.name ?? completingWO.assetId) : '—'))
             : ''
         }
         loading={completeMutation.isPending}

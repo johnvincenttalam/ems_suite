@@ -309,7 +309,7 @@ describe('issuesApi.createWorkOrder', () => {
       title: 'Escalation test (asset)',
       severity: 'major',
       source: 'manual',
-      target: { kind: 'asset', id: 'AST-008' },
+      target: { kind: 'asset', id: 'AST-010' },
       reportedByUserId: ACTOR,
     })
     const auditBefore = mockAuditLog.length
@@ -321,7 +321,7 @@ describe('issuesApi.createWorkOrder', () => {
       actorUserId: ACTOR,
     })
     expect(workOrder.id).toMatch(/^WO-\d{4}-\d{4}$/)
-    expect(workOrder.assetId).toBe('AST-008')
+    expect(workOrder.assetId).toBe('AST-010')
     expect(workOrder.sourceIssueId).toBe(issue.id)
     expect(workOrder.priority).toBe('high')
     expect(updated.workOrderId).toBe(workOrder.id)
@@ -330,12 +330,12 @@ describe('issuesApi.createWorkOrder', () => {
     dropIssuesCreatedDuringTest()
   })
 
-  it('escalates a vehicle-targeted issue via the vehicle.linkedAssetId', async () => {
+  it('escalates a vehicle-targeted issue to a vehicle-WO', async () => {
     const issue = await issuesApi.create({
       title: 'Escalation test (vehicle)',
       severity: 'critical',
       source: 'manual',
-      target: { kind: 'vehicle', id: 'V001' }, // V001 → AST-008
+      target: { kind: 'vehicle', id: 'V001' },
       reportedByUserId: ACTOR,
     })
     const { workOrder, issue: updated } = await issuesApi.createWorkOrder({
@@ -344,18 +344,19 @@ describe('issuesApi.createWorkOrder', () => {
       assigneeUserId: 'U006',
       actorUserId: ACTOR,
     })
-    expect(workOrder.assetId).toBe('AST-008')
+    expect(workOrder.vehicleId).toBe('V001')
+    expect(workOrder.assetId).toBeUndefined()
     expect(workOrder.priority).toBe('critical')
     expect(updated.workOrderId).toBe(workOrder.id)
     dropIssuesCreatedDuringTest()
   })
 
-  it('refuses to escalate a vehicle that is not linked to an asset', async () => {
+  it('refuses to escalate a vehicle that does not exist', async () => {
     const issue = await issuesApi.create({
-      title: 'Unlinked vehicle escalation',
+      title: 'Missing vehicle escalation',
       severity: 'major',
       source: 'manual',
-      target: { kind: 'vehicle', id: 'V003' }, // V003 has no linkedAssetId in seed
+      target: { kind: 'vehicle', id: 'V999' },
       reportedByUserId: ACTOR,
     })
     await expect(
@@ -365,7 +366,7 @@ describe('issuesApi.createWorkOrder', () => {
         assigneeUserId: 'U006',
         actorUserId: ACTOR,
       }),
-    ).rejects.toThrow(/not linked to an asset/i)
+    ).rejects.toThrow(/not found/i)
     // The issue should NOT have been mutated.
     expect(issue.workOrderId).toBeUndefined()
     expect(issue.status).toBe('open')
@@ -377,7 +378,7 @@ describe('issuesApi.createWorkOrder', () => {
       title: 'Double escalation',
       severity: 'major',
       source: 'manual',
-      target: { kind: 'asset', id: 'AST-008' },
+      target: { kind: 'asset', id: 'AST-010' },
       reportedByUserId: ACTOR,
     })
     await issuesApi.createWorkOrder({
@@ -402,7 +403,7 @@ describe('issuesApi.createWorkOrder', () => {
       title: 'Already resolved',
       severity: 'minor',
       source: 'manual',
-      target: { kind: 'asset', id: 'AST-008' },
+      target: { kind: 'asset', id: 'AST-010' },
       reportedByUserId: ACTOR,
     })
     await issuesApi.setStatus({ id: issue.id, status: 'resolved', actorUserId: ACTOR })
@@ -422,7 +423,7 @@ describe('issuesApi.createWorkOrder', () => {
       title: 'Already in progress',
       severity: 'major',
       source: 'manual',
-      target: { kind: 'asset', id: 'AST-008' },
+      target: { kind: 'asset', id: 'AST-010' },
       reportedByUserId: ACTOR,
     })
     await issuesApi.setStatus({ id: issue.id, status: 'in_progress', actorUserId: ACTOR })
@@ -443,7 +444,7 @@ describe('issuesApi.findByWorkOrderId', () => {
       title: 'Find-by-WO test',
       severity: 'major',
       source: 'manual',
-      target: { kind: 'asset', id: 'AST-008' },
+      target: { kind: 'asset', id: 'AST-010' },
       reportedByUserId: ACTOR,
     })
     const { workOrder } = await issuesApi.createWorkOrder({

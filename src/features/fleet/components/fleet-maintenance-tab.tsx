@@ -29,15 +29,11 @@ export function FleetMaintenanceTab() {
   const navigate = useNavigate()
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
-  const vehicleByAssetId = useMemo(() => {
-    const map: Record<string, typeof vehicles[number]> = {}
-    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
-    return map
-  }, [vehicles])
+  const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
 
   const fleetWorkOrders = useMemo(
-    () => workOrders.filter((w) => !!vehicleByAssetId[w.assetId]),
-    [workOrders, vehicleByAssetId],
+    () => workOrders.filter((w) => !!w.vehicleId && !!vehicleMap[w.vehicleId]),
+    [workOrders, vehicleMap],
   )
 
   const [search, setSearch] = useState('')
@@ -45,8 +41,8 @@ export function FleetMaintenanceTab() {
   const columns = useMemo<ColumnDef<WorkOrder>[]>(() => [
     { accessorKey: 'id', header: 'Order', cell: ({ getValue }) => <span className="font-mono text-[12px] text-zinc-700">{getValue() as string}</span> },
     { accessorKey: 'title', header: 'Work', cell: ({ row }) => <span className="font-medium text-zinc-900">{row.original.title}</span> },
-    { accessorKey: 'assetId', header: 'Vehicle', cell: ({ getValue }) => {
-      const v = vehicleByAssetId[getValue() as string]
+    { id: 'vehicle', header: 'Vehicle', cell: ({ row }) => {
+      const v = row.original.vehicleId ? vehicleMap[row.original.vehicleId] : undefined
       return v ? (
         <div>
           <p className="font-mono text-[12px] text-zinc-700">{v.plateNumber}</p>
@@ -69,7 +65,7 @@ export function FleetMaintenanceTab() {
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <StatusBadge status={getValue() as string} /> },
     { accessorKey: 'scheduledDate', header: 'Scheduled', cell: ({ getValue }) => format(parseISO(getValue() as string), 'MMM dd, yyyy') },
-  ], [userMap, vehicleByAssetId])
+  ], [userMap, vehicleMap])
 
   const table = useReactTable({
     data: fleetWorkOrders, columns, state: { globalFilter: search }, onGlobalFilterChange: setSearch,

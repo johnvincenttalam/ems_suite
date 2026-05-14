@@ -94,7 +94,6 @@ interface CreateVehicleInput {
   currentOdometer: number
   fuelCapacityLiters?: number
   assignedDriverId?: string
-  linkedAssetId?: string
   checklistId?: string
   nextServiceDate?: string
   photoUrl?: string
@@ -110,7 +109,6 @@ interface UpdateVehicleInput {
   currentOdometer?: number
   fuelCapacityLiters?: number
   assignedDriverId?: string | null
-  linkedAssetId?: string | null
   checklistId?: string | null
   nextServiceDate?: string | null
   photoUrl?: string | null
@@ -227,7 +225,6 @@ export const fleetApi = {
       currentOdometer: input.currentOdometer,
       fuelCapacityLiters: input.fuelType === 'electric' ? 0 : input.fuelCapacityLiters,
       assignedDriverId: input.assignedDriverId || undefined,
-      linkedAssetId: input.linkedAssetId || undefined,
       checklistId: input.checklistId || undefined,
       nextServiceDate: input.nextServiceDate || undefined,
       photoUrl: input.photoUrl || undefined,

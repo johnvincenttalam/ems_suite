@@ -60,21 +60,18 @@ export function CreateWorkOrderFromIssueModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, issue?.id])
 
-  const resolvedAsset = useMemo(() => {
-    if (!issue) return { id: null as string | null, name: '', missingLink: false }
+  const resolvedTarget = useMemo(() => {
+    if (!issue) return { id: null as string | null, name: '', missing: false }
     if (issue.target.kind === 'asset') {
       const a = assets.find((x) => x.id === issue.target.id)
-      return { id: issue.target.id, name: a?.name ?? issue.target.id, missingLink: false }
+      return { id: issue.target.id, name: a?.name ?? issue.target.id, missing: !a }
     }
     const v = vehicles.find((x) => x.id === issue.target.id)
-    if (!v?.linkedAssetId) {
-      return { id: null, name: '', missingLink: true }
-    }
-    const a = assets.find((x) => x.id === v.linkedAssetId)
+    if (!v) return { id: null, name: '', missing: true }
     return {
-      id: v.linkedAssetId,
-      name: a ? `${a.name} (linked to ${v.plateNumber})` : `${v.linkedAssetId} (linked to ${v.plateNumber})`,
-      missingLink: false,
+      id: v.id,
+      name: `${v.plateNumber} · ${v.model}`,
+      missing: false,
     }
   }, [issue, vehicles, assets])
 
@@ -112,7 +109,7 @@ export function CreateWorkOrderFromIssueModal({
       title="Escalate to Work Order"
       size="md"
       footer={
-        resolvedAsset.missingLink ? (
+        resolvedTarget.missing ? (
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
@@ -147,22 +144,21 @@ export function CreateWorkOrderFromIssueModal({
           </p>
         </div>
 
-        {resolvedAsset.missingLink ? (
+        {resolvedTarget.missing ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="text-[12.5px] text-amber-900">
-              <p className="font-medium">This vehicle isn't linked to an asset.</p>
+              <p className="font-medium">Target not found.</p>
               <p className="mt-1 text-amber-800">
-                Maintenance work orders attach to assets. Link this vehicle to an asset record
-                from the Vehicles page first, then escalate again.
+                The asset or vehicle referenced by this issue could not be located.
               </p>
             </div>
           </div>
         ) : (
           <form id={FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-[12px]">
-              <Field label="Asset">
-                <span className="text-zinc-700">{resolvedAsset.name || resolvedAsset.id}</span>
+              <Field label={issue.target.kind === 'vehicle' ? 'Vehicle' : 'Asset'}>
+                <span className="text-zinc-700">{resolvedTarget.name || resolvedTarget.id}</span>
               </Field>
               <Field label="Priority (from severity)">
                 <span className="capitalize text-zinc-700">{priority}</span>

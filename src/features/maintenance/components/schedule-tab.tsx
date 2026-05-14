@@ -56,11 +56,7 @@ export function ScheduleTab() {
 
   const assetMap = useMemo(() => Object.fromEntries(assets.map((a) => [a.id, a])), [assets])
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
-  const vehicleByAssetId = useMemo(() => {
-    const map: Record<string, typeof vehicles[number]> = {}
-    for (const v of vehicles) if (v.linkedAssetId) map[v.linkedAssetId] = v
-    return map
-  }, [vehicles])
+  const vehicleMap = useMemo(() => Object.fromEntries(vehicles.map((v) => [v.id, v])), [vehicles])
 
   const buckets = useMemo(() => bucketize(workOrders), [workOrders])
 
@@ -94,12 +90,12 @@ export function ScheduleTab() {
             </div>
             <div className="space-y-2">
               {bucket.orders.map((wo) => {
-                const vehicle = vehicleByAssetId[wo.assetId]
-                const asset = assetMap[wo.assetId]
+                const vehicle = wo.vehicleId ? vehicleMap[wo.vehicleId] : undefined
+                const asset = wo.assetId ? assetMap[wo.assetId] : undefined
                 const user = userMap[wo.assignedTo]
                 const subjectLabel = vehicle
                   ? `🚛 ${vehicle.plateNumber} · ${vehicle.model}`
-                  : asset?.name ?? wo.assetId
+                  : asset?.name ?? (wo.assetId ?? wo.vehicleId ?? '—')
                 return (
                   <div key={wo.id} className={cn(
                     'bg-white rounded-lg border px-4 py-3 flex items-center gap-4',

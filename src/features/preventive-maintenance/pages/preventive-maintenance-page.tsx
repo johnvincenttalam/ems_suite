@@ -14,7 +14,7 @@ export function PreventiveMaintenancePage() {
   const due = schedules.filter((s) => {
     if (s.status !== 'active') return false
     if (isUsageInterval(s.intervalUnit)) {
-      const asset = assetById[s.assetId]
+      const asset = s.assetId ? assetById[s.assetId] : undefined
       if (!asset || asset.currentMeter === undefined || s.lastServiceMeter === undefined) return false
       return asset.currentMeter >= s.lastServiceMeter + s.intervalValue
     }

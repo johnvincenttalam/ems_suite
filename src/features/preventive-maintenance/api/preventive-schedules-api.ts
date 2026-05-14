@@ -33,7 +33,8 @@ function userName(userId: string): string {
   return mockUsers.find((u) => u.id === userId)?.name ?? userId
 }
 
-function assetLabel(assetId: string): string {
+function assetLabel(assetId: string | undefined): string {
+  if (!assetId) return '—'
   const a = mockAssets.find((x) => x.id === assetId)
   return a ? `${a.name} (${a.assetCode})` : assetId
 }

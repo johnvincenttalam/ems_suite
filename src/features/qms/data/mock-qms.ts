@@ -96,7 +96,7 @@ export const mockQmsReports: QmsReport[] = [
     periodStart: '2026-04-01',
     periodEnd: '2026-04-30',
     status: 'draft',
-    summary: 'Solid month — only outlier is overdue work orders trending up due to AST-009 maintenance backlog.',
+    summary: 'Solid month — only outlier is overdue work orders trending up due to V002 (Ford Transit Van) maintenance backlog.',
     preparedBy: 'U002',
     preparedAt: '2026-04-27T11:00:00Z',
     sections: [
@@ -112,7 +112,7 @@ export const mockQmsReports: QmsReport[] = [
       { templateSectionId: 'QTS-001-3', title: 'Maintenance', metrics: [
         { templateMetricId: 'M-001-3-1', label: 'Work order completion rate', unit: '%', target: 90, comparator: 'gte', value: 92,  status: 'pass' },
         { templateMetricId: 'M-001-3-2', label: 'Avg time to complete',       unit: 'd', target: 3,  comparator: 'lte', value: 2.4, status: 'pass' },
-        { templateMetricId: 'M-001-3-3', label: 'Overdue work orders',        unit: '%', target: 5,  comparator: 'lte', value: 8,   status: 'fail', notes: 'AST-009 brake replacement waiting on parts' },
+        { templateMetricId: 'M-001-3-3', label: 'Overdue work orders',        unit: '%', target: 5,  comparator: 'lte', value: 8,   status: 'fail', notes: 'V002 brake replacement waiting on parts' },
       ]},
     ],
   },

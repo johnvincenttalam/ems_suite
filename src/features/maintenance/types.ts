@@ -42,7 +42,10 @@ export interface WorkOrderPart {
 
 export interface WorkOrder {
   id: string
-  assetId: string
+  /** Targeted asset. Exactly one of `assetId` or `vehicleId` must be set. */
+  assetId?: string
+  /** Targeted fleet vehicle. Exactly one of `assetId` or `vehicleId` must be set. */
+  vehicleId?: string
   title: string
   description?: string
   type: WorkOrderType

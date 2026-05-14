@@ -2,21 +2,6 @@ import type { PreventiveSchedule } from '@/features/preventive-maintenance/types
 
 export const mockPreventiveSchedules: PreventiveSchedule[] = [
   {
-    id: 'PM-2026-0001',
-    title: 'Engine oil & filter service',
-    assetId: 'AST-009',
-    intervalUnit: 'months',
-    intervalValue: 3,
-    lastServiceDate: '2026-02-15',
-    nextServiceDate: '2026-05-15',
-    status: 'active',
-    priority: 'high',
-    defaultAssigneeId: 'U003',
-    notes: 'Routine quarterly service. Use OEM filter (SKU INV-1006).',
-    createdAt: '2026-02-15T09:00:00Z',
-    createdBy: 'U001',
-  },
-  {
     id: 'PM-2026-0002',
     title: 'Forklift pre-shift inspection',
     assetId: 'AST-011',
@@ -47,21 +32,6 @@ export const mockPreventiveSchedules: PreventiveSchedule[] = [
     notes: 'Per ISO 8528-13 maintenance plan.',
     createdAt: '2026-01-15T08:00:00Z',
     createdBy: 'U001',
-  },
-  {
-    id: 'PM-2026-0004',
-    title: 'Vehicle tire rotation',
-    assetId: 'AST-008',
-    intervalUnit: 'weeks',
-    intervalValue: 12,
-    lastServiceDate: '2026-02-15',
-    nextServiceDate: '2026-05-10',
-    status: 'active',
-    priority: 'low',
-    defaultAssigneeId: 'U003',
-    notes: 'Every ~10,000 km. Inspect pressures while rotating.',
-    createdAt: '2026-02-15T09:00:00Z',
-    createdBy: 'U002',
   },
   {
     id: 'PM-2026-0006',

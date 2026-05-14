@@ -24,6 +24,7 @@ import { useWorkOrders, workOrderTotalCost } from '@/features/maintenance'
 import { formatCurrency } from '@/shared/utils/format'
 import { useUsers } from '@/features/users'
 import { useAssets } from '@/features/assets'
+import { useVehicles } from '@/features/fleet/hooks/use-fleet'
 import type { WorkOrder, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@/features/maintenance'
 import { ExportMenu, StatCard, StatCardSkeleton } from '@/shared/ui/index'
 import { PageHeader } from '@/shared/ui/page-header'
@@ -67,6 +68,20 @@ export function MaintenanceReportsPage() {
   const { data: workOrders = [], isLoading } = useWorkOrders()
   const { data: users = [] } = useUsers()
   const { data: assets = [] } = useAssets()
+  const { data: vehicles = [] } = useVehicles()
+
+  const subjectKey = (w: WorkOrder) => w.vehicleId ? `vehicle:${w.vehicleId}` : `asset:${w.assetId ?? 'unknown'}`
+  const subjectLabel = (w: WorkOrder) => {
+    if (w.vehicleId) {
+      const v = vehicles.find((x) => x.id === w.vehicleId)
+      return v ? `${v.plateNumber} · ${v.model}` : w.vehicleId
+    }
+    if (w.assetId) {
+      const a = assets.find((x) => x.id === w.assetId)
+      return a?.name ?? w.assetId
+    }
+    return '—'
+  }
 
   const stats = useMemo(() => {
     const today = new Date()
@@ -198,17 +213,18 @@ export function MaintenanceReportsPage() {
   }, [workOrders, users])
 
   const byAsset = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const w of workOrders) counts.set(w.assetId, (counts.get(w.assetId) ?? 0) + 1)
+    const counts = new Map<string, { count: number; label: string }>()
+    for (const w of workOrders) {
+      const k = subjectKey(w)
+      const existing = counts.get(k) ?? { count: 0, label: subjectLabel(w) }
+      counts.set(k, { count: existing.count + 1, label: existing.label })
+    }
     return Array.from(counts.entries())
-      .map(([id, count]) => ({
-        key: id,
-        label: assets.find((a) => a.id === id)?.name ?? id,
-        count,
-      }))
+      .map(([key, { count, label }]) => ({ key, label, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 6)
-  }, [workOrders, assets])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workOrders, assets, vehicles])
 
   const costByType = useMemo(() => {
     const sums = new Map<WorkOrderType, number>()
@@ -225,22 +241,21 @@ export function MaintenanceReportsPage() {
   }, [workOrders])
 
   const costByAsset = useMemo(() => {
-    const sums = new Map<string, number>()
+    const sums = new Map<string, { cost: number; label: string }>()
     for (const w of workOrders) {
       if (w.status !== 'completed') continue
       const cost = workOrderTotalCost(w)
       if (cost === 0) continue
-      sums.set(w.assetId, (sums.get(w.assetId) ?? 0) + cost)
+      const k = subjectKey(w)
+      const existing = sums.get(k) ?? { cost: 0, label: subjectLabel(w) }
+      sums.set(k, { cost: existing.cost + cost, label: existing.label })
     }
     return Array.from(sums.entries())
-      .map(([id, cost]) => ({
-        key: id,
-        label: assets.find((a) => a.id === id)?.name ?? id,
-        cost,
-      }))
+      .map(([key, { cost, label }]) => ({ key, label, cost }))
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 6)
-  }, [workOrders, assets])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workOrders, assets, vehicles])
 
   const overdueList = useMemo(() => {
     const today = new Date()
@@ -259,7 +274,7 @@ export function MaintenanceReportsPage() {
       workOrders.map((w: WorkOrder) => ({
         id: w.id,
         title: w.title,
-        asset: assets.find((a) => a.id === w.assetId)?.name ?? w.assetId,
+        asset: subjectLabel(w),
         type: TYPE_LABEL[w.type],
         priority: PRIORITY_LABEL[w.priority],
         technician: users.find((u) => u.id === w.assignedTo)?.name ?? w.assignedTo,
@@ -361,7 +376,7 @@ export function MaintenanceReportsPage() {
         <BreakdownCard title="By Priority" rows={byPriority} icon={TriangleAlert} barColor="bg-amber-500" />
         <BreakdownCard title="By Status" rows={byStatus} icon={CheckCircle2} barColor="bg-emerald-500" />
         <TopAssetsCard rows={byAsset} />
-        <OverdueCard rows={overdueList} users={users} assets={assets} />
+        <OverdueCard rows={overdueList} users={users} assets={assets} vehicles={vehicles} />
       </div>
     </div>
   )
@@ -526,10 +541,12 @@ function OverdueCard({
   rows,
   users,
   assets,
+  vehicles,
 }: {
   rows: (WorkOrder & { daysOverdue: number })[]
   users: { id: string; name: string }[]
   assets: { id: string; name: string }[]
+  vehicles: { id: string; plateNumber: string; model: string }[]
 }) {
   return (
     <div className="bg-white rounded-xl border border-zinc-200/60 p-5">
@@ -546,13 +563,18 @@ function OverdueCard({
         <ul className="space-y-2">
           {rows.map((w) => {
             const tech = users.find((u) => u.id === w.assignedTo)
-            const asset = assets.find((a) => a.id === w.assetId)
+            const label = w.vehicleId
+              ? (() => {
+                  const v = vehicles.find((x) => x.id === w.vehicleId)
+                  return v ? `${v.plateNumber} · ${v.model}` : w.vehicleId
+                })()
+              : (w.assetId ? (assets.find((a) => a.id === w.assetId)?.name ?? w.assetId) : '—')
             return (
               <li key={w.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-zinc-100/60 last:border-0">
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium text-zinc-900 truncate">{w.title}</p>
                   <p className="text-[11px] text-zinc-400 truncate">
-                    {asset?.name ?? w.assetId}
+                    {label}
                     {tech && <> · {tech.name}</>}
                   </p>
                 </div>

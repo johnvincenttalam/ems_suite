@@ -19,7 +19,7 @@ async function newSchedule(
 ) {
   return preventiveSchedulesApi.create({
     title: overrides.title ?? 'Test PM schedule',
-    assetId: overrides.assetId ?? 'AST-009',
+    assetId: overrides.assetId ?? 'AST-011',
     intervalUnit: overrides.intervalUnit ?? 'months',
     intervalValue: overrides.intervalValue ?? 1,
     lastServiceDate: overrides.lastServiceDate ?? format(subMonths(new Date(), 2), 'yyyy-MM-dd'),
@@ -127,7 +127,7 @@ describe('preventiveSchedulesApi.list', () => {
     const result = await preventiveSchedulesApi.list()
     const assetIds = new Set(mockAssets.map((a) => a.id))
     const userIds = new Set(mockUsers.map((u) => u.id))
-    expect(result.every((s) => assetIds.has(s.assetId))).toBe(true)
+    expect(result.every((s) => !!s.assetId && assetIds.has(s.assetId))).toBe(true)
     expect(result.every((s) => userIds.has(s.defaultAssigneeId))).toBe(true)
   })
 
@@ -151,7 +151,7 @@ describe('preventiveSchedulesApi.create', () => {
     await expect(
       preventiveSchedulesApi.create({
         title: 'bad',
-        assetId: 'AST-009',
+        assetId: 'AST-011',
         intervalUnit: 'days',
         intervalValue: 0,
         lastServiceDate: '2026-01-01',

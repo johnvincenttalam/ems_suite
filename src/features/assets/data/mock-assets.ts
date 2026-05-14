@@ -8,8 +8,6 @@ export const mockAssets: Asset[] = [
   { id: 'AST-005', assetCode: 'CHR-0001', name: 'Herman Miller Aeron',     model: 'Size B',    vendor: 'Herman Miller',        serialNumber: 'HM-AER-2024-005', categoryId: 'C002', locationId: 'W003', status: 'active',      condition: 'excellent', assignedTo: 'U001', purchaseDate: '2024-08-12', purchaseCost: 1495, warrantyExpiry: '2036-08-12', usefulLifeMonths: 144, salvageValue: 200, description: 'Graphite frame, polished aluminum base',                       createdAt: '2024-08-12' },
   { id: 'AST-006', assetCode: 'CHR-0002', name: 'Steelcase Series 1',      model: 'Series 1',  vendor: 'Steelcase',            serialNumber: 'SC-S1-2024-006', categoryId: 'C002', locationId: 'W003', status: 'active',      condition: 'good',                          purchaseDate: '2024-08-12', purchaseCost: 415,  warrantyExpiry: '2036-08-12', usefulLifeMonths: 120, salvageValue: 50,                                                                                              createdAt: '2024-08-12' },
   { id: 'AST-007', assetCode: 'DSK-0001', name: 'IKEA Bekant Desk',        model: 'Bekant',    vendor: 'IKEA',                 serialNumber: 'IK-BK-2024-007', categoryId: 'C002', locationId: 'W005', status: 'active',      condition: 'good',                          purchaseDate: '2024-09-15', purchaseCost: 199,                                 usefulLifeMonths: 96,                                                                                                  createdAt: '2024-09-15' },
-  { id: 'AST-008', assetCode: 'VEH-0001', name: 'Toyota Hilux Pickup',     model: 'Hilux 2.8 GR-S', vendor: 'Toyota Philippines', serialNumber: 'JTM-HLX-2025-008', categoryId: 'C003', locationId: 'W002', status: 'active',     condition: 'good',      assignedTo: 'U003', purchaseDate: '2025-01-10', purchaseCost: 38500, warrantyExpiry: '2030-01-10', usefulLifeMonths: 96, salvageValue: 8000, checklistId: 'TPL-002', description: 'Field operations vehicle — assigned to Site Alpha',           createdAt: '2025-01-10' },
-  { id: 'AST-009', assetCode: 'VEH-0002', name: 'Ford Transit Van',        model: 'Transit Custom 320', vendor: 'Ford',         serialNumber: 'FORD-TR-2024-009', categoryId: 'C003', locationId: 'W001', status: 'maintenance', condition: 'fair',                          purchaseDate: '2024-06-04', purchaseCost: 41200, warrantyExpiry: '2029-06-04', usefulLifeMonths: 96, salvageValue: 9000, checklistId: 'TPL-002', description: 'Out for transmission service',                                  createdAt: '2024-06-04' },
   { id: 'AST-010', assetCode: 'GEN-0010', name: 'Caterpillar 30kVA Genset', model: 'C3.3-DE33', vendor: 'Caterpillar',         serialNumber: 'CAT-30K-2024-010', categoryId: 'C004', locationId: 'W004', status: 'active',      condition: 'good',                          purchaseDate: '2024-11-12', purchaseCost: 18500, warrantyExpiry: '2027-11-12', usefulLifeMonths: 120, salvageValue: 3500, checklistId: 'TPL-004', description: 'Backup generator for site C',                                   meterUnit: 'hours', currentMeter: 1480, meterUpdatedAt: '2026-05-08T09:00:00Z', meterUpdatedBy: 'Sam Tech', createdAt: '2024-11-12' },
   { id: 'AST-011', assetCode: 'EQP-0001', name: 'Toyota 2.5T Forklift',    model: '8FBE25U',   vendor: 'Toyota Material Handling', serialNumber: 'TOY-FL-2024-011', categoryId: 'C004', locationId: 'W001', status: 'maintenance', condition: 'poor',                          purchaseDate: '2024-07-19', purchaseCost: 26900, warrantyExpiry: '2027-07-19', usefulLifeMonths: 96, salvageValue: 4000, checklistId: 'TPL-001', description: 'Hydraulic leak — under inspection',                             meterUnit: 'hours', currentMeter: 3275, meterUpdatedAt: '2026-05-10T15:30:00Z', meterUpdatedBy: 'Jane Doe', createdAt: '2024-07-19' },
   { id: 'AST-012', assetCode: 'WS-0001',  name: 'Dell Precision Workstation', model: '7820',    vendor: 'Dell Technologies',    serialNumber: 'DELL-WS-2023-012', categoryId: 'C001', locationId: 'W001', status: 'disposed',    condition: 'out_of_service',                purchaseDate: '2021-03-04', purchaseCost: 2899,                                  usefulLifeMonths: 60, salvageValue: 100, description: 'End of life — replaced 2024-12',
@@ -22,9 +20,7 @@ export const mockAssetAssignments: AssetAssignment[] = [
   { id: 'ASN-002', assetId: 'AST-002', assignedTo: 'U002', assignedDate: '2024-08-13' },
   { id: 'ASN-003', assetId: 'AST-003', assignedTo: 'U002', assignedDate: '2024-08-23', notes: 'Secondary monitor' },
   { id: 'ASN-004', assetId: 'AST-005', assignedTo: 'U001', assignedDate: '2024-08-14' },
-  { id: 'ASN-005', assetId: 'AST-008', assignedTo: 'U003', assignedDate: '2025-01-15', notes: 'Field operations' },
   { id: 'ASN-006', assetId: 'AST-012', assignedTo: 'U003', assignedDate: '2021-03-08', returnedDate: '2024-12-01', notes: 'Returned for disposal — end of life' },
-  { id: 'ASN-007', assetId: 'AST-009', assignedTo: 'U002', assignedDate: '2024-06-10', returnedDate: '2026-04-12', notes: 'Returned for service' },
   { id: 'ASN-008', assetId: 'AST-001', assignedTo: 'U003', assignedDate: '2024-08-12', returnedDate: '2024-08-13', notes: 'Initial assignment, reassigned same day' },
 ]
 
@@ -47,18 +43,6 @@ export const mockAssetEvents: AssetEvent[] = [
   { id: 'EVT-0008', assetId: 'AST-003', type: 'assigned', detail: 'Assigned to Jane Doe — secondary monitor',   timestamp: '2024-08-23T09:30:00Z', actorName: 'Admin User', payload: { toUserId: 'U002' } },
   { id: 'EVT-0009', assetId: 'AST-005', type: 'created',  detail: 'Registered Herman Miller Aeron',             timestamp: '2024-08-12T09:15:00Z', actorName: 'Admin User' },
   { id: 'EVT-0010', assetId: 'AST-005', type: 'assigned', detail: 'Assigned to Admin User',                     timestamp: '2024-08-14T13:00:00Z', actorName: 'Admin User', payload: { toUserId: 'U001' } },
-
-  // AST-008: created → assigned with field ops note → recent inspection
-  { id: 'EVT-0011', assetId: 'AST-008', type: 'created',     detail: 'Registered Toyota Hilux (VEH-0001)',                           timestamp: '2025-01-10T08:00:00Z', actorName: 'Admin User' },
-  { id: 'EVT-0012', assetId: 'AST-008', type: 'assigned',    detail: 'Assigned to John Smith — Field Ops',                          timestamp: '2025-01-15T09:00:00Z', actorName: 'Jane Doe',   payload: { toUserId: 'U003' } },
-  { id: 'EVT-0013', assetId: 'AST-008', type: 'inspection',  detail: 'Quarterly inspection — passed (8/9 items)',                   timestamp: '2026-04-15T11:00:00Z', actorName: 'John Smith',  payload: { inspectionId: 'INSP-0002' } },
-
-  // AST-009: created → assigned → returned → maintenance
-  { id: 'EVT-0014', assetId: 'AST-009', type: 'created',           detail: 'Registered Ford Transit Van',                  timestamp: '2024-06-04T10:00:00Z', actorName: 'Admin User' },
-  { id: 'EVT-0015', assetId: 'AST-009', type: 'assigned',          detail: 'Assigned to Jane Doe',                          timestamp: '2024-06-10T09:00:00Z', actorName: 'Admin User', payload: { toUserId: 'U002' } },
-  { id: 'EVT-0016', assetId: 'AST-009', type: 'returned',          detail: 'Returned by Jane Doe — service due',             timestamp: '2026-04-12T15:30:00Z', actorName: 'Jane Doe',   payload: { fromUserId: 'U002' } },
-  { id: 'EVT-0017', assetId: 'AST-009', type: 'maintenance_started', detail: 'Out for transmission service',                timestamp: '2026-04-13T08:00:00Z', actorName: 'Jane Doe' },
-  { id: 'EVT-0018', assetId: 'AST-009', type: 'condition_changed', detail: 'Condition demoted: good → fair',                 timestamp: '2026-04-13T08:05:00Z', actorName: 'Jane Doe',   payload: { fromCondition: 'good', toCondition: 'fair' } },
 
   // AST-011: created → assigned-internally for hydraulic issue, recent inspection failed
   { id: 'EVT-0019', assetId: 'AST-011', type: 'created',           detail: 'Registered Toyota Forklift',                                 timestamp: '2024-07-19T08:00:00Z', actorName: 'Admin User' },
@@ -97,30 +81,6 @@ export const mockInspections: Inspection[] = [
       { label: 'Operator Cabin',          result: 'fail', remarks: 'Cracked side mirror' },
       { label: 'Fluid Levels',            result: 'pass' },
       { label: 'Documentation',           result: 'pass' },
-    ],
-  },
-  // AST-008 hilux — passing inspection, one minor remark.
-  {
-    id: 'INSP-0002',
-    assetId: 'AST-008',
-    checklistId: 'TPL-002',
-    inspectionDate: '2026-04-15',
-    inspector: 'John Smith',
-    status: 'submitted',
-    overallResult: 'pass',
-    notes: 'Routine quarterly check. Small chip on windshield noted but not yet a safety concern.',
-    createdAt: '2026-04-15T10:30:00Z',
-    submittedAt: '2026-04-15T11:00:00Z',
-    lines: [
-      { label: 'Engine Condition', result: 'pass' },
-      { label: 'Brakes',           result: 'pass' },
-      { label: 'Tires',            result: 'pass' },
-      { label: 'Lights / Alarms',  result: 'pass' },
-      { label: 'Fluid Levels',     result: 'pass' },
-      { label: 'Body / Glass',     result: 'pass', remarks: 'Small windshield chip — monitor' },
-      { label: 'Safety Devices',   result: 'pass' },
-      { label: 'Documentation',    result: 'pass' },
-      { label: 'Cleanliness',      result: 'pass' },
     ],
   },
 ]

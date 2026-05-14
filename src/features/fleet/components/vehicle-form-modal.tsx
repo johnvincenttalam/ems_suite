@@ -10,7 +10,6 @@ import { Select } from '@/shared/ui/select'
 import { Button } from '@/shared/ui/button'
 import { useAuthStore } from '@/features/auth'
 import { useDrivers } from '@/features/drivers'
-import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useCreateVehicle, useUpdateVehicle } from '@/features/fleet/hooks/use-fleet'
 import { VehicleThumbnail } from '@/features/fleet/components/vehicle-thumbnail'
@@ -26,7 +25,6 @@ const schema = z.object({
   currentOdometer: z.number().int().min(0),
   fuelCapacityLiters: z.number().min(0).optional(),
   assignedDriverId: z.string().optional(),
-  linkedAssetId: z.string().optional(),
   checklistId: z.string().optional(),
   nextServiceDate: z.string().optional(),
   photoUrl: z.string().optional(),
@@ -49,7 +47,6 @@ const numericOrUndef = (v: unknown) =>
 export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFormModalProps) {
   const { user } = useAuthStore()
   const { data: drivers = [] } = useDrivers()
-  const { data: assets = [] } = useAssets()
   const { data: templates = [] } = useTemplates()
   const createVehicle = useCreateVehicle()
   const updateVehicle = useUpdateVehicle()
@@ -66,7 +63,6 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
         currentOdometer: vehicle.currentOdometer,
         fuelCapacityLiters: vehicle.fuelCapacityLiters,
         assignedDriverId: vehicle.assignedDriverId,
-        linkedAssetId: vehicle.linkedAssetId,
         checklistId: vehicle.checklistId,
         nextServiceDate: vehicle.nextServiceDate,
         photoUrl: vehicle.photoUrl,
@@ -80,7 +76,6 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
         currentOdometer: 0,
         fuelCapacityLiters: undefined,
         assignedDriverId: undefined,
-        linkedAssetId: undefined,
         checklistId: undefined,
         nextServiceDate: undefined,
         photoUrl: undefined,
@@ -118,7 +113,6 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
             // Empty string from a Select means "unassigned" — translate to null
             // so the API treats it as a clear, not as no-op.
             assignedDriverId: data.assignedDriverId ? data.assignedDriverId : null,
-            linkedAssetId: data.linkedAssetId ? data.linkedAssetId : null,
             checklistId: data.checklistId ? data.checklistId : null,
             nextServiceDate: data.nextServiceDate ? data.nextServiceDate : null,
             photoUrl: data.photoUrl ? data.photoUrl : null,
@@ -137,7 +131,6 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
           currentOdometer: data.currentOdometer,
           fuelCapacityLiters: data.fuelCapacityLiters,
           assignedDriverId: data.assignedDriverId || undefined,
-          linkedAssetId: data.linkedAssetId || undefined,
           checklistId: data.checklistId || undefined,
           nextServiceDate: data.nextServiceDate || undefined,
           photoUrl: data.photoUrl || undefined,
@@ -156,10 +149,6 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
   const driverOptions = drivers
     .filter((d) => d.status === 'active')
     .map((d) => ({ value: d.id, label: d.name }))
-
-  const assetOptions = assets
-    .filter((a) => a.status !== 'disposed')
-    .map((a) => ({ value: a.id, label: `${a.assetCode} — ${a.name}` }))
 
   const templateOptions = templates.map((t) => ({ value: t.id, label: t.name }))
 
@@ -260,31 +249,17 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
             helperText="Drives the Maintenance Due card on the dashboard"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Select
-              label="Linked Asset"
-              {...register('linkedAssetId')}
-              error={errors.linkedAssetId?.message}
-              placeholder="None"
-              options={assetOptions}
-            />
-            <p className="text-[11px] text-zinc-400 mt-1">
-              Required to escalate vehicle issues to maintenance.
-            </p>
-          </div>
-          <div>
-            <Select
-              label="Pre-trip Checklist"
-              {...register('checklistId')}
-              error={errors.checklistId?.message}
-              placeholder="None"
-              options={templateOptions}
-            />
-            <p className="text-[11px] text-zinc-400 mt-1">
-              Enables the pre-trip inspection action.
-            </p>
-          </div>
+        <div>
+          <Select
+            label="Pre-trip Checklist"
+            {...register('checklistId')}
+            error={errors.checklistId?.message}
+            placeholder="None"
+            options={templateOptions}
+          />
+          <p className="text-[11px] text-zinc-400 mt-1">
+            Enables the pre-trip inspection action.
+          </p>
         </div>
       </form>
     </Modal>

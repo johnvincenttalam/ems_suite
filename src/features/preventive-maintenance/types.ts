@@ -29,7 +29,9 @@ export type ScheduleStatus = 'active' | 'paused'
 export interface PreventiveSchedule {
   id: string
   title: string
-  assetId: string
+  /** Exactly one of `assetId` or `vehicleId` must be set. */
+  assetId?: string
+  vehicleId?: string
   intervalUnit: IntervalUnit
   intervalValue: number
   /** ISO date (YYYY-MM-DD). Last completion date for the schedule. Always

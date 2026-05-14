@@ -20,7 +20,6 @@ import {
 import { useAuthStore } from '@/features/auth'
 import { useUsers } from '@/features/users'
 import { useDrivers } from '@/features/drivers'
-import { useAssets } from '@/features/assets'
 import { useTemplates } from '@/features/checklists'
 import { useAuditLog } from '@/features/audit-log'
 import { useTrips, useFuelLogs, useRetireVehicle } from '@/features/fleet'
@@ -242,13 +241,11 @@ function DrawerHeader({
 
 function OverviewTab({ vehicle }: { vehicle: Vehicle }) {
   const { data: drivers = [] } = useDrivers()
-  const { data: assets = [] } = useAssets()
   const { data: templates = [] } = useTemplates()
   const [showLocation, setShowLocation] = useState(false)
   const [showInspection, setShowInspection] = useState(false)
 
   const driver = drivers.find((d) => d.id === vehicle.assignedDriverId)
-  const linkedAsset = assets.find((a) => a.id === vehicle.linkedAssetId)
   const checklist = templates.find((t) => t.id === vehicle.checklistId)
 
   return (
@@ -292,21 +289,6 @@ function OverviewTab({ vehicle }: { vehicle: Vehicle }) {
 
       <Section title="Linked Records">
         <div className="space-y-2">
-          {linkedAsset ? (
-            <Link
-              to={`/module/assets/registry?asset=${linkedAsset.id}`}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50/40 border border-zinc-200/60 hover:border-zinc-300 transition-colors"
-            >
-              <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Asset</span>
-              <span className="font-mono text-[12px] text-zinc-700">{linkedAsset.assetCode}</span>
-              <span className="text-[12.5px] text-zinc-700">{linkedAsset.name}</span>
-              <ExternalLink className="w-3 h-3 text-zinc-400 ml-auto" />
-            </Link>
-          ) : (
-            <div className="px-3 py-2 rounded-lg bg-amber-50/40 border border-amber-200/60 text-[12px] text-amber-800">
-              Not linked to an asset — required to escalate issues to maintenance.
-            </div>
-          )}
           {checklist ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50/40 border border-zinc-200/60">
               <span className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">Checklist</span>
@@ -406,17 +388,7 @@ function MaintenanceTab({ vehicle }: { vehicle: Vehicle }) {
   const { data: workOrders = [] } = useWorkOrders()
   const { data: users = [] } = useUsers()
 
-  if (!vehicle.linkedAssetId) {
-    return (
-      <EmptyState
-        icon={Wrench}
-        title="No linked asset"
-        message="Maintenance work orders attach to assets. Link this vehicle to an asset record (Edit → Linked Asset) to track its service history here."
-      />
-    )
-  }
-
-  const linked = workOrders.filter((wo) => wo.assetId === vehicle.linkedAssetId)
+  const linked = workOrders.filter((wo) => wo.vehicleId === vehicle.id)
     .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate))
 
   if (linked.length === 0) {

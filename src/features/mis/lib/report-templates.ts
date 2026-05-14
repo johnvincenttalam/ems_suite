@@ -152,10 +152,12 @@ export function buildReport(template: ReportTemplateKey, ctx: ReportContext): Bu
       )
       const byAsset = new Map<string, { woCount: number; cost: number }>()
       for (const w of completed) {
-        const cur = byAsset.get(w.assetId) ?? { woCount: 0, cost: 0 }
+        const key = w.assetId ?? w.vehicleId
+        if (!key) continue
+        const cur = byAsset.get(key) ?? { woCount: 0, cost: 0 }
         cur.woCount += 1
         cur.cost += workOrderTotalCost(w)
-        byAsset.set(w.assetId, cur)
+        byAsset.set(key, cur)
       }
       const rows = Array.from(byAsset.entries())
         .map(([id, { woCount, cost }]) => {

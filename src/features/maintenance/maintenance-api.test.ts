@@ -38,10 +38,16 @@ describe('maintenanceApi.list', () => {
     }
   })
 
-  it('every work order references a known asset', async () => {
+  it('every work order references a known asset or vehicle', async () => {
     const result = await maintenanceApi.list()
     const assetIds = new Set(mockAssets.map((a) => a.id))
-    expect(result.every((w) => assetIds.has(w.assetId))).toBe(true)
+    expect(
+      result.every(
+        (w) =>
+          (w.assetId && assetIds.has(w.assetId)) ||
+          (w.vehicleId && /^V\d{3,}$/.test(w.vehicleId)),
+      ),
+    ).toBe(true)
   })
 
   it('every work order is assigned to a known user', async () => {

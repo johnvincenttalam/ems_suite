@@ -12,7 +12,7 @@ export function scoreWorkOrders(workOrders: WorkOrder[], query: string): GlobalS
       { text: wo.id.toLowerCase(), weight: 10 },
       { text: wo.title.toLowerCase(), weight: 5 },
       ...(wo.description ? [{ text: wo.description.toLowerCase(), weight: 3 }] : []),
-      { text: wo.assetId.toLowerCase(), weight: 2 },
+      { text: (wo.assetId ?? wo.vehicleId ?? '').toLowerCase(), weight: 2 },
       { text: wo.assignedTo.toLowerCase(), weight: 1 },
     ])
     if (!matched || score === 0) continue

@@ -73,7 +73,7 @@ export function deriveMaintenanceInsights(
   const dueSchedules = schedules.filter((s) => {
     if (s.status !== 'active') return false
     if (isUsageInterval(s.intervalUnit)) {
-      const asset = assetById.get(s.assetId)
+      const asset = s.assetId ? assetById.get(s.assetId) : undefined
       if (!asset || asset.currentMeter === undefined || s.lastServiceMeter === undefined) return false
       return asset.currentMeter >= s.lastServiceMeter + s.intervalValue
     }
