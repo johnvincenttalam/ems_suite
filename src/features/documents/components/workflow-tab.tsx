@@ -179,7 +179,7 @@ export function WorkflowTab() {
         )
       })}
 
-      <DocumentDetailDrawer document={drawerDoc} onClose={() => setDrawerDoc(null)} />
+      <DocumentDetailDrawer document={drawerDoc} onClose={() => setDrawerDoc(null)} onSelectDocument={setDrawerDoc} />
 
       <SignatureModal
         open={!!signTarget}

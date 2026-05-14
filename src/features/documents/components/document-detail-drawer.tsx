@@ -21,12 +21,14 @@ import { useUsers } from '@/features/users'
 import { useDepartments } from '@/features/departments'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import { documentsApi } from '@/features/documents/api/documents-api'
+import { useDocuments } from '@/features/documents/hooks/use-documents'
 import {
   DOCUMENT_STATUS_LABEL,
   RECEIPT_MODE_LABEL,
   ROUTING_PURPOSE_LABEL,
   type AppDocument,
 } from '@/features/documents/types'
+import { isModuleManagerOrAbove } from '@/features/auth'
 import { Avatar } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { StatusBadge } from '@/shared/ui/status-badge'
@@ -46,11 +48,15 @@ type DrawerTab = 'overview' | 'workflow' | 'routing' | 'access' | 'checklist' | 
 interface DocumentDetailDrawerProps {
   document: AppDocument | null
   onClose: () => void
+  /** Optional — when provided, the Related documents section switches the
+   * drawer to the clicked doc instead of just opening it. */
+  onSelectDocument?: (doc: AppDocument) => void
 }
 
-export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawerProps) {
+export function DocumentDetailDrawer({ document, onClose, onSelectDocument }: DocumentDetailDrawerProps) {
   const { data: users = [] } = useUsers()
   const { data: departments = [] } = useDepartments()
+  const { data: allDocuments = [] } = useDocuments()
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<DrawerTab>('overview')
@@ -107,17 +113,49 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
     }
   }, [document, onClose])
 
+  // Access log is sensitive — surface the audit trail only to the doc's
+  // author and to SDMS managers/admins. Other members see a placeholder so
+  // they know access IS being recorded; they just can't view it.
+  const canSeeAccessLog = useMemo(() => {
+    if (!document || !user) return false
+    return document.createdBy === user.id || isModuleManagerOrAbove(user, 'sdms')
+  }, [document, user])
+
+  // Suggest documents sharing a category + at least one tag (or, lacking
+  // tags, the same department). Capped at 5; excludes the current doc.
+  // Cheap derivation — no schema, just pattern matching against the cache.
+  const related = useMemo<AppDocument[]>(() => {
+    if (!document) return []
+    const tagSet = new Set(document.tags ?? [])
+    const score = (other: AppDocument): number => {
+      if (other.id === document.id) return -1
+      if (other.category && other.category === document.category) {
+        const sharedTags = (other.tags ?? []).filter((t) => tagSet.has(t)).length
+        if (sharedTags > 0) return 10 + sharedTags
+        if (other.departmentId && other.departmentId === document.departmentId) return 5
+        return 3
+      }
+      return -1
+    }
+    return allDocuments
+      .map((d) => ({ d, s: score(d) }))
+      .filter((x) => x.s >= 0)
+      .sort((a, b) => b.s - a.s || b.d.createdAt.localeCompare(a.d.createdAt))
+      .slice(0, 5)
+      .map((x) => x.d)
+  }, [document, allDocuments])
+
   const tabs: { label: string; value: DrawerTab; count?: number }[] = useMemo(() => {
     if (!document) return []
     return [
       { label: 'Overview', value: 'overview' },
       { label: 'Workflow', value: 'workflow', count: document.signatures.length },
       { label: 'Routing', value: 'routing', count: document.routings?.length ?? 0 },
-      { label: 'Access Log', value: 'access', count: document.accessLog?.length ?? 0 },
+      { label: 'Access Log', value: 'access', count: canSeeAccessLog ? (document.accessLog?.length ?? 0) : undefined },
       ...(document.checklistId ? [{ label: 'Checklist', value: 'checklist' as const }] : []),
       { label: 'Archive', value: 'archive' },
     ]
-  }, [document])
+  }, [document, canSeeAccessLog])
 
   return (
     <AnimatePresence>
@@ -193,6 +231,33 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
                           <span key={t} className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 text-[11px] font-medium">{t}</span>
                         ))}
                       </div>
+                    </Section>
+                  )}
+
+                  {related.length > 0 && (
+                    <Section title="Related documents">
+                      <ul className="space-y-1.5">
+                        {related.map((r) => (
+                          <li key={r.id}>
+                            <button
+                              type="button"
+                              onClick={() => onSelectDocument?.(r)}
+                              disabled={!onSelectDocument}
+                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-zinc-200/60 hover:border-zinc-300 transition-colors text-left disabled:cursor-default disabled:hover:border-zinc-200/60"
+                            >
+                              <FileIcon type={r.fileType} size="sm" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12.5px] font-medium text-zinc-900 truncate">{r.title}</p>
+                                <p className="text-[11px] text-zinc-400 truncate">
+                                  {r.trackingNumber ?? r.id}
+                                  {r.tags && r.tags.length > 0 && ` · ${r.tags.slice(0, 2).join(', ')}`}
+                                </p>
+                              </div>
+                              <StatusBadge status={r.status} label={DOCUMENT_STATUS_LABEL[r.status]} size="sm" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </Section>
                   )}
 
@@ -392,7 +457,14 @@ export function DocumentDetailDrawer({ document, onClose }: DocumentDetailDrawer
                 </>
               )}
 
-              {tab === 'access' && (
+              {tab === 'access' && !canSeeAccessLog && (
+                <EmptyMessage
+                  icon={Shield}
+                  message="Access activity is recorded but visible only to the document's author and SDMS managers."
+                />
+              )}
+
+              {tab === 'access' && canSeeAccessLog && (
                 <>
                   {(document.accessLog?.length ?? 0) === 0 ? (
                     <EmptyMessage icon={Eye} message="No access activity recorded yet." />

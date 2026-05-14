@@ -173,6 +173,45 @@ export function DocumentsTab() {
 
   const columns = useMemo<ColumnDef<AppDocument>[]>(() => [
     {
+      id: 'select',
+      header: ({ table }) => {
+        // Only rows the user can actually delete are selectable, so the header
+        // checkbox reflects deletable rows only.
+        const selectable = table.getRowModel().rows.filter((r) => r.getCanSelect())
+        if (selectable.length === 0) return null
+        const allSelected = selectable.every((r) => r.getIsSelected())
+        const someSelected = !allSelected && selectable.some((r) => r.getIsSelected())
+        return (
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected }}
+            onChange={(e) => {
+              const next = e.target.checked
+              selectable.forEach((r) => r.toggleSelected(next))
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-zinc-900 w-3.5 h-3.5"
+            aria-label="Select all deletable rows on this page"
+          />
+        )
+      },
+      cell: ({ row }) => {
+        if (!row.getCanSelect()) return null
+        return (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-zinc-900 w-3.5 h-3.5"
+            aria-label={`Select ${row.original.title}`}
+          />
+        )
+      },
+      enableHiding: false,
+    },
+    {
       accessorKey: 'trackingNumber',
       header: 'Tracking #',
       cell: ({ row }) => <TrackingBadge trackingNumber={row.original.trackingNumber} />,
@@ -182,6 +221,12 @@ export function DocumentsTab() {
       header: 'Document',
       cell: ({ row }) => {
         const isMine = !!user && row.original.createdBy === user.id
+        // Overdue = in review AND past its declared deadline. Surfaced inline
+        // so dispatchers don't have to bounce to the Alerts page to scan.
+        const isOverdue =
+          row.original.status === 'in_review' &&
+          !!row.original.deadline &&
+          parseISO(row.original.deadline) < new Date()
         return (
           <div className="flex items-center gap-3">
             <FileIcon type={row.original.fileType} size="sm" />
@@ -194,6 +239,14 @@ export function DocumentsTab() {
                     className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200 flex-shrink-0"
                   >
                     You
+                  </span>
+                )}
+                {isOverdue && (
+                  <span
+                    title={`Deadline ${row.original.deadline} has passed`}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 text-[10px] font-semibold border border-red-200 flex-shrink-0"
+                  >
+                    Overdue
                   </span>
                 )}
               </div>
@@ -305,15 +358,49 @@ export function DocumentsTab() {
     },
   ], [archiveMutation, navigate, user])
 
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+
   const table = useReactTable({
     data: filtered,
     columns,
-    state: { globalFilter },
+    state: { globalFilter, rowSelection },
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id,
+    enableRowSelection: (row) => canDeleteDocument(user, row.original),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
+
+  // Selected docs the current user can actually delete (defensive — the
+  // mutation re-checks per row, but we filter the UI list so the toolbar
+  // shows the correct count.)
+  const selectedDeletable = useMemo(() => {
+    const ids = Object.keys(rowSelection).filter((k) => rowSelection[k])
+    return documents.filter((d) => ids.includes(d.id) && canDeleteDocument(user, d))
+  }, [rowSelection, documents, user])
+
+  const bulkDelete = async () => {
+    if (selectedDeletable.length === 0 || !user) return
+    let ok = 0
+    let fail = 0
+    for (const d of selectedDeletable) {
+      try {
+        await documentsApi.deleteDocument(d.id, user.id)
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    setRowSelection({})
+    queryClient.invalidateQueries({ queryKey: ['documents'] })
+    queryClient.invalidateQueries({ queryKey: ['audit-log'] })
+    if (fail === 0) toast.success(`Deleted ${ok} document${ok === 1 ? '' : 's'}`)
+    else toast.warning(`Deleted ${ok} of ${ok + fail} — ${fail} failed`)
+  }
+
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
 
   if (isLoading) return <TableSkeleton columns={9} rows={6} />
 
@@ -413,6 +500,32 @@ export function DocumentsTab() {
         </div>
       </div>
 
+      {selectedDeletable.length > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-zinc-900 text-white">
+          <p className="text-[12.5px]">
+            <span className="font-medium tabular-nums">{selectedDeletable.length}</span>{' '}
+            {selectedDeletable.length === 1 ? 'document' : 'documents'} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRowSelection({})}
+              className="text-[11.5px] text-zinc-300 hover:text-white"
+            >
+              Clear
+            </button>
+            <Button
+              size="sm"
+              variant="danger"
+              leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <DataTable
         table={table}
         columns={columns}
@@ -440,6 +553,19 @@ export function DocumentsTab() {
         busy={deleteMutation.isPending}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title={`Delete ${selectedDeletable.length} document${selectedDeletable.length === 1 ? '' : 's'}?`}
+        message="Each document will be removed permanently. The audit log keeps a record of every deletion. Any rows you couldn't normally delete on their own have already been excluded."
+        confirmLabel={`Delete ${selectedDeletable.length}`}
+        tone="danger"
+        onCancel={() => setBulkConfirmOpen(false)}
+        onConfirm={async () => {
+          setBulkConfirmOpen(false)
+          await bulkDelete()
+        }}
       />
     </div>
   )

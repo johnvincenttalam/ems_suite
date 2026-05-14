@@ -3,7 +3,7 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsDown, ChevronsUp } from 'lucide-react'
 import type { AppDocument, SignatureSlot } from '@/features/documents/types'
 import { Spinner } from '@/shared/ui/spinner'
 import { cn } from '@/shared/utils/cn'
@@ -22,9 +22,13 @@ interface PdfViewerProps {
    * places it as a fixed bar at the bottom of the viewer, useful inside slide-in
    * drawers where the topbar sticky offset doesn't apply. */
   toolbarPosition?: 'top-sticky' | 'bottom'
+  /** Optional node rendered to the right of the centred paginator. Used by
+   * SDMS to attach a Cancel-placement button so it stays as visible as the
+   * page controls while the user scrolls a long document. */
+  toolbarRightSlot?: React.ReactNode
 }
 
-export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlaced, toolbarPosition = 'top-sticky' }: PdfViewerProps) {
+export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlaced, toolbarPosition = 'top-sticky', toolbarRightSlot }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [numPages, setNumPages] = useState<number>(0)
@@ -81,16 +85,23 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
 
   const pages = useMemo(() => Array.from({ length: numPages }, (_, i) => i + 1), [numPages])
 
+  // 3-zone toolbar layout: scroll-jump (left) · paginator (centered) · slot (right).
+  // grid-cols-[1fr_auto_1fr] keeps the paginator perfectly centered regardless
+  // of what's in the side zones. Each zone is its own pill so the shapes read
+  // as separate controls instead of a single oversized bar.
   const toolbar = showToolbar ? (
     <div
       className={cn(
-        'flex justify-center',
+        'grid grid-cols-[1fr_auto_1fr] items-center gap-2',
         toolbarPosition === 'top-sticky'
           ? 'sticky top-[calc(var(--topbar-h)+1rem)] z-10 mb-3'
           : 'sticky bottom-2 z-10 mt-3',
       )}
     >
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur">
+      <div className="justify-self-start">
+        <ScrollJumpButton />
+      </div>
+      <div className="justify-self-center inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur">
         <button
           type="button"
           onClick={() => scrollToPage(currentPage - 1)}
@@ -100,7 +111,7 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex items-center gap-1 text-[12px] text-zinc-700">
+        <div className="flex items-center gap-1 text-[12px] text-zinc-700 px-1">
           <span>Page</span>
           <input
             type="number"
@@ -135,6 +146,9 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
         >
           <ChevronRight className="w-4 h-4" />
         </button>
+      </div>
+      <div className="justify-self-end">
+        {toolbarRightSlot}
       </div>
     </div>
   ) : null
@@ -174,5 +188,59 @@ export default function PdfViewer({ doc, url, userMap, placementMode, onSlotPlac
         </Document>
       )}
     </div>
+  )
+}
+
+/**
+ * Smart scroll-jump button — single control that toggles its target based on
+ * the user's current vertical position. When in the top half of the page, the
+ * label/icon point to the bottom; once you cross 50% scroll, it morphs to
+ * point back at the top. Hidden when the page doesn't actually scroll.
+ *
+ * Lives in the PdfViewer toolbar so it sits in the same sticky band as the
+ * paginator + cancel slot — naturally in the user's attention path.
+ */
+function ScrollJumpButton() {
+  const [canScroll, setCanScroll] = useState(false)
+  const [aimBottom, setAimBottom] = useState(true)
+
+  useEffect(() => {
+    const recompute = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      setCanScroll(max > 40)
+      if (max <= 0) return
+      const pct = window.scrollY / max
+      setAimBottom(pct < 0.5)
+    }
+    recompute()
+    window.addEventListener('scroll', recompute, { passive: true })
+    window.addEventListener('resize', recompute, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', recompute)
+      window.removeEventListener('resize', recompute)
+    }
+  }, [])
+
+  if (!canScroll) return null
+
+  const onClick = () => {
+    const target = aimBottom ? document.documentElement.scrollHeight : 0
+    window.scrollTo({ top: target, behavior: 'smooth' })
+  }
+
+  const Icon = aimBottom ? ChevronsDown : ChevronsUp
+  const label = aimBottom ? 'Jump to bottom' : 'Jump to top'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-zinc-200/60 bg-white/95 shadow-sm backdrop-blur text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 transition-colors text-[12px]"
+    >
+      <Icon className="w-4 h-4" />
+      <span>{aimBottom ? 'Bottom' : 'Top'}</span>
+    </button>
   )
 }
